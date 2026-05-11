@@ -91,8 +91,12 @@ Optional argument: `--force` (overwrite existing template files; does
      "${CLAUDE_PLUGIN_ROOT}/bin/solid-gemc-run" build
    ```
    - `clone` no-ops if `solid_gemc/.git` already exists.
-   - `build` runs both `scons OPT=1 -j4` invocations
-     (`solid_gemc/mod/gemc/2.9/` first, then `solid_gemc/source/2.9/`).
+   - `build` runs two `scons` invocations:
+     `solid_gemc/mod/gemc/2.9/` with **`scons OPT=1 LIBRARY=shared -j4`**
+     (the `LIBRARY=shared` flag is required — `mod/gemc/2.9/SConstruct`
+     gates `libgemc.so` behind it; without it scons builds only the
+     per-module `.a` archives and `source/2.9` then fails to link),
+     then `solid_gemc/source/2.9/` with `scons OPT=1 -j4`.
      First-run is several minutes; later runs only rebuild changed
      sources.
 

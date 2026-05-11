@@ -193,8 +193,13 @@ cmd_build() {
   [[ -d "${solid_dir}" ]] \
     || die "missing ${solid_dir} — solid_gemc layout may have changed?"
 
+  # LIBRARY=shared is REQUIRED — mod/gemc/2.9/SConstruct gates libgemc.so
+  # behind it. Without LIBRARY=shared, scons builds only the per-module
+  # .a static archives and never produces libgemc.so; the downstream
+  # source/2.9 link then fails with `cannot find -lgemc`. source/2.9
+  # doesn't need its own LIBRARY flag (the gate there is commented out).
   log "building GEMC library at ${gemc_dir}"
-  in_container "cd ${gemc_dir} && scons OPT=1 -j4"
+  in_container "cd ${gemc_dir} && scons OPT=1 LIBRARY=shared -j4"
   log "building solid_gemc at ${solid_dir}"
   in_container "cd ${solid_dir} && scons OPT=1 -j4"
   log "build complete: ${solid_dir}/solid_gemc"
