@@ -12,9 +12,11 @@ analysis runs on the host with [`uproot`](https://github.com/scikit-hep/uproot5)
 ## Requirements
 
 - [apptainer](https://apptainer.org) ≥ 1.4 on Linux.
-- `wget`, `git`, `tcsh` on the host.
+- `wget`, `git` on the host. (No host-side `tcsh` needed — the
+  wrapper invokes `tcsh` *inside* the container.)
 - Python 3.9+ with `uproot numpy matplotlib` (only for the analyze step).
-- ~5 GB of disk for the cached JLabCE 2.5 image.
+- ~1.7 GB of disk for the cached JLabCE 2.5 image, plus ~1 GB for
+  the cloned + built solid_gemc tree per workspace.
 - Claude Code with plugin support.
 
 The plugin downloads

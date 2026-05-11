@@ -8,13 +8,14 @@ namespace lookup.
 
 **Run this before tagging any release.** ~15 minutes once the
 container is cached + `solid_gemc` is built (otherwise add the
-multi-GB `.sif` pull + ~5–10 min for two scons builds).
+~1.7 GB `.sif` pull + ~5–10 min for two scons builds).
 
 ## Prerequisites
 
-- A host with `apptainer`, `wget`, `git`, `tcsh`, `python3` on PATH.
+- A host with `apptainer`, `wget`, `git`, `python3` on PATH.
+  (`tcsh` runs *inside* the container, not on the host.)
 - Claude Code with the plugin marketplace feature enabled.
-- ~5 GB of free disk for the cached `.sif` if a fresh pull is needed,
+- ~1.7 GB of free disk for the cached `.sif` if a fresh pull is needed,
   plus ~1 GB for a fresh `solid_gemc` clone.
 - Either:
   - **(preferred)** the plugin not installed yet on this host — phases
@@ -81,7 +82,7 @@ In Claude Code:
 ```
 
 Pass:
-- Tool checks succeed for `apptainer`, `git`, `wget`, `tcsh`.
+- Tool checks succeed for `apptainer`, `git`, `wget`.
 - Workspace skeleton appears: `CLAUDE.md`, `.gitignore`, `log.md`,
   `result.md`, `gcards/`, `runs/`, `analysis/` (with `.gitkeep`
   placeholders).

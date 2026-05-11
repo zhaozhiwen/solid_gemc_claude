@@ -11,7 +11,7 @@
 # Usage:
 #   tests/clean-smoke.sh
 #       Fresh state. Needs the .sif and solid_gemc tree from scratch:
-#       ~5 GB wget pull (Duke webhome) + ~5–10 min for two scons builds.
+#       ~1.7 GB wget pull (Duke webhome) + ~5–10 min for two scons builds.
 #
 #   SGC_REUSE_SIF=/abs/path/to/<pinned-name>.sif tests/clean-smoke.sh
 #       Symlinks an existing .sif into the sandbox to skip the wget pull.
@@ -20,7 +20,8 @@
 #       Symlinks an existing built solid_gemc tree to skip the clone +
 #       scons builds. Both reuse vars stack.
 #
-# Requires: apptainer, bash >= 4, git, wget, tcsh, python3.
+# Requires: apptainer, bash >= 4, git, wget, python3.
+# (tcsh runs inside the container, not on the host.)
 # Optional: python3 with uproot+numpy+matplotlib (the plugin's venv at
 #           ${CLAUDE_PLUGIN_DATA}/venv will be used if present). Without
 #           them, the analyze step is skipped (the rest still runs).
@@ -42,8 +43,8 @@ require bash
 require apptainer
 require git
 require wget
-require tcsh
 require python3
+# Note: tcsh is needed *inside* the container, not on the host.
 
 # --- sandbox ----------------------------------------------------------------
 SCRATCH=$(mktemp -d -t sgc-smoke.XXXXXX)

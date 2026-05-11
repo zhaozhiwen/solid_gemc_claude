@@ -8,9 +8,10 @@ allowed-tools: Bash, Read, Write, Glob, AskUserQuestion
 ## Purpose
 
 Set up a fresh solid_gemc simulation workspace in the user's current
-working directory. First run is **slow** — multi-GB `.sif` download,
-git clone of `JeffersonLab/solid_gemc`, and two `scons` builds inside
-the container. Subsequent runs are idempotent: already-done steps are
+working directory. First run is **slow** — ~1.7 GB `.sif` download
+(JLabCE 2.5 from the Duke webhome), `git clone` of
+`JeffersonLab/solid_gemc`, and two `scons` builds inside the
+container. Subsequent runs are idempotent: already-done steps are
 skipped.
 
 After init: empty `gcards/`, `runs/`, `analysis/` plus a built
@@ -28,10 +29,11 @@ Optional argument: `--force` (overwrite existing template files; does
 ## Steps
 
 1. **Confirm environment.** Required host tools: `apptainer`, `git`,
-   `wget`, `tcsh`. Stop if anything is missing — tell the user what to
+   `wget`. (`tcsh` runs *inside* the container — it doesn't need to be
+   on the host.) Stop if anything is missing — tell the user what to
    install. Do not proceed.
    ```bash
-   for tool in apptainer git wget tcsh; do
+   for tool in apptainer git wget; do
      command -v "$tool" >/dev/null \
        || { echo "[solid-gemc-init] missing host tool: $tool"; exit 1; }
    done
@@ -75,7 +77,7 @@ Optional argument: `--force` (overwrite existing template files; does
    SOLID_GEMC_CLAUDE_CACHE="${CLAUDE_PLUGIN_DATA}/cache" \
      "${CLAUDE_PLUGIN_ROOT}/bin/solid-gemc-run" pull
    ```
-   First-run downloads the JLabCE 2.5 `.sif` (~5 GB) from
+   First-run downloads the JLabCE 2.5 `.sif` (~1.7 GB) from
    `webhome.phy.duke.edu/~zz81/simg/` into
    `${CLAUDE_PLUGIN_DATA}/cache/sif/`. Reruns no-op if the file is
    already present.
@@ -135,7 +137,7 @@ Optional argument: `--force` (overwrite existing template files; does
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| `missing host tool: apptainer / git / wget / tcsh` | Required host tool not installed. | Install it; rerun. |
+| `missing host tool: apptainer / git / wget` | Required host tool not installed. | Install it; rerun. |
 | `wget` fails on the .sif URL | Network or Duke webhome unreachable. | Retry. Workaround: mirror the `.sif` locally with `wget`, drop it at `${CLAUDE_PLUGIN_DATA}/cache/sif/<pinned-name>.sif`, rerun. |
 | `git clone` fails | Network or GitHub unreachable. | Retry. |
 | `scons` fails at `mod/gemc/2.9` or `source/2.9` | Upstream solid_gemc broken on HEAD of master, or the layout changed and `GEMC_VERSION` in `bin/solid-gemc-run` is stale. | First try `cd solid_gemc && git log --oneline -10` to spot a recent breaking commit; pin with `git checkout <earlier-SHA>` and re-run `bin/solid-gemc-run build`. If `mod/gemc/<v>` no longer exists, bump `GEMC_VERSION` in `bin/solid-gemc-run`. |

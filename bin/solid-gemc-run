@@ -75,7 +75,7 @@ ensure_sif() {
   mkdir -p "${SIF_DIR}"
   log "downloading ${SIF_URL}"
   log "  -> ${SIF_PATH}"
-  log "  (multi-GB .sif; first pull can take several minutes)"
+  log "  (~1.7 GB .sif; first pull can take several minutes)"
   local tmp="${SIF_PATH}.part"
   if ! wget --show-progress -O "${tmp}" "${SIF_URL}"; then
     rm -f "${tmp}"
