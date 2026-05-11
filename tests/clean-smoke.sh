@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # tests/clean-smoke.sh — plumbing smoke test for solid-gemc-claude.
 #
-# Exercises bin/solid-gemc-run + the workspace template + the four-step
-# config/run/analyze pipeline against a sandboxed CLAUDE_PLUGIN_DATA.
+# Exercises bin/solid-gemc-run + the workspace template + the simulation
+# loop the orchestrator skill drives (gcard prep + solid_gemc +
+# evio2root) + the analyze step, against a sandboxed CLAUDE_PLUGIN_DATA.
 # Does NOT go through Claude Code, so it does not test slash-command
-# dispatch, the SessionStart hook, MCP approval, or AskUserQuestion —
+# dispatch, the SessionStart hook, MCP approval, the skill's
+# AskUserQuestion gate, or the orchestrator's NL-trigger auto-load —
 # see tests/CLEAN-INSTALL-CHECKLIST.md for the manual flow that covers
 # those.
 #
@@ -115,8 +117,13 @@ fi
   || fail "solid_gemc binary missing at solid_gemc/source/2.9/solid_gemc"
 pass "solid_gemc binary present"
 
-# --- phase 3: config equivalent (cherenkov.gcard) ---------------------------
-log "phase 3 — config cherenkov (small, fast, self-contained)"
+# --- phase 3: gcard prep (cherenkov.gcard) ----------------------------------
+# Mirrors the skill's "prepare the GCard" sub-step: resolve the preset,
+# copy from upstream, apply batch overrides on the live <gcard> block,
+# write a sidecar recording the source dir for cwd-relative geometry
+# lookup at run time. The sidecar is bookkeeping inside the smoke test;
+# the skill carries the same info in its own state.
+log "phase 3 — prepare cherenkov.gcard (small, fast, self-contained)"
 PRESET=cherenkov
 SRC=$(find solid_gemc/analysis -mindepth 2 -maxdepth 2 -name "${PRESET}.gcard" 2>/dev/null | head -1)
 [[ -n "$SRC" ]] || fail "${PRESET}.gcard not found under solid_gemc/analysis/"
@@ -148,7 +155,11 @@ grep -q '<option name="N" value="2"/>'                     "${DEST}" || fail "co
 grep -q '<option name="USE_GUI" value="0"/>'               "${DEST}" || fail "config: USE_GUI override missing"
 pass "cherenkov.gcard configured (2 events, USE_GUI=0, OUTPUT=evio,out.evio)"
 
-# --- phase 4: run equivalent (gemc + evio2root) -----------------------------
+# --- phase 4: run (gemc + evio2root) ----------------------------------------
+# Mirrors the skill's "run gemc + evio2root" sub-step. The cd into
+# $SOURCE_DIR is the cwd-relative-geometry-lookup discipline; absolute
+# GCARD_ABS / RUN_DIR_ABS paths are how we keep the workspace dirs in
+# scope from a different cwd.
 log "phase 4 — run gemc + evio2root (N=2 events, ~10 s)"
 RUN_ID=$(date -u +%Y%m%d-%H%M%S)-$(head -c 12 /dev/urandom | base32 | tr 'A-Z' 'a-z' | head -c 6)
 RUN_DIR="runs/${RUN_ID}"

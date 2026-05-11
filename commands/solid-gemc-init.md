@@ -114,21 +114,24 @@ Optional argument: `--force` (overwrite existing template files; does
    - workspace files written under `cwd`,
    - .sif cached at `${CLAUDE_PLUGIN_DATA}/cache/sif/`,
    - `solid_gemc` commit cloned + binary built,
-   - **what to try first** — recommend the upstream HGC study
-     (canonical config+run+analyze example) and point at the
-     detector-authoring example as a parallel reference:
+   - **what to try first** — the upstream HGC study is the canonical
+     config + run + analyze worked example. Two ways in:
      ```text
+     # Path A — let the orchestrator skill drive it:
+     # just describe what you want, e.g. "run the heavy-gas Cherenkov study on He-3".
+     # The skill copies an hgc_study GCard into gcards/, runs solid_gemc + evio2root,
+     # then hands off to /solid-gemc-claude:solid-gemc-analyze.
+
+     # Path B — follow upstream's flow directly:
      bin/solid-gemc-run shell
      # then inside the container:
      cd solid_gemc/analysis/hgc_study     # GCards + run.sh + analysis.C
-     # detector-authoring reference (Perl generators + factory text files):
-     #   solid_gemc/geometry/hgc_moved/   (see its readme.md)
      ```
-     Mention the plugin's own loop as the alternative:
-     `/solid-gemc-claude:solid-gemc-config <preset>` →
-     edit `gcards/<preset>.gcard` →
-     `/solid-gemc-claude:solid-gemc-run --gcard gcards/<preset>.gcard` →
-     `/solid-gemc-claude:solid-gemc-analyze runs/<id>`.
+     Mention the detector-authoring example as a parallel reference:
+     `solid_gemc/geometry/hgc_moved/` (Perl generators + factory text
+     files; see its `readme.md`). The plugin does not ship a
+     detector-authoring command — follow upstream's pattern for that
+     work.
 
 ## Outputs
 

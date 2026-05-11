@@ -6,8 +6,10 @@ commands. solid_gemc, GEMC, Geant4, and ROOT all live in a pinned
 [JLabCE 2.5](https://github.com/JeffersonLab/solid_release) apptainer image;
 analysis runs on the host with [`uproot`](https://github.com/scikit-hep/uproot5).
 
-> **Status: v0.0.1, pre-release.** Plugin scaffolding only. Slash commands
-> not yet shipped. See `PLAN.md` and `CLAUDE.md` for design intent.
+> **Status: v0.0.2.** Two slash commands shipped (`init`, `analyze`);
+> the orchestrator skill drives the simulation loop in between. See
+> `CLAUDE.md` for design intent; `PLAN.md` is the superseded original
+> plan, retained for historical context.
 
 ## Requirements
 
@@ -30,14 +32,20 @@ on first use; URL is pinned in [`bin/solid-gemc-run`](bin/solid-gemc-run).
 /plugin install solid-gemc-claude@solid-gemc-claude
 ```
 
-## Planned slash commands
+## Slash commands
 
 | Command | Purpose |
 |---|---|
-| `/solid-gemc-claude:solid-gemc-init` | Pull .sif, clone solid_gemc, run both scons builds, scaffold workspace. |
-| `/solid-gemc-claude:solid-gemc-config <preset>` | Copy a canonical GCard from `$SoLID_GEMC/script/` into `gcards/`. |
-| `/solid-gemc-claude:solid-gemc-run --gcard <path>` | Run `solid_gemc <gcard>` inside container (writes `out.evio`), then auto-convert to `out.root` via `evio2root`. Provenance captured. |
+| `/solid-gemc-claude:solid-gemc-init` | Pull .sif, clone solid_gemc, run both scons builds, scaffold workspace. One-shot bootstrap. |
 | `/solid-gemc-claude:solid-gemc-analyze runs/<id>` | uproot-based default plots from `out.root` (the post-converted file). |
+
+The workflow **between** init and analyze (pick a GCard, run
+`solid_gemc`, convert EVIO → ROOT, record provenance) is driven by the
+`solid-gemc` orchestrator skill — auto-loads on SoLID-flavored natural
+language ("run a PVDIS LD2 study at 11 GeV") and gap-checks against a
+six-field spec before executing. Users who want upstream's pattern
+directly can `bin/solid-gemc-run shell` and follow
+`solid_gemc/analysis/hgc_study/run.sh`.
 
 ## First-run flow (after `solid-gemc-init`)
 
@@ -56,7 +64,7 @@ then `./run.sh`. For detector authoring: edit the `.pl` in
 `solid_gemc/geometry/hgc_moved/`, regenerate, run gemc against your new
 detector.
 
-## Known limitations (v0.0.1)
+## Known limitations (v0.0.2)
 
 - The .sif is hosted at a personal Duke webhome
   (`http://webhome.phy.duke.edu/~zz81/simg/`). No SLA, may move. Mirror

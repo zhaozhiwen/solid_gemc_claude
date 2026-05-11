@@ -7,12 +7,14 @@ allowed-tools: Bash, Read, Write, Glob
 
 ## Purpose
 
-Open the ROOT file produced by `/solid-gemc-claude:solid-gemc-run`,
-report the schema (TTrees, branches, entry counts), and emit a set
-of default plots into the same `runs/<id>/` directory. Schema-aware:
-no canned "this is what solid_gemc outputs" assumption — whatever
-branches actually exist get histogrammed (numeric ones) or summarized
-(non-numeric).
+Open the ROOT file produced by an earlier simulation run (driven by
+the `solid-gemc` orchestrator skill, by upstream's
+`hgc_study/run.sh`, or by a hand-written invocation of
+`bin/solid-gemc-run exec "solid_gemc ..."`), report the schema
+(TTrees, branches, entry counts), and emit a set of default plots
+into the same `runs/<id>/` directory. Schema-aware: no canned "this
+is what solid_gemc outputs" assumption — whatever branches actually
+exist get histogrammed (numeric ones) or summarized (non-numeric).
 
 For custom analysis (asymmetries, kinematic cuts, multi-run
 comparisons), the user writes a Python script in `analysis/` and reads

@@ -1,5 +1,27 @@
 # Ship `solid_gemc_claude` as a separate plugin
 
+> **Historical — superseded.** This is the original plan from before
+> the solid_gemc scope pivot. The post-pivot design lives in
+> `CLAUDE.md` + the per-phase entries in `BUILD_LOG.md` (the latter is
+> the maintainer's chronological build log). Notable items below that
+> no longer hold:
+>
+> - The `solid-gemc-detector` / `solid-gemc-gcard` / `solid-gemc-example`
+>   commands were never built — `detector` and `gcard` (NL → factory /
+>   GCard generation) are deferred past v0.0.1; `example` was replaced
+>   by pointing users at the upstream HGC study.
+> - The `solid-gemc-config` and `solid-gemc-run` commands existed
+>   briefly (phases 3.x) then got removed in phase 7 in favor of the
+>   `solid-gemc` orchestrator skill driving the same loop directly.
+>   The shipped v0.0.1 slash surface is just `init` + `analyze`.
+> - The image is JLabCE 2.5 from the Duke webhome (not `ghcr.io/gemc/*`);
+>   `bin/solid-gemc-run` keeps a `build` subcommand (two scons compiles)
+>   because solid_gemc must be compiled on top of the JLabCE image,
+>   not pre-built.
+>
+> Read `CLAUDE.md` and `BUILD_LOG.md` first; consult this file only for
+> historical context.
+
 ## Context
 
 GEMC (`github.com/gemc/gemc`) is a Geant4 wrapper widely used in JLab

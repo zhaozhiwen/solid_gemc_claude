@@ -1,22 +1,31 @@
 ---
 name: solid-gemc
-description: Orchestrate the full solid_gemc (SoLID experiment) simulation flow from a single natural-language user request. Load whenever the user asks to "simulate", "run", "do a SoLID / solid_gemc / PVDIS / SIDIS / J/psi / He-3 / heavy-gas Cherenkov" study — including one-shot setups like "PVDIS A_PV asymmetry on LD2 at 11 GeV" or "SIDIS heavy-gas Cherenkov yield on He-3". Captures the physics spec across six fields, asks targeted clarifying questions when something required is missing, presents a brief plan for approval, then drives `solid-gemc-init → solid-gemc-config → solid-gemc-run → solid-gemc-analyze` in sequence with post-condition checks.
+description: Orchestrate the full solid_gemc (SoLID experiment) simulation flow from a single natural-language user request. Load whenever the user asks to "simulate", "run", "do a SoLID / solid_gemc / PVDIS / SIDIS / J/psi / He-3 / heavy-gas Cherenkov" study — including one-shot setups like "PVDIS A_PV asymmetry on LD2 at 11 GeV" or "SIDIS heavy-gas Cherenkov yield on He-3". Captures the physics spec across six fields, asks targeted clarifying questions when something required is missing, presents a brief plan for approval, then drives the run end-to-end: `/solid-gemc-claude:solid-gemc-init` (one-shot bootstrap), then a `bin/solid-gemc-run` driven simulation (the skill writes the GCard edits, runs `solid_gemc` + `evio2root` inside the container, records provenance), then `/solid-gemc-claude:solid-gemc-analyze` for host-side uproot plots.
 ---
 
 # solid-gemc — full-flow orchestrator
 
 Use this skill the moment the user asks for a SoLID-flavored
 simulation. It is the front door for everything else this plugin
-does. The four core slash commands
-(`/solid-gemc-claude:solid-gemc-init`, `…config`, `…run`, `…analyze`)
-are the *steps*; this skill is the *director* that turns
-"simulate PVDIS A_PV on LD2" into a planned sequence of those steps
-the user has approved.
+does. The plugin's slash-command surface is intentionally small —
+`/solid-gemc-claude:solid-gemc-init` (bootstrap) and
+`/solid-gemc-claude:solid-gemc-analyze` (host-side uproot plots).
+**Everything in between is this skill's job**, driving
+`bin/solid-gemc-run` directly. This keeps the plugin a thin wrapper
+around upstream `solid_gemc` (which already ships canonical GCards,
+`hgc_study/run.sh`, and `hgc_moved/` for detector authoring) instead
+of duplicating that workflow as more slash commands.
 
 The default flow this skill drives:
 
 ```
-init  →  config  →  (optionally edit gcards/<preset>.gcard)  →  run  →  analyze
+init                                       (one-shot per workspace)
+  → pick a GCard from solid_gemc/script/   (canonical) or solid_gemc/analysis/*/
+  → copy to gcards/<preset>.gcard + apply batch overrides (in-skill, not a slash command)
+  → bin/solid-gemc-run exec "solid_gemc <gcard>"  (run gemc; emits out.evio)
+  → bin/solid-gemc-run exec "evio2root -INPUTF=out.evio"  (post-convert)
+  → write runs/<id>/{gcard.gcard, out.evio, out.root, log.txt, config.json}
+  → /solid-gemc-claude:solid-gemc-analyze runs/<id>   (host-side uproot)
 ```
 
 `init` is one-shot per workspace — if `solid_gemc/` already has a
@@ -25,8 +34,8 @@ built binary and the `.sif` is cached, skip step 1.
 There is no bring-your-own-binary alternative for solid_gemc. If the
 user needs something the canonical configs don't cover, the
 divergence point is **the GCard** — they pick a closer canonical and
-edit it, or they hand-author one. The binary, the geometry tree, and
-the physics list all come from upstream solid_gemc.
+edit it, or hand-author one. The binary, the geometry tree, and the
+physics list all come from upstream solid_gemc.
 
 ## When to load this skill
 
@@ -41,21 +50,21 @@ Trigger on any of:
   SPD, baffle) without "solid_gemc" named explicitly.
 - "where do I start?" inside a workspace scaffolded by this plugin.
 - The upstream HGC study: "run the heavy-gas Cherenkov study from
-  solid_gemc/analysis/hgc_study". That uses the same flow with
-  `config` pointing at one of the hgc_study GCards (or the user can
-  follow upstream's `run.sh` via `bin/solid-gemc-run shell` instead —
-  call out both paths in the plan).
+  solid_gemc/analysis/hgc_study". That is the canonical worked
+  example — use one of its GCards as the preset; if the user just
+  wants to follow upstream's `run.sh` verbatim, recommend
+  `bin/solid-gemc-run shell` and skip the skill flow.
 
 Do **not** load this skill when:
 
-- The user is mid-flow and only wants one step ("just copy the
-  PVDIS_LD2 GCard" → `/solid-gemc-claude:solid-gemc-config` alone;
-  "plot runs/<id>" → `…analyze` alone).
+- The user already has a `runs/<id>/out.root` and only wants plots —
+  call `/solid-gemc-claude:solid-gemc-analyze` directly.
 - A previous run is failing and the user wants to debug — that's a
-  debugging task, not a fresh orchestration. Read
-  `runs/<id>/log.txt` + `config.json` and reason from there.
-- The user is iterating on an existing `gcards/<preset>.gcard` for a
-  previous study; use `solid-gemc-run` directly.
+  debugging task, not a fresh orchestration. Read `runs/<id>/log.txt`
+  + `runs/<id>/config.json` and reason from there.
+- The user is iterating on an existing `gcards/<preset>.gcard` and
+  just wants a re-run — execute the run loop in step 3 below
+  directly without re-running the gap-check.
 
 **Co-existence with `geant4_claude/skills/geant4`.** SoLID-specific
 vocabulary (`PVDIS`, `SIDIS`, `solid_gemc`, `J/psi`, `He-3`, the
@@ -76,9 +85,9 @@ whether a default is safe, or whether you must ask.
 | **Physics goal** | What's being measured / counted | "PVDIS A_PV asymmetry vs Q²", "HGC photoelectron yield vs Cherenkov radius", "J/psi recoil acceptance on LH2" |
 | **SoLID config** | Magnet + spectrometer configuration that fixes the geometry | "PVDIS, LD2 target, full magnet config", "SIDIS He-3, heavy-gas Cherenkov in", "J/psi LH2 simple" |
 | **Beam** | Particle, energy, event count | "11 GeV e-, 10000 events" |
-| **GCard** | Preset name from `solid_gemc/script/` (or `solid_gemc/analysis/*/`), with any parameter overrides | `solid_PVDIS_LD2_moved_full.gcard` (canonical), `N=10000`, `OUTPUT=evio,out.evio` |
-| **Output** | ROOT file shape (per-event, per-hit, integrated) — usually defaulted by the GCard. gemc 2.9 writes **EVIO natively** (the build has no ROOT writer); `solid-gemc-run` post-converts to ROOT via `evio2root` so uproot analysis works the same. | `runs/<id>/out.evio` (raw) + `runs/<id>/out.root` (converted) |
-| **Analysis** | Plots / numbers to produce | "auto-histogram all numeric branches", "asymmetry binned in Q²", "PE yield vs radius via custom analysis script" |
+| **GCard** | Preset from `solid_gemc/script/` or `solid_gemc/analysis/*/`, with any parameter overrides | `solid_PVDIS_LD2_moved_full.gcard` (canonical), `N=10000`, `OUTPUT=evio,out.evio` |
+| **Output** | gemc 2.9 writes **EVIO natively** (the build has no ROOT writer); the skill post-converts to ROOT via `evio2root` so uproot analysis works the same. | `runs/<id>/out.evio` (raw) + `runs/<id>/out.root` (converted) |
+| **Analysis** | Plots / numbers to produce | "auto-histogram all numeric branches", "asymmetry binned in Q²", "PE yield vs radius via custom script in `analysis/`" |
 
 ### What must be asked, never guessed
 
@@ -89,7 +98,7 @@ whether a default is safe, or whether you must ask.
   LD2 vs LH2 vs ³He vs NH3 are different targets. Never pick one
   without explicit user choice — list available presets and ask.
 - **Beam energy** if not standard for the chosen config (most SoLID
-  configs assume 11 GeV; flag and ask if user implies otherwise).
+  configs assume 11 GeV; flag and ask if the user implies otherwise).
 
 For each missing required field, ask one focused question via
 `AskUserQuestion` for multi-option fields, or plain prose for
@@ -104,13 +113,13 @@ default is not safe. Don't chain a bunch of guesses together.
   user this in the plan and suggest a production number for the
   follow-up.
 - **OUTPUT format** — `evio,out.evio`. gemc 2.9 in JLabCE 2.5
-  supports only `evio` and `txt` natively (no ROOT writer); the
-  `solid-gemc-run` step post-converts EVIO → ROOT via `evio2root` so
-  `solid-gemc-analyze` reads `out.root` with uproot the same way as
-  any TTree-based file. If the user explicitly asks for `txt` output,
+  supports only `evio` and `txt` natively (no ROOT writer); the skill
+  post-converts EVIO → ROOT via `evio2root` so
+  `solid-gemc-analyze` reads `out.root` the same way as any
+  TTree-based file. If the user explicitly asks for `txt` output,
   warn that `solid-gemc-analyze` can't auto-plot it.
 - **USE_GUI** — always 0 in the orchestrator (batch run). Even if
-  the canonical GCard has `USE_GUI=1`, the `config` step flips it.
+  the canonical GCard has `USE_GUI=1`, the skill flips it.
 - **Physics list, hall material, geometry detail level** — never
   touch; the canonical preset has the right values for its physics.
 
@@ -120,11 +129,18 @@ If the user asks specifically about "heavy-gas Cherenkov study",
 "HGC mirror radius study", "compare He-3 vs NH3 HGC", or anything
 that points at `solid_gemc/analysis/hgc_study/`: that's an upstream
 ready-made workflow with its own `load.sh` / `run.sh` / `analysis.C`.
-Recommend it as the *alternative* path in the plan — `bin/solid-gemc-run
-shell`, then follow upstream's README. The plugin's own flow still
-works (copy the hgc GCards via `config`, run with `solid-gemc-run`,
-analyze with `solid-gemc-analyze`), but the upstream flow has more
-canned comparison plots.
+Two ways in:
+
+- **Skill-driven** — copy one of the hgc GCards into `gcards/`, run
+  through this skill. The `analyze` step gives host-side uproot
+  plots from the EVIO → ROOT conversion.
+- **Upstream-driven** — `bin/solid-gemc-run shell` drops the user
+  into a tcsh prompt with the env set; they `cd
+  solid_gemc/analysis/hgc_study` and run `./run.sh`. Their analysis
+  is upstream's `.C` scripts (run via `bin/solid-gemc-run root <.C>`).
+
+Mention both in the plan when the request maps onto hgc_study; let
+the user pick.
 
 ## Step 2 — Present a brief plan for approval
 
@@ -144,10 +160,12 @@ Spec
 - Analysis:      <auto-plots | custom script in analysis/ | hgc_study upstream>
 
 Steps
-1. /solid-gemc-claude:solid-gemc-init     — workspace + .sif pull + clone + 2× scons (skip if already done)
-2. /solid-gemc-claude:solid-gemc-config <preset>  — copy + override USE_GUI/OUTPUT/N
+1. /solid-gemc-claude:solid-gemc-init    — workspace + .sif pull + clone + 2× scons (skip if already done)
+2. copy gcards/<preset>.gcard from solid_gemc/script/<preset>.gcard (or .../analysis/.../<preset>.gcard); apply USE_GUI=0 + OUTPUT=evio,out.evio + N=<n>
 3. <only if user wants non-default beam/physics:> edit gcards/<preset>.gcard
-4. /solid-gemc-claude:solid-gemc-run --gcard gcards/<preset>.gcard
+4. bin/solid-gemc-run exec "solid_gemc <abs gcard> -OUTPUT=evio,<abs runs>/out.evio"  (from the gcard's upstream dir)
+   then bin/solid-gemc-run exec "evio2root -INPUTF=out.evio"   (from runs/<id>/)
+   write runs/<id>/{gcard.gcard, out.evio, out.root, log.txt, config.json}
 5. /solid-gemc-claude:solid-gemc-analyze runs/<id>
      <one line: auto-plots | custom analysis/<id>.py | container-side ROOT macro>
 
@@ -171,32 +189,172 @@ Wait for the user's choice. Do not start writing files before approval.
 
 ## Step 3 — Execute, in order
 
-Only after the user picks "Approve and run". For each step:
+Only after the user picks "Approve and run". Each sub-step has a
+post-condition check; if it fails, stop and report.
 
-1. Run it.
-2. Check its post-condition before moving on:
-   - `init` → `CLAUDE.md`, `.gitignore`, `log.md`, `result.md`,
-     `gcards/`, `runs/`, `analysis/` exist; `.sif` cached;
-     `solid_gemc/source/2.9/solid_gemc` exists and is executable.
-   - `config` → `gcards/<preset>.gcard` exists; the file contains
-     live `<option name="OUTPUT" .../>`, `<option name="N" .../>`,
-     `<option name="USE_GUI" value="0"/>` inside the `<gcard>` block;
-     `bin/solid-gemc-run validate-gcard` returns 0.
-   - `run` → `runs/<id>/{gcard.gcard, out.evio, out.root, log.txt,
-     config.json}` exist; `config.json` `exit_code` is 0; both
-     `out.evio` and `out.root` are non-empty.
-   - `analyze` → expected PNGs under `runs/<id>/`, or — for
-     histogram-only output files — the schema summary lists ≥1
-     histogram (the analyze command will say so).
-3. If a step fails, **stop**. Report the failure (last 20 lines of
-   `runs/<id>/log.txt` or the command's stderr) and ask the user how
-   to proceed. Do not silently retry, do not paper over the error,
-   do not move to the next step.
+### 3a. `init` if needed
 
-Maintain the workspace's handoff documents per the rule in
-`templates/workspace/CLAUDE.md` non-negotiable #6 — that file is the
-authoritative spec; this skill just reminds you to apply it. The
-orchestrator slice:
+```bash
+if [[ ! -x solid_gemc/source/2.9/solid_gemc ]]; then
+  echo "Running /solid-gemc-claude:solid-gemc-init"  # or invoke directly
+fi
+```
+
+Post-condition: `solid_gemc/source/2.9/solid_gemc` exists and is
+executable; `.sif` is cached; `gcards/`, `runs/`, `analysis/` dirs exist.
+
+### 3b. Prepare the GCard
+
+Resolve the preset against `solid_gemc/script/` first, then
+`solid_gemc/analysis/*/`. Copy to `gcards/<preset>.gcard`. Apply
+batch overrides **only inside the live `<gcard>…</gcard>` block**
+(canonicals often carry a `<!-- comment out … -->` example block;
+leave it alone). The robust regex strips any existing `OUTPUT` / `N`
+/ `USE_GUI` lines (the `name="USE_GUI"  value=...` double-space
+variant in some canonicals is matched by `[^>]*`), then appends the
+overrides at the bottom of the live block:
+
+```bash
+PRESET=<resolved>
+SRC=<solid_gemc/script/solid_${PRESET}.gcard or under solid_gemc/analysis/*/>
+DEST="gcards/$(basename "$SRC")"
+SOURCE_DIR=$(dirname "$SRC")   # needed at run time; gemc 2.9 resolves <detector name="..."> relative to cwd, not the GCard's location
+
+cp "$SRC" "$DEST"
+python3 - "$DEST" "${N_EVENTS:-100}" "out.evio" "0" <<'PY'
+import re, sys, pathlib
+path, n_events, output_name, gui_keep = sys.argv[1:5]
+strip_keys = ['OUTPUT', 'N'] + ([] if gui_keep == '1' else ['USE_GUI'])
+text = pathlib.Path(path).read_text()
+m = re.search(r'(<gcard>)(.*?)(</gcard>)', text, re.DOTALL)
+if not m:
+    sys.exit(f"[skill] no <gcard>...</gcard> block in {path}")
+head, body, tail = m.groups()
+body = re.sub(
+    r'^[ \t]*<option name="(' + '|'.join(strip_keys) + r')"[^>]*/>[ \t]*\n',
+    '', body, flags=re.MULTILINE)
+adds = [
+    f'<option name="OUTPUT" value="evio,{output_name}"/>',
+    f'<option name="N" value="{n_events}"/>',
+]
+if gui_keep != '1':
+    adds.append('<option name="USE_GUI" value="0"/>')
+new_body = body.rstrip() + '\n' + '\n'.join(adds) + '\n'
+pathlib.Path(path).write_text(text[:m.start(2)] + new_body + text[m.end(2):])
+PY
+
+SOLID_GEMC_CLAUDE_CACHE="${CLAUDE_PLUGIN_DATA}/cache" \
+  "${CLAUDE_PLUGIN_ROOT}/bin/solid-gemc-run" validate-gcard "$DEST"
+```
+
+Post-condition: `gcards/<preset>.gcard` exists; the live `<gcard>`
+block contains the three overrides; `validate-gcard` returns 0.
+
+### 3c. Run gemc + evio2root
+
+Two important disciplines: (1) **cwd-relative geometry lookup** —
+gemc 2.9 resolves `<detector name="…">` from the process cwd, not
+from the GCard's path, so we `cd "$SOURCE_DIR"` (the dir holding the
+canonical's geometry siblings) before invoking `solid_gemc`. (2)
+**Absolute paths** for the GCard and OUTPUT, since cwd has changed.
+Pipe-exit-code capture is portable across bash and zsh via a
+tempfile (the harness shell may be either).
+
+```bash
+RUN_ID=$(date -u +%Y%m%d-%H%M%S)-$(head -c 12 /dev/urandom | base32 | tr 'A-Z' 'a-z' | head -c 6)
+RUN_DIR="runs/${RUN_ID}"
+mkdir -p "$RUN_DIR"
+cp "$DEST" "$RUN_DIR/gcard.gcard"
+
+WORKSPACE_ABS=$(readlink -f .)
+RUN_DIR_ABS="${WORKSPACE_ABS}/${RUN_DIR}"
+GCARD_ABS="${WORKSPACE_ABS}/${RUN_DIR}/gcard.gcard"
+
+START_ISO=$(date -u +%Y-%m-%dT%H:%M:%SZ); START_EPOCH=$(date +%s)
+
+GEMC_EC_FILE=$(mktemp)
+( cd "$SOURCE_DIR" && \
+  SoLID_GEMC="${WORKSPACE_ABS}/solid_gemc" \
+  SOLID_GEMC_CLAUDE_CACHE="${CLAUDE_PLUGIN_DATA}/cache" \
+    "${CLAUDE_PLUGIN_ROOT}/bin/solid-gemc-run" exec \
+      "solid_gemc '${GCARD_ABS}' -OUTPUT='evio,${RUN_DIR_ABS}/out.evio'"; \
+  echo $? > "${GEMC_EC_FILE}" ) 2>&1 | tee "${RUN_DIR_ABS}/log.txt"
+GEMC_EXIT=$(cat "${GEMC_EC_FILE}"); rm -f "${GEMC_EC_FILE}"
+
+EVIO2ROOT_EXIT=0
+if [[ "$GEMC_EXIT" = "0" && -f "${RUN_DIR_ABS}/out.evio" ]]; then
+  EVIO_EC_FILE=$(mktemp)
+  ( cd "$RUN_DIR_ABS" && \
+    SoLID_GEMC="${WORKSPACE_ABS}/solid_gemc" \
+    SOLID_GEMC_CLAUDE_CACHE="${CLAUDE_PLUGIN_DATA}/cache" \
+      "${CLAUDE_PLUGIN_ROOT}/bin/solid-gemc-run" exec \
+        "evio2root -INPUTF=out.evio"; \
+    echo $? > "${EVIO_EC_FILE}" ) 2>&1 | tee -a "${RUN_DIR_ABS}/log.txt"
+  EVIO2ROOT_EXIT=$(cat "${EVIO_EC_FILE}"); rm -f "${EVIO_EC_FILE}"
+fi
+END_ISO=$(date -u +%Y-%m-%dT%H:%M:%SZ); END_EPOCH=$(date +%s)
+EXIT_CODE=$([ "$GEMC_EXIT" = "0" ] && echo "$EVIO2ROOT_EXIT" || echo "$GEMC_EXIT")
+```
+
+Post-condition: `runs/<id>/{gcard.gcard, out.evio, out.root,
+log.txt}` exist and are non-empty; `EXIT_CODE` is 0.
+
+### 3d. Write the provenance `config.json`
+
+```bash
+SIF_NAME=$(grep '^SIF_NAME=' "${CLAUDE_PLUGIN_ROOT}/bin/solid-gemc-run" | head -1 | cut -d'"' -f2)
+SOLID_GEMC_SHA=$(cd solid_gemc && git rev-parse HEAD 2>/dev/null || echo unknown)
+GEMC_VERSION_PINNED=$(grep '^GEMC_VERSION=' "${CLAUDE_PLUGIN_ROOT}/bin/solid-gemc-run" | head -1 | cut -d'"' -f2)
+N_EVENTS=$(grep -oE '<option name="N" value="[^"]+"' "$RUN_DIR/gcard.gcard" | head -1 | sed 's/.*value="//; s/"$//')
+
+python3 - "$RUN_DIR/config.json" <<PY
+import json, sys, pathlib
+d = {
+  "run_id":           "${RUN_ID}",
+  "gcard_source":     "${DEST}",
+  "gcard_frozen":     "${RUN_DIR}/gcard.gcard",
+  "source_dir":       "${SOURCE_DIR}",
+  "n_events":         "${N_EVENTS}",
+  "sif_name":         "${SIF_NAME}",
+  "solid_gemc_repo":  "https://github.com/JeffersonLab/solid_gemc",
+  "solid_gemc_sha":   "${SOLID_GEMC_SHA}",
+  "gemc_version":     "${GEMC_VERSION_PINNED}",
+  "start_utc":        "${START_ISO}",
+  "end_utc":          "${END_ISO}",
+  "wall_seconds":     ${END_EPOCH} - ${START_EPOCH},
+  "gemc_exit_code":   ${GEMC_EXIT},
+  "evio2root_exit":   ${EVIO2ROOT_EXIT},
+  "exit_code":        ${EXIT_CODE},
+  "command":          "solid_gemc <gcard> -OUTPUT=evio,<run>/out.evio; evio2root -INPUTF=out.evio",
+  "cwd_gemc":         "${SOURCE_DIR}",
+  "cwd_evio2root":    "${RUN_DIR}",
+}
+pathlib.Path(sys.argv[1]).write_text(json.dumps(d, indent=2) + "\n")
+PY
+```
+
+`runs/<id>/config.json` is the **provenance record**. Treat
+`runs/<id>/` as immutable from this point on.
+
+### 3e. Analyze
+
+Hand off to `/solid-gemc-claude:solid-gemc-analyze runs/<id>` —
+host-side uproot, auto-plots numeric branches into PNGs alongside
+`out.root`. For asymmetries / fits / multi-run comparisons, write a
+script under `analysis/`.
+
+### Failure handling
+
+If a sub-step's post-condition check fails, **stop**. Report the
+failure (last 20 lines of `runs/<id>/log.txt` or the command's
+stderr) and ask the user how to proceed. Do not silently retry, do
+not paper over the error, do not move to the next step.
+
+### Handoff documents
+
+Maintain the workspace's `log.md` and `result.md` per the rule in
+`templates/workspace/CLAUDE.md` non-negotiable #6. The orchestrator
+slice:
 
 - Capture the user's **original request verbatim** (don't paraphrase
   — future readers need to tell what was asked vs. what was inferred).
@@ -233,19 +391,22 @@ the plan — the plots and numbers are the recap.
 ## Cross-references
 
 - `commands/solid-gemc-init.md` — workspace + image + clone + build.
-- `commands/solid-gemc-config.md` — canonical GCard → workspace
-  `gcards/`, with batch + EVIO-output overrides + a `.source` sidecar
-  for cwd-relative geometry loading at run time.
-- `commands/solid-gemc-run.md` — fires `solid_gemc <gcard>` inside
-  the container; writes provenance.
 - `commands/solid-gemc-analyze.md` — uproot inspect + auto-plot
   TTrees, enumerate pre-built histograms.
+- `bin/solid-gemc-run` — the maintainer-side wrapper this skill
+  drives via `exec`, `validate-gcard`, `shell`, `root`. Single seam
+  for everything that needs the JLabCE 2.5 container.
 - `templates/workspace/CLAUDE.md` — the rules that apply once the
   workspace is scaffolded; loaded into Claude's context for every
   subsequent action in the workspace.
 - `https://gemc.jlab.org` — GCard option reference (`BEAM_P`,
   `PHYSICS`, `OUTPUT`, `N`, …) for any user request that needs
-  non-canonical overrides.
+  non-canonical overrides. Plugin-local mirror of the SoLID-side
+  "how to use gemc" guide lives in `reference/gemc_simulation_general_note.md`.
+- `reference/gemc.md` and `reference/solid_gemc.md` — source-level
+  digests of the gemc 2.9 framework and the SoLID hit processors.
+  Consult when a user hits an unexpected behavior in geometry
+  loading, hit-processor output, build flags, or option overrides.
 - Upstream `solid_gemc/analysis/hgc_study/` — the ready-made HGC
   study workflow (canonical worked example for **config + run +
   analyze**). GCards + `run.sh` + ROOT analysis scripts. Recommended
@@ -256,4 +417,4 @@ the plan — the plots and numbers are the recap.
   `<detector name="..." factory="TEXT" ...>`). Has a `readme.md` plus
   the full Perl-generator → text-file pipeline. If a user needs to
   write a new detector, point them here. The plugin doesn't ship a
-  detector-authoring slash command at v0.0.1.
+  detector-authoring slash command at v0.0.2.

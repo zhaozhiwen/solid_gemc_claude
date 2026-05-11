@@ -4,10 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repo state
 
-v0.0.1 in progress. **Phase 0 (plugin scaffolding) done:**
-`.claude-plugin/`, `bin/solid-gemc-run`, `hooks/`, `.mcp.json`,
-`requirements.txt`, `LICENSE`, `.gitignore`, stub `README.md`. Slash
-commands, workspace skeleton, and skills are phase 1+.
+v0.0.2 surface complete. Two slash commands shipped
+(`/solid-gemc-claude:solid-gemc-init` and
+`/solid-gemc-claude:solid-gemc-analyze`); the workflow between them is
+driven by the `solid-gemc` orchestrator skill against
+`bin/solid-gemc-run`. The earlier `…-config` and `…-run` slash commands
+were removed in favor of the skill — see BUILD_LOG.md phase 7 for why.
 
 `PLAN.md` is the **original plan** (generic GEMC plugin); scope has
 since shifted to solid_gemc specifically. The post-pivot design spec is
@@ -119,13 +121,15 @@ with stop-on-failure post-condition checks.
   `solid-gemc-run` post-converts the EVIO to ROOT via `evio2root`
   inside the same container, so the analysis path is still uproot.
   Both `out.evio` and `out.root` end up in `runs/<id>/`. HIPO
-  deferred past v0.0.1.
+  deferred past v0.0.2.
 - **solid_gemc pin.** Clone HEAD of master; record commit SHA per run
-  in `runs/<id>/config.json`. No upstream pin at v0.0.1.
-- **GCard surface.** Template-picker (`solid-gemc-config <preset>`)
-  copies from `$SoLID_GEMC/script/`. NL→GCard deferred past v0.0.1.
+  in `runs/<id>/config.json`. No upstream pin at v0.0.2.
+- **GCard surface.** The orchestrator skill copies a canonical GCard
+  from `$SoLID_GEMC/script/` (or `…/analysis/*/`) into `gcards/` and
+  injects `USE_GUI=0` / `OUTPUT=evio,out.evio` / `N=<n>` on the live
+  `<gcard>` block. NL→GCard deferred past v0.0.2.
 
-## v0.0.1 known limitations
+## v0.0.2 known limitations
 
 - **.sif hosted at Duke webhome.** Personal hosting (no SLA), flagged
   in `README.md` "Known limitations". Revisit before paper citation.
@@ -138,17 +142,20 @@ with stop-on-failure post-condition checks.
 
 ## Common commands
 
-`bin/solid-gemc-run` exists today. Slash commands are phase 1+ (not
-yet built); the table below is the planned v0.0.1 surface.
-
 ```bash
-# Slash commands (planned — phase 1+)
-/solid-gemc-claude:solid-gemc-init                                 # workspace skeleton + pull .sif + clone + 2× scons build
-/solid-gemc-claude:solid-gemc-config <preset>                      # copy canonical GCard from $SoLID_GEMC/script/ to gcards/
-/solid-gemc-claude:solid-gemc-run --gcard gcards/<name>.gcard      # solid_gemc <gcard>; writes runs/<id>/{out.root,log.txt,config.json}
-/solid-gemc-claude:solid-gemc-analyze runs/<id>                    # uproot plots from out.root
+# Slash commands (v0.0.2 surface — two only)
+/solid-gemc-claude:solid-gemc-init             # workspace skeleton + pull .sif + clone + 2× scons build (one-shot bootstrap)
+/solid-gemc-claude:solid-gemc-analyze runs/<id>  # host-side uproot plots from out.root (post-converted via evio2root)
 
-# Maintainer-side wrapper (exists; host shell, from this repo)
+# Workflow (between init and analyze) is driven by the orchestrator skill
+# at skills/solid-gemc/SKILL.md. It auto-loads on SoLID-flavored
+# natural-language requests, gap-checks the six-field spec, presents a
+# plan, then drives: gcard prep → solid_gemc + evio2root in the container
+# → runs/<id>/{out.evio, out.root, log.txt, config.json}.
+# Users who want the upstream pattern instead can `bin/solid-gemc-run shell`
+# and follow `solid_gemc/analysis/hgc_study/run.sh` directly.
+
+# Maintainer-side wrapper (host shell, from this repo)
 bin/solid-gemc-run pull                       # wget the .sif into cache
 bin/solid-gemc-run clone [dest]               # git clone solid_gemc (default: ./solid_gemc)
 bin/solid-gemc-run build [dest]               # two scons builds inside container: mod/gemc/2.9 → source/2.9
@@ -158,18 +165,20 @@ bin/solid-gemc-run exec <cmd...>              # run cmd inside container with en
 bin/solid-gemc-run root <args...>             # ROOT (-l -b -q) inside container
 bin/solid-gemc-run env                        # print the tcsh setenv block
 bin/solid-gemc-run validate-gcard <file>      # xmllint a GCard inside container
-tests/clean-smoke.sh                          # not yet ported from geant4_claude
-tests/clean-install-test.sh                   # not yet ported from geant4_claude
+tests/clean-smoke.sh                          # end-to-end smoke (workspace + image + clone/build + gemc + evio2root + analyze)
 ```
 
-There is no `solid-gemc-example` command. After `solid-gemc-init`, the
-upstream HGC study at `solid_gemc/analysis/hgc_study/` (cloned into the
-workspace by init) is the recommended first run — point users there
-rather than shipping a dropped-in example.
+There is no `solid-gemc-example`, no `solid-gemc-config`, and no
+`solid-gemc-run` slash command. After `solid-gemc-init`, the upstream
+HGC study at `solid_gemc/analysis/hgc_study/` (cloned into the
+workspace by init) is the recommended first run — drive it through the
+orchestrator skill in plain language ("run the heavy-gas Cherenkov
+study on He-3"), or follow upstream's `run.sh` via
+`bin/solid-gemc-run shell`.
 
 ## Pre-publish checks
 
-Before the v0.0.1 tag, every item must be clean:
+Before the v0.0.2 tag, every item must be clean:
 
 - `grep -RIn "/home/$USER\|jefflab" .` returns nothing in tracked files (with
   `$USER` expanded). `jlab.org` is allowed only as the `gemc.jlab.org`

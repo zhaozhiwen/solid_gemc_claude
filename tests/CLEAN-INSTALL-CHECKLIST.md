@@ -95,72 +95,12 @@ Pass:
 - The command's closing summary recommends the upstream HGC study as
   the first thing to try.
 
-## Phase 4 — `/solid-gemc-claude:solid-gemc-config`
+## Phase 4 — Orchestrator skill drives a simulation
+
+Type a SoLID-flavored NL request that doesn't name a slash command:
 
 ```text
-> /solid-gemc-claude:solid-gemc-config cherenkov
-```
-
-Pass:
-- `gcards/cherenkov.gcard` is created.
-- `gcards/cherenkov.gcard.source` sidecar contains
-  `solid_gemc/analysis/hgc_study`.
-- The live `<gcard>` block contains
-  `<option name="OUTPUT" value="evio,out.evio"/>`,
-  `<option name="N" value="100"/>`, and
-  `<option name="USE_GUI" value="0"/>`.
-- The comment-block examples at the file's tail are untouched.
-- `validate-gcard` reports "well-formed".
-
-## Phase 5 — `/solid-gemc-claude:solid-gemc-run`
-
-Edit the GCard to use a small event count for the smoke (`N=10`),
-then:
-
-```text
-> /solid-gemc-claude:solid-gemc-run --gcard gcards/cherenkov.gcard
-```
-
-Pass:
-- A new `runs/<UTC-id>/` directory appears.
-- It contains all five expected files:
-  - `gcard.gcard` (frozen)
-  - `out.evio` (non-empty; from solid_gemc)
-  - `out.root` (non-empty; from evio2root)
-  - `log.txt` (multi-KB; shows both gemc and evio2root output)
-  - `config.json` (records `sif_name`, `solid_gemc_sha`,
-    `gemc_exit_code: 0`, `evio2root_exit: 0`, `exit_code: 0`,
-    `source_dir: solid_gemc/analysis/hgc_study`)
-- A new entry is prepended to `log.md` with the verbatim request, the
-  plan, the decision, and the outcome.
-
-## Phase 6 — `/solid-gemc-claude:solid-gemc-analyze`
-
-```text
-> /solid-gemc-claude:solid-gemc-analyze runs/<UTC-id>
-```
-
-Pass:
-- The command lists at least one TTree from `out.root` with its
-  branches and entry count.
-- At least 1 PNG histogram lands in `runs/<UTC-id>/`, named
-  `hist_<tree>_<branch>.png`.
-- The closing report points the user at `analysis/` for custom
-  scripts.
-
-## Phase 7 — Orchestrator skill auto-load
-
-Restart Claude Code in a fresh directory:
-
-```bash
-mkdir /tmp/sgc_orch_smoke && cd /tmp/sgc_orch_smoke
-```
-
-Then in Claude Code, type a SoLID-flavored NL request that doesn't
-name a slash command:
-
-```text
-> Set up a PVDIS LD2 study at 11 GeV, 100 events, default analysis.
+> Run the heavy-gas Cherenkov study from solid_gemc/analysis/hgc_study, He-3, 10 events, default analysis.
 ```
 
 Pass:
@@ -169,10 +109,20 @@ Pass:
 - The skill captures the six-field spec from the NL request; asks
   for any missing fields via `AskUserQuestion`.
 - A compact plan is presented for approval.
-- On approving, the skill drives init (skipped since already done in
-  phase 3, or fires if this is a fresh host) → config → run → analyze
-  with post-condition checks at each step.
-- `log.md` and `result.md` get appropriate updates.
+- On approving, the skill drives:
+  - GCard copy: `gcards/cherenkov.gcard` appears, with live `<gcard>`
+    block containing `<option name="OUTPUT" value="evio,out.evio"/>`,
+    `<option name="N" value="10"/>`, `<option name="USE_GUI" value="0"/>`.
+    The canonical's `<!-- comment out … -->` example block is left intact.
+  - Run: a new `runs/<UTC-id>/` directory appears containing
+    `gcard.gcard` (frozen), `out.evio` (non-empty; from solid_gemc),
+    `out.root` (non-empty; from evio2root), `log.txt` (multi-KB; shows
+    both gemc and evio2root output), and `config.json` (records
+    `sif_name`, `solid_gemc_sha`, `gemc_exit_code: 0`,
+    `evio2root_exit: 0`, `exit_code: 0`,
+    `source_dir: solid_gemc/analysis/hgc_study`).
+- A new entry is prepended to `log.md` with the verbatim request, the
+  plan, the decision, and the outcome.
 
 Negative test: in a fresh workspace, type something purely Geant4-y:
 
@@ -186,7 +136,21 @@ Pass:
   skill should load instead. This is the description-match arbitration
   test.
 
-## Phase 8 — Idempotency
+## Phase 5 — `/solid-gemc-claude:solid-gemc-analyze`
+
+```text
+> /solid-gemc-claude:solid-gemc-analyze runs/<UTC-id>
+```
+
+Pass:
+- The command lists at least one TTree from `out.root` with its
+  branches and entry count.
+- At least 1 PNG histogram lands in `runs/<UTC-id>/`, named
+  `hist_<tree>_<branch>.png`.
+- The closing report points the user at `analysis/` for custom
+  scripts.
+
+## Phase 6 — Idempotency
 
 Re-run `/solid-gemc-claude:solid-gemc-init` in the same workspace:
 
@@ -196,7 +160,7 @@ Pass:
 - `solid-gemc-run build` is a no-op (scons reports no work) or a
   fast incremental rebuild.
 
-## Phase 9 — Pre-publish leakage scan
+## Phase 7 — Pre-publish leakage scan
 
 On the maintainer's host, with `$USER` expanded:
 
