@@ -16,6 +16,7 @@ __pycache__/
 .claude.local.md
 .env
 BUILD_LOG.md
+PLAN.md
 
 # Apptainer cache (normally outside the repo; defensive)
 *.sif
