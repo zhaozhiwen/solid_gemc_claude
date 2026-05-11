@@ -1,0 +1,284 @@
+#!/usr/bin/env bash
+# solid-gemc-run — the only bridge between solid-gemc-claude and the SoLID/GEMC
+# runtime. Every solid_gemc, scons, ROOT, or xmllint invocation in commands
+# and skills must pass through here. The container .sif URL, solid_gemc
+# upstream, and GEMC_VERSION are pinned in this file alone.
+
+set -euo pipefail
+
+# --- pinned runtime (single source of truth) ---------------------------------
+
+# JLabCE 2.5 container. Hosted at Zhiwen Zhao's Duke physics webhome at v0.0.1
+# (see README "Known limitations" — personal hosting, no SLA, mirror locally
+# if you need durability). The sha256 in the filename is the docker image
+# manifest digest of jeffersonlab/jlabce:2.5; that is *not* the .sif file's
+# own content hash, so no automated checksum verification at v0.0.1.
+SIF_NAME="jeffersonlab_jlabce_tag2.5_digest:sha256:9b9a9ec8c793035d5bfe6651150b54ac298f5ad17dca490a8039c530d0302008_20220413_s3.9.5.sif"
+SIF_URL="http://webhome.phy.duke.edu/~zz81/simg/${SIF_NAME}"
+
+# solid_gemc source. v0.0.1 clones HEAD of master (no upstream pin); the
+# resolved commit SHA is recorded per run in runs/<id>/config.json.
+SOLID_GEMC_REPO="https://github.com/JeffersonLab/solid_gemc"
+
+# Version directory used inside solid_gemc's layout: mod/gemc/<v>, source/<v>.
+# Bump only when solid_gemc upstream supports a new GEMC version line.
+GEMC_VERSION="2.9"
+
+# --- paths -------------------------------------------------------------------
+PLUGIN_ROOT="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+
+# --- helpers -----------------------------------------------------------------
+log()  { printf '[solid-gemc-run] %s\n' "$*" >&2; }
+die()  { printf '[solid-gemc-run] error: %s\n' "$*" >&2; exit 1; }
+
+# Cache resolution: explicit env wins, else CLAUDE_PLUGIN_DATA/cache, else
+# error. There is intentionally no $HOME/.solid_gemc_claude fallback — silent
+# fallback to a non-plugin path leads to phantom re-downloads when the plugin's
+# own .sif already exists at $CLAUDE_PLUGIN_DATA/cache/sif/. If you're
+# invoking solid-gemc-run outside a Claude Code plugin context, set
+# SOLID_GEMC_CLAUDE_CACHE explicitly. Resolution is lazy so `solid-gemc-run
+# help` works without any env vars set.
+CACHE_DIR=""
+SIF_DIR=""
+SIF_PATH=""
+resolve_cache_dir() {
+  [[ -n "${CACHE_DIR}" ]] && return 0
+  if [[ -n "${SOLID_GEMC_CLAUDE_CACHE:-}" ]]; then
+    CACHE_DIR="${SOLID_GEMC_CLAUDE_CACHE}"
+  elif [[ -n "${CLAUDE_PLUGIN_DATA:-}" ]]; then
+    CACHE_DIR="${CLAUDE_PLUGIN_DATA}/cache"
+  else
+    die "no cache path: set SOLID_GEMC_CLAUDE_CACHE or invoke from a plugin context that exports CLAUDE_PLUGIN_DATA. Slash commands should prefix every solid-gemc-run call with SOLID_GEMC_CLAUDE_CACHE=\"\${CLAUDE_PLUGIN_DATA}/cache\"."
+  fi
+  SIF_DIR="${CACHE_DIR}/sif"
+  SIF_PATH="${SIF_DIR}/${SIF_NAME}"
+}
+
+require_apptainer() {
+  command -v apptainer >/dev/null 2>&1 \
+    || die "apptainer not found on PATH. Install apptainer first (https://apptainer.org)."
+}
+
+require_wget() {
+  command -v wget >/dev/null 2>&1 || die "wget not found on PATH."
+}
+
+require_git() {
+  command -v git >/dev/null 2>&1 || die "git not found on PATH."
+}
+
+ensure_sif() {
+  resolve_cache_dir
+  require_apptainer
+  if [[ -f "${SIF_PATH}" ]]; then return 0; fi
+  require_wget
+  mkdir -p "${SIF_DIR}"
+  log "downloading ${SIF_URL}"
+  log "  -> ${SIF_PATH}"
+  log "  (multi-GB .sif; first pull can take several minutes)"
+  local tmp="${SIF_PATH}.part"
+  if ! wget --show-progress -O "${tmp}" "${SIF_URL}"; then
+    rm -f "${tmp}"
+    die "wget failed for ${SIF_URL}"
+  fi
+  mv "${tmp}" "${SIF_PATH}"
+  log "image ready at ${SIF_PATH}"
+}
+
+# Resolve symlinks before handing paths to apptainer. On shared-FS hosts the
+# user's $HOME or $(pwd) can be a symlink chain (e.g. ~/work -> /work/...);
+# apptainer will --bind the symlink path but then fail to chdir into it.
+# `pwd -P` and `readlink -f` give the physical path apptainer can mount.
+container_workdir()   { pwd -P; }
+container_cache_dir() { readlink -f "${CACHE_DIR}"; }
+
+# Tcsh env block for solid_gemc/GEMC inside the container. Honors any
+# externally-set `$SoLID_GEMC` (lets slash commands cd into a subdir like
+# `solid_gemc/analysis/hgc_study/` to pick up cwd-relative detector loading
+# while keeping `SoLID_GEMC` pinned to the workspace root). Falls back to
+# `${PWD}/solid_gemc` for the workspace-root-cwd case. The heredoc is
+# single-quoted so `${VAR}` stays literal — tcsh interpolates at run time.
+env_block() {
+  cat <<'TCSH'
+if ( ! $?SoLID_GEMC ) setenv SoLID_GEMC ${PWD}/solid_gemc
+if ( ! $?LD_LIBRARY_PATH ) setenv LD_LIBRARY_PATH ""
+setenv GEMC_VERSION 2.9
+setenv GEMC ${SoLID_GEMC}/mod/gemc/${GEMC_VERSION}
+setenv LD_LIBRARY_PATH ${GEMC}:${LD_LIBRARY_PATH}
+setenv PATH ${SoLID_GEMC}/source/${GEMC_VERSION}:${GEMC}:${PATH}
+TCSH
+}
+
+# Echo host paths needing an explicit --bind beyond the workspace and cache.
+# A path is auto-covered if it's already under the bound workdir or cache.
+extra_binds_for() {
+  local wd="$1" cache_real="$2"; shift 2
+  local p
+  for p in "$@"; do
+    [[ -z "$p" ]] && continue
+    if [[ "$p" != "${wd}"* && "$p" != "${cache_real}"* ]]; then
+      printf -- '--bind\n%s\n' "$p"
+    fi
+  done
+}
+
+# Run a tcsh command inside the container with the env block applied and the
+# current working directory plus the cache bind-mounted.
+in_container() {
+  ensure_sif
+  local cmd="$1"
+  local wd cache_real env
+  wd="$(container_workdir)"
+  cache_real="$(container_cache_dir)"
+  env="$(env_block)"
+  apptainer exec \
+    --bind "${wd}" \
+    --bind "${cache_real}" \
+    --pwd "${wd}" \
+    "${SIF_PATH}" \
+    tcsh -c "${env}
+${cmd}"
+}
+
+# --- subcommands -------------------------------------------------------------
+
+cmd_info() {
+  resolve_cache_dir
+  local cache_src
+  if [[ -n "${SOLID_GEMC_CLAUDE_CACHE:-}" ]]; then
+    cache_src="SOLID_GEMC_CLAUDE_CACHE override"
+  else
+    cache_src="CLAUDE_PLUGIN_DATA (plugin default)"
+  fi
+  echo "sif url:        ${SIF_URL}"
+  echo "sif file:       ${SIF_PATH} $([[ -f ${SIF_PATH} ]] && echo '[present]' || echo '[not pulled]')"
+  echo "cache:          ${CACHE_DIR}  [${cache_src}]"
+  echo "plugin:         ${PLUGIN_ROOT}"
+  echo "solid_gemc:     ${SOLID_GEMC_REPO} (HEAD of master)"
+  echo "GEMC_VERSION:   ${GEMC_VERSION}"
+  if command -v apptainer >/dev/null 2>&1; then
+    echo "apptainer:      $(apptainer --version)"
+  else
+    echo "apptainer:      NOT FOUND"
+  fi
+}
+
+cmd_pull() {
+  ensure_sif
+}
+
+cmd_clone() {
+  local dest="${1:-solid_gemc}"
+  if [[ -d "${dest}/.git" ]]; then
+    log "${dest} already cloned; skipping. To refresh: rm -rf ${dest} && solid-gemc-run clone"
+    return 0
+  fi
+  if [[ -e "${dest}" ]]; then
+    die "${dest} exists but is not a git clone. Move it aside or remove first."
+  fi
+  require_git
+  log "cloning ${SOLID_GEMC_REPO} -> ${dest}"
+  git clone "${SOLID_GEMC_REPO}" "${dest}"
+  log "cloned: $(cd "${dest}" && git rev-parse HEAD)"
+}
+
+cmd_build() {
+  local dest="${1:-solid_gemc}"
+  [[ -d "${dest}" ]] \
+    || die "solid_gemc tree not found at ${dest}; run 'solid-gemc-run clone' first"
+  local gemc_dir="${dest}/mod/gemc/${GEMC_VERSION}"
+  local solid_dir="${dest}/source/${GEMC_VERSION}"
+  [[ -d "${gemc_dir}"  ]] \
+    || die "missing ${gemc_dir} — solid_gemc layout may have changed; bump GEMC_VERSION in bin/solid-gemc-run?"
+  [[ -d "${solid_dir}" ]] \
+    || die "missing ${solid_dir} — solid_gemc layout may have changed?"
+
+  log "building GEMC library at ${gemc_dir}"
+  in_container "cd ${gemc_dir} && scons OPT=1 -j4"
+  log "building solid_gemc at ${solid_dir}"
+  in_container "cd ${solid_dir} && scons OPT=1 -j4"
+  log "build complete: ${solid_dir}/solid_gemc"
+}
+
+cmd_env() {
+  env_block
+}
+
+cmd_exec() {
+  [[ $# -ge 1 ]] || die "usage: solid-gemc-run exec <command...>"
+  in_container "$*"
+}
+
+cmd_shell() {
+  ensure_sif
+  local wd cache_real env
+  wd="$(container_workdir)"
+  cache_real="$(container_cache_dir)"
+  env="$(env_block)"
+  log "entering container ($(basename "${SIF_PATH}")). Type 'exit' to leave."
+  apptainer exec \
+    --bind "${wd}" \
+    --bind "${cache_real}" \
+    --pwd "${wd}" \
+    "${SIF_PATH}" \
+    tcsh -c "${env}
+exec tcsh -i"
+}
+
+cmd_root() {
+  in_container "root -l -b -q $*"
+}
+
+cmd_validate_gcard() {
+  local gcard="${1:-}"
+  [[ -n "${gcard}" ]] || die "usage: solid-gemc-run validate-gcard <file.gcard>"
+  [[ -f "${gcard}"  ]] || die "GCard not found: ${gcard}"
+  in_container "xmllint --noout '${gcard}'"
+  log "GCard well-formed: ${gcard}"
+}
+
+usage() {
+  cat <<EOF
+solid-gemc-run — apptainer wrapper for solid-gemc-claude
+
+Usage: solid-gemc-run <subcommand> [args]
+
+Subcommands:
+  pull                          Download the pinned .sif from upstream (wget).
+  clone [dest]                  git clone solid_gemc into dest (default: ./solid_gemc).
+  build [dest]                  Two scons builds inside container: mod/gemc/<v>, then source/<v>.
+  env                           Print the tcsh env block (setenv SoLID_GEMC, GEMC, PATH, ...).
+  info                          Show .sif URL, cache path, solid_gemc repo, GEMC_VERSION, apptainer.
+  shell                         Open an interactive tcsh inside the container with env set.
+  exec <cmd...>                 Run a command inside the container with env set.
+  root <args...>                Run ROOT (-l -b -q) inside the container with env set.
+  validate-gcard <file>         xmllint a GCard file inside the container.
+
+Container: ${SIF_URL}
+solid_gemc: ${SOLID_GEMC_REPO} (HEAD of master)
+GEMC_VERSION: ${GEMC_VERSION}
+
+Cache resolution order:
+  1. \$SOLID_GEMC_CLAUDE_CACHE         (explicit override; required outside plugin context)
+  2. \$CLAUDE_PLUGIN_DATA/cache         (auto-set when invoked via Claude Code)
+Run \`solid-gemc-run info\` to see the resolved cache path.
+EOF
+}
+
+# --- dispatch ----------------------------------------------------------------
+sub="${1:-}"; shift || true
+case "${sub}" in
+  ""|-h|--help|help) usage; exit 0 ;;
+esac
+case "${sub}" in
+  pull)            cmd_pull "$@" ;;
+  clone)           cmd_clone "$@" ;;
+  build)           cmd_build "$@" ;;
+  env)             cmd_env "$@" ;;
+  info)            cmd_info "$@" ;;
+  shell)           cmd_shell "$@" ;;
+  exec)            cmd_exec "$@" ;;
+  root)            cmd_root "$@" ;;
+  validate-gcard)  cmd_validate_gcard "$@" ;;
+  *)               usage; die "unknown subcommand: ${sub}" ;;
+esac

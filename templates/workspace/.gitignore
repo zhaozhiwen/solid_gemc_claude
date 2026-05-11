@@ -1,0 +1,10 @@
+# solid_gemc_claude workspace — generated artifacts
+runs/*/
+!runs/.gitkeep
+*.root
+*.hipo
+*.evio
+solid_gemc/
+__pycache__/
+.venv/
+.ipynb_checkpoints/

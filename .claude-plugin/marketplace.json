@@ -1,0 +1,13 @@
+{
+  "name": "solid-gemc-claude",
+  "owner": {
+    "name": "Zhiwen Zhao"
+  },
+  "plugins": [
+    {
+      "name": "solid-gemc-claude",
+      "source": "./",
+      "description": "Run solid_gemc (SoLID/JLab) simulations via four slash commands: init, config, run, analyze. JLabCE 2.5 container; solid_gemc cloned + built per workspace; uproot analysis."
+    }
+  ]
+}

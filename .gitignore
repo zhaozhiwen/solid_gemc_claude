@@ -1,0 +1,35 @@
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*.swo
+
+# Python tooling
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.mypy_cache/
+
+# Local/private overrides (not for the public repo)
+.claude.local.md
+.env
+BUILD_LOG.md
+
+# Apptainer cache (normally outside the repo; defensive)
+*.sif
+*.sif.part
+
+# Defensive: someone running the smoke test at the repo root.
+# Leading `/` anchors to the repo root only — without it, the pattern
+# also matches templates/workspace/runs/, dropping the shipped skeleton's
+# runs/ placeholder from the package.
+/runs/
+/solid_gemc/
+
+# Logs
+*.log
+
+# Per-user Claude Code local settings
+.claude/settings.local.json

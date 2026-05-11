@@ -1,0 +1,24 @@
+{
+  "name": "solid-gemc-claude",
+  "description": "Build, run, and analyze solid_gemc (SoLID experiment) simulations through Claude Code slash commands. JLabCE 2.5 container pulled via wget; tcsh runtime inside container; analysis on the host with uproot.",
+  "version": "0.0.1",
+  "author": {
+    "name": "Zhiwen Zhao"
+  },
+  "keywords": [
+    "solid",
+    "solid_gemc",
+    "gemc",
+    "geant4",
+    "simulation",
+    "particle-physics",
+    "nuclear-physics",
+    "jlab",
+    "jefferson-lab",
+    "apptainer",
+    "uproot",
+    "claude-code-plugin"
+  ],
+  "homepage": "https://github.com/zhaozhiwen/solid_gemc_claude",
+  "repository": "https://github.com/zhaozhiwen/solid_gemc_claude.git"
+}
