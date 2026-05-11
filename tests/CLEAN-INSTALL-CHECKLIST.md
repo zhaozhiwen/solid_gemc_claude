@@ -2,9 +2,8 @@
 
 Pre-release smoke test that exercises the parts of the plugin
 `tests/clean-smoke.sh` *can't* reach: Claude Code's slash-command
-dispatch, the `SessionStart` hook, the deepwiki MCP approval prompt,
-the orchestrator skill's NL-trigger + `AskUserQuestion` flow, and
-namespace lookup.
+dispatch, the `SessionStart` hook, the orchestrator skill's
+NL-trigger + `AskUserQuestion` flow, and namespace lookup.
 
 **Run this before tagging any release.** ~15 minutes once the
 container is cached + `solid_gemc` is built (otherwise add the
@@ -60,14 +59,12 @@ Pass:
 Open Claude Code in **any** directory.
 
 Pass:
-- Claude Code prompts once to approve the `deepwiki` MCP server.
-  Approve it.
 - The `SessionStart` hook reports
   `[solid_gemc_claude] installing Python deps into …/venv (one-time, ~30s)…`
   and then `Python deps ready.`
 - `~/.claude/plugins/data/solid-gemc-claude-solid-gemc-claude/venv/bin/python -c "import uproot, numpy, matplotlib, pdg"`
   succeeds.
-- In Claude Code, `mcp__deepwiki__ask_question` is an available tool.
+- No MCP approval prompt fires (the plugin ships no `.mcp.json`).
 
 ## Phase 3 — `/solid-gemc-claude:solid-gemc-init`
 
