@@ -77,16 +77,41 @@ binary (`solid_gemc/source/2.9/solid_gemc`) live.
 
 The recommended first thing to run is the **upstream HGC study** at
 `solid_gemc/analysis/hgc_study/` — a fully self-contained example
-shipped with solid_gemc. It ships canonical GCards
-(`solid_SIDIS_He3_hgc.gcard`, etc.), batch run script (`run.sh`), and
-ROOT analysis (`analysis.C`, comparison scripts). Two ways in:
+shipped with solid_gemc. It is the canonical worked example for the
+**config + run + analyze** pipeline: GCards
+(`cherenkov.gcard`, `cherenkov_batch.gcard`, `solid_SIDIS_He3_hgc.gcard`,
+etc.), batch run scripts (`load.sh` / `run.sh`), and ROOT analysis
+(`analysis.C`, `analysis_tree_solid_hgc.C`, the `compare_*.C`
+comparison scripts). Two ways in:
 
 - Drop into a container shell: `bin/solid-gemc-run shell`, then
-  `cd solid_gemc/analysis/hgc_study` and follow upstream's README.
+  `cd solid_gemc/analysis/hgc_study` and follow upstream's flow.
   (The wrapper binds your workspace to its host path inside the
   container and sets PWD there, so the path is the same in and out.)
 - Or pick one of its GCards: `cp solid_gemc/analysis/hgc_study/solid_SIDIS_He3_hgc.gcard gcards/`
   then `/solid-gemc-claude:solid-gemc-run --gcard gcards/solid_SIDIS_He3_hgc.gcard`.
+
+## Reference example for custom detectors
+
+If you ever need to author your own detector (factory text files
+that gemc loads via `<detector name="..." factory="TEXT" ...>`),
+the canonical worked example is upstream
+`solid_gemc/geometry/hgc_moved/`. It has a `readme.md` plus the
+full set:
+
+- `solid_SIDIS_hgc_geometry.pl`, `_materials.pl`, `_hit.pl`,
+  `_mirror.pl`, `_virtualplane.pl` — Perl generators (the editable
+  source-of-truth in solid_gemc's convention).
+- `solid_SIDIS_hgc__geometry_Original.txt`, `__materials_Original.txt`,
+  `__hit_Original.txt`, `__mirrors_Original.txt`, `__bank.txt` —
+  generated text files (what gemc actually reads at runtime).
+- `config_solid_SIDIS_hgc.dat` — parameter file the Perl generators
+  consume.
+
+The plugin's v0.0.1 surface doesn't include a custom-detector
+authoring slash command — for that work, follow upstream conventions
+in `geometry/hgc_moved/` directly (edit the `.pl`, regenerate the
+`.txt`, reference from your GCard with `<detector name="..." factory="TEXT" ...>`).
 
 ## When something fails
 

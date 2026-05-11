@@ -41,16 +41,20 @@ on first use; URL is pinned in [`bin/solid-gemc-run`](bin/solid-gemc-run).
 
 ## First-run flow (after `solid-gemc-init`)
 
-There is no shipped "example" command. The recommended first run is the
-upstream HGC study, which already lives in your workspace after init:
+There is no shipped "example" command. Two upstream worked examples
+live in your workspace after init, both fully self-contained:
 
-```text
-solid_gemc/analysis/hgc_study/
-```
+| Example | What it teaches |
+|---|---|
+| `solid_gemc/analysis/hgc_study/` | the **config + run + analyze** pipeline — GCards (`cherenkov.gcard`, `solid_SIDIS_He3_hgc.gcard`, …), batch run scripts (`load.sh` / `run.sh`), ROOT analysis (`analysis.C` and the `compare_*.C` scripts) |
+| `solid_gemc/geometry/hgc_moved/` | **custom detector authoring** — Perl generators (`solid_SIDIS_hgc_*.pl`), the resulting factory text files (`*__geometry_Original.txt` etc.) referenced by `<detector name="..." factory="TEXT" ...>`, plus a `readme.md` |
 
-Follow `solid_gemc/analysis/hgc_study/README` upstream; the plugin's
-`bin/solid-gemc-run shell` drops you into a tcsh prompt with the right
-env exported for the `run.sh` script there.
+`bin/solid-gemc-run shell` drops you into a tcsh prompt with the env
+exported (`SoLID_GEMC`, `GEMC`, `PATH`, `LD_LIBRARY_PATH`) so you can
+follow upstream's scripts directly. For HGC: `cd solid_gemc/analysis/hgc_study`,
+then `./run.sh`. For detector authoring: edit the `.pl` in
+`solid_gemc/geometry/hgc_moved/`, regenerate, run gemc against your new
+detector.
 
 ## Known limitations (v0.0.1)
 

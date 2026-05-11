@@ -114,12 +114,15 @@ Optional argument: `--force` (overwrite existing template files; does
    - workspace files written under `cwd`,
    - .sif cached at `${CLAUDE_PLUGIN_DATA}/cache/sif/`,
    - `solid_gemc` commit cloned + binary built,
-   - **what to try first** — recommend the upstream HGC study:
+   - **what to try first** — recommend the upstream HGC study
+     (canonical config+run+analyze example) and point at the
+     detector-authoring example as a parallel reference:
      ```text
      bin/solid-gemc-run shell
      # then inside the container:
-     cd solid_gemc/analysis/hgc_study
-     # follow the README — it ships canonical GCards, run.sh, and analysis.C
+     cd solid_gemc/analysis/hgc_study     # GCards + run.sh + analysis.C
+     # detector-authoring reference (Perl generators + factory text files):
+     #   solid_gemc/geometry/hgc_moved/   (see its readme.md)
      ```
      Mention the plugin's own loop as the alternative:
      `/solid-gemc-claude:solid-gemc-config <preset>` →

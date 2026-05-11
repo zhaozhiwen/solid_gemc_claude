@@ -247,5 +247,13 @@ the plan — the plots and numbers are the recap.
   `PHYSICS`, `OUTPUT`, `N`, …) for any user request that needs
   non-canonical overrides.
 - Upstream `solid_gemc/analysis/hgc_study/` — the ready-made HGC
-  study workflow; recommended as a first-run example. See workspace
-  `CLAUDE.md` for the two paths in.
+  study workflow (canonical worked example for **config + run +
+  analyze**). GCards + `run.sh` + ROOT analysis scripts. Recommended
+  as a first-run example. See workspace `CLAUDE.md` for the two
+  paths in.
+- Upstream `solid_gemc/geometry/hgc_moved/` — the canonical worked
+  example for **custom detector authoring** (factory text files via
+  `<detector name="..." factory="TEXT" ...>`). Has a `readme.md` plus
+  the full Perl-generator → text-file pipeline. If a user needs to
+  write a new detector, point them here. The plugin doesn't ship a
+  detector-authoring slash command at v0.0.1.
