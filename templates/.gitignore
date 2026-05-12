@@ -1,0 +1,17 @@
+# solid_gemc_claude workspace — generated artifacts
+
+# Per-project run output (one runs/ subdir per project)
+*/analysis/runs/*/
+
+# Built upstream tree
+solid_gemc/
+
+# File-type-level catches
+*.root
+*.hipo
+*.evio
+
+# Python / Jupyter
+__pycache__/
+.venv/
+.ipynb_checkpoints/
