@@ -170,7 +170,13 @@ cmd_pull() {
 cmd_clone() {
   local dest="${1:-solid_gemc}"
   if [[ -d "${dest}/.git" ]]; then
-    log "${dest} already cloned; skipping. To refresh: rm -rf ${dest} && solid-gemc-run clone"
+    local existing_sha dirty=""
+    existing_sha=$(cd "${dest}" && git rev-parse HEAD 2>/dev/null || echo unknown)
+    if ! (cd "${dest}" && git diff --quiet HEAD 2>/dev/null); then
+      dirty=" (uncommitted local changes)"
+    fi
+    log "warning: ${dest} already cloned at ${existing_sha}${dirty}"
+    log "  using existing tree. To refresh upstream: rm -rf ${dest} && solid-gemc-run clone"
     return 0
   fi
   if [[ -e "${dest}" ]]; then

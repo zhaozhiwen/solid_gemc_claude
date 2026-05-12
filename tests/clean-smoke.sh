@@ -84,16 +84,18 @@ sgrun() {
 log "phase 1 — workspace skeleton + image cache"
 WS="${SCRATCH}/ws"
 mkdir -p "${WS}" && cd "${WS}"
-cp -r "${PLUGIN_ROOT}/templates/workspace/." .
-[ -f CLAUDE.md ]   || fail "workspace/CLAUDE.md missing"
-[ -f .gitignore ]  || fail "workspace/.gitignore missing"
-[ -f log.md ]      || fail "workspace/log.md missing"
-[ -f result.md ]   || fail "workspace/result.md missing"
-for d in gcards runs analysis; do
-  [ -d "$d" ] || fail "workspace skeleton missing $d/"
-  [ -f "$d/.gitkeep" ] || fail "$d/.gitkeep missing"
-done
-pass "workspace template copied (7 files / 3 dirs)"
+# Workspace-common files only (the four at templates/, not the per-project
+# template at templates/workspace/). The per-project template is seeded
+# later in phase 3 for the smoke project.
+cp "${PLUGIN_ROOT}/templates/CLAUDE.md"   ./CLAUDE.md
+cp "${PLUGIN_ROOT}/templates/.gitignore"  ./.gitignore
+cp "${PLUGIN_ROOT}/templates/log.md"      ./log.md
+cp "${PLUGIN_ROOT}/templates/result.md"   ./result.md
+[ -f CLAUDE.md ]   || fail "workspace CLAUDE.md missing"
+[ -f .gitignore ]  || fail "workspace .gitignore missing"
+[ -f log.md ]      || fail "workspace log.md missing"
+[ -f result.md ]   || fail "workspace result.md missing"
+pass "workspace-common files copied (4 files)"
 
 # Pull the .sif if not already reused.
 sgrun pull
@@ -117,17 +119,22 @@ fi
   || fail "solid_gemc binary missing at solid_gemc/source/2.9/solid_gemc"
 pass "solid_gemc binary present"
 
-# --- phase 3: gcard prep (cherenkov.gcard) ----------------------------------
-# Mirrors the skill's "prepare the GCard" sub-step: resolve the preset,
-# copy from upstream, apply batch overrides on the live <gcard> block,
-# write a sidecar recording the source dir for cwd-relative geometry
-# lookup at run time. The sidecar is bookkeeping inside the smoke test;
-# the skill carries the same info in its own state.
-log "phase 3 — prepare cherenkov.gcard (small, fast, self-contained)"
+# --- phase 3: seed project + gcard prep (cherenkov.gcard) -------------------
+# Mirrors the skill's per-project flow: seed a project subdir from the
+# per-project template, resolve the preset, copy from upstream into
+# <project>/analysis/, apply batch overrides on the live <gcard> block.
+log "phase 3 — seed project + prepare cherenkov.gcard (small, fast, self-contained)"
+PROJECT=cherenkov_smoke
+cp -r "${PLUGIN_ROOT}/templates/workspace/." "${PROJECT}/"
+[ -f "${PROJECT}/CLAUDE.md" ]            || fail "project CLAUDE.md missing under ${PROJECT}/"
+[ -d "${PROJECT}/geometry" ]             || fail "project geometry/ missing under ${PROJECT}/"
+[ -d "${PROJECT}/analysis" ]             || fail "project analysis/ missing under ${PROJECT}/"
+pass "seeded project ${PROJECT}/ from templates/workspace/"
+
 PRESET=cherenkov
 SRC=$(find solid_gemc/analysis -mindepth 2 -maxdepth 2 -name "${PRESET}.gcard" 2>/dev/null | head -1)
 [[ -n "$SRC" ]] || fail "${PRESET}.gcard not found under solid_gemc/analysis/"
-DEST="gcards/$(basename "${SRC}")"
+DEST="${PROJECT}/analysis/$(basename "${SRC}")"
 SOURCE_DIR=$(dirname "${SRC}")
 cp "${SRC}" "${DEST}"
 python3 - "${DEST}" 2 out.evio 0 <<'PY'
@@ -146,10 +153,8 @@ if gui_keep != '1':
 new_body = body.rstrip() + '\n' + '\n'.join(adds) + '\n'
 pathlib.Path(path).write_text(text[:m.start(2)] + new_body + text[m.end(2):])
 PY
-printf '%s\n' "${SOURCE_DIR}" > "${DEST}.source"
 sgrun validate-gcard "${DEST}" >/dev/null
-[ -f "${DEST}" ]          || fail "config: ${DEST} not created"
-[ -f "${DEST}.source" ]   || fail "config: ${DEST}.source sidecar missing"
+[ -f "${DEST}" ]                                           || fail "config: ${DEST} not created"
 grep -q '<option name="OUTPUT" value="evio,out.evio"/>'    "${DEST}" || fail "config: OUTPUT override missing"
 grep -q '<option name="N" value="2"/>'                     "${DEST}" || fail "config: N override missing"
 grep -q '<option name="USE_GUI" value="0"/>'               "${DEST}" || fail "config: USE_GUI override missing"
@@ -159,10 +164,11 @@ pass "cherenkov.gcard configured (2 events, USE_GUI=0, OUTPUT=evio,out.evio)"
 # Mirrors the skill's "run gemc + evio2root" sub-step. The cd into
 # $SOURCE_DIR is the cwd-relative-geometry-lookup discipline; absolute
 # GCARD_ABS / RUN_DIR_ABS paths are how we keep the workspace dirs in
-# scope from a different cwd.
+# scope from a different cwd. Per-run output lands under the project's
+# analysis/runs/<id>/.
 log "phase 4 — run gemc + evio2root (N=2 events, ~10 s)"
 RUN_ID=$(date -u +%Y%m%d-%H%M%S)-$(head -c 12 /dev/urandom | base32 | tr 'A-Z' 'a-z' | head -c 6)
-RUN_DIR="runs/${RUN_ID}"
+RUN_DIR="${PROJECT}/analysis/runs/${RUN_ID}"
 mkdir -p "${RUN_DIR}"
 cp "${DEST}" "${RUN_DIR}/gcard.gcard"
 WORKSPACE_ABS=$(readlink -f .)

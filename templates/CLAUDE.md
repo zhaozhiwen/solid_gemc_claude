@@ -3,14 +3,14 @@
 Rules for Claude when working in this solid_gemc simulation workspace.
 The `solid-gemc-claude` plugin scaffolded these directories.
 
-`/solid-gemc-claude:solid-gemc-init` (which created this workspace) also
+`/solid-gemc-claude:init` (which created this workspace) also
 cloned and built solid_gemc into `./solid_gemc/` — that's where SoLID
 geometry, the canonical GCards (`solid_gemc/script/`), and the built
 binary (`solid_gemc/source/2.9/solid_gemc`) live.
 
 The plugin ships **two slash commands** —
-`/solid-gemc-claude:solid-gemc-init` (already done) and
-`/solid-gemc-claude:solid-gemc-analyze` (host-side uproot plots after a
+`/solid-gemc-claude:init` (already done) and
+`/solid-gemc-claude:analyze` (host-side uproot plots after a
 run). Everything in between (picking a GCard, running gemc, converting
 EVIO → ROOT) is driven by the **`solid-gemc` orchestrator skill** which
 auto-loads on SoLID-flavored natural-language requests, or by
@@ -66,7 +66,7 @@ upstream organizes `solid_gemc/analysis/hgc_study/` and
    physics goal, SoLID config, beam, GCard, output, analysis), the
    user's **decision** (approved / edited / plan-only), and the
    **outcome** (run id, status, one-line summary). After a
-   `/solid-gemc-claude:solid-gemc-analyze` that produced a
+   `/solid-gemc-claude:analyze` that produced a
    noteworthy result, add or update a section in `<name>/result.md`
    with key numbers + plot paths. Both files are load-bearing
    handoff documents.
@@ -89,7 +89,7 @@ the six-field spec, presents a plan, and on approval drives:
 3. Post-convert `out.evio` → `out.root` via `evio2root` in the
    same container, from the run directory. Capture combined log +
    provenance.
-4. Hand off to `/solid-gemc-claude:solid-gemc-analyze
+4. Hand off to `/solid-gemc-claude:analyze
    <name>/analysis/runs/<id>`.
 
 For variations: edit `<name>/analysis/<preset>.gcard` between steps
@@ -136,7 +136,7 @@ Mirror its pattern under `<name>/geometry/`:
   generated text files (what gemc actually reads at runtime).
 - `config_<sub>.dat` — parameter file the Perl generators consume.
 
-The plugin's v0.0.2 surface doesn't include a custom-detector
+The plugin's v0.0.3 surface doesn't include a custom-detector
 authoring slash command — for that work, follow upstream conventions
 in `solid_gemc/geometry/hgc_moved/` directly (edit the `.pl`,
 regenerate the `.txt`, reference from your GCard with
@@ -148,6 +148,6 @@ regenerate the `.txt`, reference from your GCard with
 - `solid_gemc` crashes at runtime → `<name>/analysis/runs/<id>/log.txt`;
   usually the failing volume, material, or magnet field config.
 - Missing binary at `solid_gemc/source/2.9/solid_gemc` → re-run
-  `/solid-gemc-claude:solid-gemc-init` or `bin/solid-gemc-run build`.
+  `/solid-gemc-claude:init` or `bin/solid-gemc-run build`.
 - Image missing → `bin/solid-gemc-run info` shows `[not pulled]`; run
   `bin/solid-gemc-run pull`.

@@ -66,7 +66,7 @@ Pass:
   succeeds.
 - No MCP approval prompt fires (the plugin ships no `.mcp.json`).
 
-## Phase 3 — `/solid-gemc-claude:solid-gemc-init`
+## Phase 3 — `/solid-gemc-claude:init`
 
 ```bash
 mkdir /tmp/sgc_clean_smoke && cd /tmp/sgc_clean_smoke
@@ -75,22 +75,23 @@ mkdir /tmp/sgc_clean_smoke && cd /tmp/sgc_clean_smoke
 In Claude Code:
 
 ```text
-> /solid-gemc-claude:solid-gemc-init
+> /solid-gemc-claude:init
 ```
 
 Pass:
 - Tool checks succeed for `apptainer`, `git`, `wget`.
-- Workspace skeleton appears: `CLAUDE.md`, `.gitignore`, `log.md`,
-  `result.md`, `gcards/`, `runs/`, `analysis/` (with `.gitkeep`
-  placeholders).
+- Workspace-common files appear: `CLAUDE.md`, `.gitignore`,
+  `log.md`, `result.md` (no `gcards/`, `runs/`, `analysis/` at the
+  workspace root — those live inside each project subdir).
 - `.sif` lands at
   `~/.claude/plugins/data/solid-gemc-claude-solid-gemc-claude/cache/sif/jeffersonlab_jlabce_tag2.5_digest:sha256:9b9a9...sif`.
 - `solid_gemc/` is cloned into the workspace; `git rev-parse HEAD`
   there is reported in the command's final summary.
 - Two scons builds complete (first run: several minutes); the binary
   `solid_gemc/source/2.9/solid_gemc` is executable.
-- The command's closing summary recommends the upstream HGC study as
-  the first thing to try.
+- The command's closing summary lists the three paths in
+  (skill-driven, upstream-direct, manual `cp -r`) and recommends
+  the upstream HGC study as the first thing to try.
 
 ## Phase 4 — Orchestrator skill drives a simulation
 
@@ -101,25 +102,37 @@ Type a SoLID-flavored NL request that doesn't name a slash command:
 ```
 
 Pass:
-- Claude auto-loads `skills/solid-gemc` (verifiable by asking it which
-  skill it just activated, or by checking the loaded-skills indicator).
-- The skill captures the six-field spec from the NL request; asks
-  for any missing fields via `AskUserQuestion`.
+- Claude auto-loads `skills/solid-gemc` (verifiable by asking it
+  which skill it just activated, or by checking the loaded-skills
+  indicator).
+- The skill captures the **seven-field** spec from the NL request
+  (project name + the six physics fields); asks for any missing
+  fields via `AskUserQuestion` — in particular, suggests a default
+  project name like `hgc_he3_study` and confirms.
 - A compact plan is presented for approval.
 - On approving, the skill drives:
-  - GCard copy: `gcards/cherenkov.gcard` appears, with live `<gcard>`
-    block containing `<option name="OUTPUT" value="evio,out.evio"/>`,
-    `<option name="N" value="10"/>`, `<option name="USE_GUI" value="0"/>`.
-    The canonical's `<!-- comment out … -->` example block is left intact.
-  - Run: a new `runs/<UTC-id>/` directory appears containing
-    `gcard.gcard` (frozen), `out.evio` (non-empty; from solid_gemc),
-    `out.root` (non-empty; from evio2root), `log.txt` (multi-KB; shows
-    both gemc and evio2root output), and `config.json` (records
-    `sif_name`, `solid_gemc_sha`, `gemc_exit_code: 0`,
-    `evio2root_exit: 0`, `exit_code: 0`,
+  - Project seed: `<project>/` appears under the workspace root,
+    seeded from `templates/workspace/.` — contains its own
+    `CLAUDE.md`, `log.md`, `result.md`, plus empty `geometry/` and
+    `analysis/` dirs.
+  - GCard copy: `<project>/analysis/cherenkov.gcard` appears, with
+    live `<gcard>` block containing
+    `<option name="OUTPUT" value="evio,out.evio"/>`,
+    `<option name="N" value="10"/>`,
+    `<option name="USE_GUI" value="0"/>`. The canonical's
+    `<!-- comment out … -->` example block is left intact.
+  - Run: a new `<project>/analysis/runs/<UTC-id>/` directory
+    appears containing `gcard.gcard` (frozen), `out.evio`
+    (non-empty; from solid_gemc), `out.root` (non-empty; from
+    evio2root), `log.txt` (multi-KB; both gemc and evio2root
+    output), and `config.json` (records `project`, `sif_name`,
+    `solid_gemc_sha`, `gemc_exit_code: 0`, `evio2root_exit: 0`,
+    `exit_code: 0`,
     `source_dir: solid_gemc/analysis/hgc_study`).
-- A new entry is prepended to `log.md` with the verbatim request, the
-  plan, the decision, and the outcome.
+- A new entry is prepended to `<project>/log.md` with the verbatim
+  request, the plan, the decision, and the outcome.
+- A one-line entry is appended/prepended to the workspace-level
+  `log.md` (cross-project index).
 
 Negative test: in a fresh workspace, type something purely Geant4-y:
 
@@ -129,27 +142,28 @@ Negative test: in a fresh workspace, type something purely Geant4-y:
 
 Pass:
 - `solid-gemc-claude`'s skill does **not** load (no SoLID vocabulary
-  in the request). If `geant4_claude` is also installed, its `geant4`
-  skill should load instead. This is the description-match arbitration
-  test.
+  in the request). If `geant4_claude` is also installed, its
+  `geant4` skill should load instead. This is the description-match
+  arbitration test.
 
-## Phase 5 — `/solid-gemc-claude:solid-gemc-analyze`
+## Phase 5 — `/solid-gemc-claude:analyze`
 
 ```text
-> /solid-gemc-claude:solid-gemc-analyze runs/<UTC-id>
+> /solid-gemc-claude:analyze <project>/analysis/runs/<UTC-id>
 ```
 
 Pass:
 - The command lists at least one TTree from `out.root` with its
   branches and entry count.
-- At least 1 PNG histogram lands in `runs/<UTC-id>/`, named
+- At least 1 PNG histogram lands in
+  `<project>/analysis/runs/<UTC-id>/`, named
   `hist_<tree>_<branch>.png`.
-- The closing report points the user at `analysis/` for custom
-  scripts.
+- The closing report points the user at `<project>/analysis/` for
+  custom scripts.
 
 ## Phase 6 — Idempotency
 
-Re-run `/solid-gemc-claude:solid-gemc-init` in the same workspace:
+Re-run `/solid-gemc-claude:init` in the same workspace:
 
 Pass:
 - The command refuses to overwrite without `--force`.

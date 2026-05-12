@@ -3,7 +3,7 @@ description: Inspect runs/<id>/out.root with uproot and generate default plots (
 allowed-tools: Bash, Read, Write, Glob
 ---
 
-# /solid-gemc-claude:solid-gemc-analyze
+# /solid-gemc-claude:analyze
 
 ## Purpose
 

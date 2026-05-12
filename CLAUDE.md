@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repo state
 
-v0.0.2 surface complete. Two slash commands shipped
-(`/solid-gemc-claude:solid-gemc-init` and
-`/solid-gemc-claude:solid-gemc-analyze`); the workflow between them is
+v0.0.3 surface complete. Two slash commands shipped
+(`/solid-gemc-claude:init` and
+`/solid-gemc-claude:analyze`); the workflow between them is
 driven by the `solid-gemc` orchestrator skill against
 `bin/solid-gemc-run`. The earlier `…-config` and `…-run` slash commands
 were removed in favor of the skill — see BUILD_LOG.md phase 7 for why.
@@ -67,7 +67,7 @@ Pattern improvements propagate by deliberate sync, not by linking.
    `gemc.jlab.org` as a documentation reference URL — call this out in any new
    doc that uses it.
 6. **Idempotent commands.** Running any slash command twice must not corrupt
-   state. `/solid-gemc-claude:solid-gemc-init` re-detects existing files and refuses to
+   state. `/solid-gemc-claude:init` re-detects existing files and refuses to
    overwrite without `--force`.
 7. **Cache resolution, no `$HOME` fallback.** `$SOLID_GEMC_CLAUDE_CACHE` →
    `$CLAUDE_PLUGIN_DATA/cache` → fatal error. Matches `geant4_claude`'s
@@ -81,7 +81,7 @@ Pattern improvements propagate by deliberate sync, not by linking.
 | Slash commands | `/solid-gemc-claude:solid-gemc-<verb>` — namespaced |
 | GitHub repo | `solid_gemc_claude` — underscore, mirrors `geant4_claude` |
 | Run IDs | `YYYYMMDD-HHMMSS-<6char>` (UTC) |
-| Command files | `commands/solid-gemc-<verb>.md` |
+| Command files | `commands/<verb>.md` (verb only — invocation namespace already encodes "solid-gemc") |
 | Skill dirs | `skills/solid-gemc-<topic>/` (plus the one orchestrator `skills/solid-gemc/`) |
 
 The orchestrator-vs-reference skill split: only `skills/solid-gemc/SKILL.md` is a
@@ -121,15 +121,15 @@ with stop-on-failure post-condition checks.
   `solid-gemc-run` post-converts the EVIO to ROOT via `evio2root`
   inside the same container, so the analysis path is still uproot.
   Both `out.evio` and `out.root` end up in `runs/<id>/`. HIPO
-  deferred past v0.0.2.
+  deferred past v0.0.3.
 - **solid_gemc pin.** Clone HEAD of master; record commit SHA per run
-  in `runs/<id>/config.json`. No upstream pin at v0.0.2.
+  in `runs/<id>/config.json`. No upstream pin at v0.0.3.
 - **GCard surface.** The orchestrator skill copies a canonical GCard
   from `$SoLID_GEMC/script/` (or `…/analysis/*/`) into `gcards/` and
   injects `USE_GUI=0` / `OUTPUT=evio,out.evio` / `N=<n>` on the live
-  `<gcard>` block. NL→GCard deferred past v0.0.2.
+  `<gcard>` block. NL→GCard deferred past v0.0.3.
 
-## v0.0.2 known limitations
+## v0.0.3 known limitations
 
 - **.sif hosted at Duke webhome.** Personal hosting (no SLA), flagged
   in `README.md` "Known limitations". Revisit before paper citation.
@@ -143,9 +143,9 @@ with stop-on-failure post-condition checks.
 ## Common commands
 
 ```bash
-# Slash commands (v0.0.2 surface — two only)
-/solid-gemc-claude:solid-gemc-init             # workspace skeleton + pull .sif + clone + 2× scons build (one-shot bootstrap)
-/solid-gemc-claude:solid-gemc-analyze runs/<id>  # host-side uproot plots from out.root (post-converted via evio2root)
+# Slash commands (v0.0.3 surface — two only)
+/solid-gemc-claude:init             # workspace skeleton + pull .sif + clone + 2× scons build (one-shot bootstrap)
+/solid-gemc-claude:analyze runs/<id>  # host-side uproot plots from out.root (post-converted via evio2root)
 
 # Workflow (between init and analyze) is driven by the orchestrator skill
 # at skills/solid-gemc/SKILL.md. It auto-loads on SoLID-flavored
@@ -168,8 +168,8 @@ bin/solid-gemc-run validate-gcard <file>      # xmllint a GCard inside container
 tests/clean-smoke.sh                          # end-to-end smoke (workspace + image + clone/build + gemc + evio2root + analyze)
 ```
 
-There is no `solid-gemc-example`, no `solid-gemc-config`, and no
-`solid-gemc-run` slash command. After `solid-gemc-init`, the upstream
+There is no `example`, no `config`, and no `run` slash command.
+After `/solid-gemc-claude:init`, the upstream
 HGC study at `solid_gemc/analysis/hgc_study/` (cloned into the
 workspace by init) is the recommended first run — drive it through the
 orchestrator skill in plain language ("run the heavy-gas Cherenkov
@@ -178,7 +178,7 @@ study on He-3"), or follow upstream's `run.sh` via
 
 ## Pre-publish checks
 
-Before the v0.0.2 tag, every item must be clean:
+Before the v0.0.3 tag, every item must be clean:
 
 - `grep -RIn "/home/$USER\|jefflab" .` returns nothing in tracked files (with
   `$USER` expanded). `jlab.org` is allowed only as the `gemc.jlab.org`

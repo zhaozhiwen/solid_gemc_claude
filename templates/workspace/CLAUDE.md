@@ -22,7 +22,7 @@ coexist in the workspace.
 | `analysis/`  | GCards, run outputs, ROOT/uproot analysis scripts | `solid_gemc/analysis/hgc_study/` |
 
 Both upstream examples (`hgc_moved/` and `hgc_study/`) are cloned
-into the workspace by `/solid-gemc-claude:solid-gemc-init`. Open
+into the workspace by `/solid-gemc-claude:init`. Open
 them side-by-side with this project to see the canonical pattern
 in full.
 
@@ -65,7 +65,7 @@ GCards, run outputs, and analysis scripts. Convention from
   `out.root`, `log.txt`, `config.json` per run.
 
 For host-side default plots from `analysis/runs/<id>/out.root`,
-use `/solid-gemc-claude:solid-gemc-analyze` — it bypasses
+use `/solid-gemc-claude:analyze` — it bypasses
 container ROOT via uproot.
 
 ## Project handoff documents

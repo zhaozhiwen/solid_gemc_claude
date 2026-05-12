@@ -3,7 +3,7 @@ description: Scaffold a solid_gemc workspace, pull the JLabCE 2.5 container, clo
 allowed-tools: Bash, Read, Write, Glob, AskUserQuestion
 ---
 
-# /solid-gemc-claude:solid-gemc-init
+# /solid-gemc-claude:init
 
 ## Purpose
 
@@ -14,62 +14,73 @@ working directory. First run is **slow** — ~1.7 GB `.sif` download
 container. Subsequent runs are idempotent: already-done steps are
 skipped.
 
-After init: empty `gcards/`, `runs/`, `analysis/` plus a built
-`solid_gemc/` tree containing the canonical GCards at
-`solid_gemc/script/` and the binary at `solid_gemc/source/2.9/solid_gemc`.
+After init the workspace has the four common files (`CLAUDE.md`,
+`.gitignore`, `log.md`, `result.md`) plus a built `solid_gemc/`
+tree containing the canonical GCards at `solid_gemc/script/` and
+the binary at `solid_gemc/source/2.9/solid_gemc`. **No project
+subdir is created** — each project is a separate `<name>/`
+directory that the user (or the orchestrator skill) materializes
+from `templates/workspace/` on demand.
 
 The recommended first thing to run is the **upstream HGC study** at
 `solid_gemc/analysis/hgc_study/` — see step 6.
 
 ## Inputs
 
-Optional argument: `--force` (overwrite existing template files; does
-**not** re-clone or re-build `solid_gemc/`).
+Optional argument: `--force` (overwrite existing workspace-common
+files; does **not** re-clone, re-build, or touch any existing
+project subdirs).
 
 ## Steps
 
 1. **Confirm environment.** Required host tools: `apptainer`, `git`,
-   `wget`. (`tcsh` runs *inside* the container — it doesn't need to be
-   on the host.) Stop if anything is missing — tell the user what to
-   install. Do not proceed.
+   `wget`. (`tcsh` runs *inside* the container — it doesn't need to
+   be on the host.) Stop if anything is missing — tell the user what
+   to install. Do not proceed.
    ```bash
    for tool in apptainer git wget; do
      command -v "$tool" >/dev/null \
-       || { echo "[solid-gemc-init] missing host tool: $tool"; exit 1; }
+       || { echo "[init] missing host tool: $tool"; exit 1; }
    done
    apptainer --version
    ```
 
 2. **Detect collisions.** List existing entries in `cwd` that the
-   template would touch:
+   workspace-common files would touch:
    ```bash
    ls -A 2>/dev/null \
-     | grep -E '^(CLAUDE\.md|\.gitignore|gcards|runs|analysis|log\.md|result\.md)$' \
+     | grep -E '^(CLAUDE\.md|\.gitignore|log\.md|result\.md)$' \
      || true
    ```
    - **Non-empty and no `--force`:** stop, show the user what's there,
      ask whether to re-run with `--force`.
-   - **`--force` passed:** proceed; the template overwrites
-     `CLAUDE.md`, `.gitignore`, `log.md`, `result.md`, and the empty
-     dir placeholders. `solid_gemc/` and `runs/<id>/` contents are
-     left alone.
+   - **`--force` passed:** proceed; overwrites `CLAUDE.md`,
+     `.gitignore`, `log.md`, `result.md`. `solid_gemc/` and any
+     existing project subdirs are left alone.
    - **Empty:** proceed.
 
-3. **Copy the workspace template** into `.`:
+3. **Copy the workspace-common files** into `.`. These are the four
+   files that apply across all projects in this workspace; they live
+   at the top of the plugin's `templates/` directory (the
+   `templates/workspace/` subdir is the per-project template, copied
+   later by the skill or the user, not by init):
    ```bash
-   cp -r "${CLAUDE_PLUGIN_ROOT}/templates/workspace/." .
+   cp "${CLAUDE_PLUGIN_ROOT}/templates/CLAUDE.md"   ./CLAUDE.md
+   cp "${CLAUDE_PLUGIN_ROOT}/templates/.gitignore"  ./.gitignore
+   cp "${CLAUDE_PLUGIN_ROOT}/templates/log.md"      ./log.md
+   cp "${CLAUDE_PLUGIN_ROOT}/templates/result.md"   ./result.md
    ```
-   The template ships:
-   - `CLAUDE.md` — workspace rules for future Claude sessions.
-   - `.gitignore` — excludes `runs/<id>/`, `*.root`, `*.hipo`,
-     `*.evio`, `solid_gemc/`, `__pycache__/`.
-   - `log.md` — chronological work-log template (prepend an entry per
-     simulation effort; see the file for the six-field-spec section).
-   - `result.md` — per-run findings (update after a noteworthy
-     `solid-gemc-analyze`).
-   - `gcards/.gitkeep`, `runs/.gitkeep`, `analysis/.gitkeep` — empty
-     dirs with conventional names the rest of the plugin's commands
-     expect.
+   The four files:
+   - `CLAUDE.md` — workspace-wide rules for future Claude sessions
+     (non-negotiables, single-runtime-seam discipline, layout
+     description).
+   - `.gitignore` — excludes per-project `*/analysis/runs/*/`, the
+     built `solid_gemc/`, `*.root`, `*.hipo`, `*.evio`,
+     `__pycache__/`.
+   - `log.md` — workspace-level chronological index (lightweight;
+     per-run detail lives in each project's `log.md`).
+   - `result.md` — workspace-level results index (lightweight;
+     headline numbers and pointers to project `result.md`).
 
 4. **Pull the runtime image** through the wrapper. This is the only
    sanctioned way to invoke the solid_gemc runtime:
@@ -111,33 +122,36 @@ Optional argument: `--force` (overwrite existing template files; does
    echo "binary:            $(readlink -f solid_gemc/source/2.9/solid_gemc 2>/dev/null || echo NOT BUILT)"
    ```
    Then tell the user, in this order:
-   - workspace files written under `cwd`,
+   - workspace-common files written under `cwd`,
    - .sif cached at `${CLAUDE_PLUGIN_DATA}/cache/sif/`,
    - `solid_gemc` commit cloned + binary built,
-   - **what to try first** — the upstream HGC study is the canonical
-     config + run + analyze worked example. Two ways in:
+   - **how to start the first project.** Each project lives in its
+     own subdirectory under the workspace. Two ways in:
      ```text
      # Path A — let the orchestrator skill drive it:
      # just describe what you want, e.g. "run the heavy-gas Cherenkov study on He-3".
-     # The skill copies an hgc_study GCard into gcards/, runs solid_gemc + evio2root,
-     # then hands off to /solid-gemc-claude:solid-gemc-analyze.
+     # The skill seeds a fresh project subdir from the per-project template,
+     # then drives gcard prep → solid_gemc + evio2root → analyze.
 
      # Path B — follow upstream's flow directly:
      bin/solid-gemc-run shell
      # then inside the container:
      cd solid_gemc/analysis/hgc_study     # GCards + run.sh + analysis.C
+
+     # Path C — start an empty project manually:
+     cp -r "${CLAUDE_PLUGIN_ROOT}/templates/workspace/." my_study/
+     # then edit my_study/CLAUDE.md, my_study/analysis/, my_study/geometry/
      ```
      Mention the detector-authoring example as a parallel reference:
-     `solid_gemc/geometry/hgc_moved/` (Perl generators + factory text
-     files; see its `readme.md`). The plugin does not ship a
-     detector-authoring command — follow upstream's pattern for that
-     work.
+     `solid_gemc/geometry/hgc_moved/` (Perl generators + factory
+     text files; see its `readme.md`). The plugin does not ship a
+     detector-authoring slash command — follow upstream's pattern.
 
 ## Outputs
 
-- Workspace under `cwd`: `CLAUDE.md`, `.gitignore`, `log.md`,
-  `result.md`, plus `gcards/`, `runs/`, `analysis/` with `.gitkeep`
-  placeholders.
+- Workspace under `cwd`: the four workspace-common files
+  (`CLAUDE.md`, `.gitignore`, `log.md`, `result.md`). No project
+  subdir is auto-created.
 - Cached `.sif` at
   `${CLAUDE_PLUGIN_DATA}/cache/sif/jeffersonlab_jlabce_tag2.5_...sif`.
 - Cloned + built `solid_gemc/` tree (gitignored). The `solid_gemc`
@@ -155,10 +169,14 @@ Optional argument: `--force` (overwrite existing template files; does
 
 ## Notes
 
-- Idempotent. Re-running in a populated workspace without `--force` is
-  a no-op; with `--force`, only template files are overwritten.
-  `solid_gemc/` and `runs/` contents are preserved.
+- Idempotent. Re-running in a populated workspace without `--force`
+  is a no-op; with `--force`, only the four workspace-common files
+  are overwritten. `solid_gemc/` and any project subdirs are
+  preserved.
 - The `.sif` URL, solid_gemc upstream, and `GEMC_VERSION=2.9` are
   pinned in `bin/solid-gemc-run`. Do not hardcode them here.
+- The per-project template is at
+  `${CLAUDE_PLUGIN_ROOT}/templates/workspace/` and is copied per
+  project by the skill (or by the user via Path C above).
 - First-run total time: ~10–20 min (image pull + clone + two scons).
   Subsequent: seconds.
