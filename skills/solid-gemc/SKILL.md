@@ -45,14 +45,148 @@ init                                          (one-shot per workspace)
   → /solid-gemc-claude:analyze <project>/analysis/runs/<id>   (host-side uproot)
 ```
 
-`init` is one-shot per workspace — if `solid_gemc/` already has a
-built binary and the `.sif` is cached, skip step 1.
+`init` is one-shot per workspace and idempotent. **Step 3a force-
+checks the workspace state and invokes init if anything is missing**
+— no extra prompt at that point. The user has already approved when
+they approved the plan, and init is a prerequisite for everything
+else this skill does.
 
 There is no bring-your-own-binary alternative for solid_gemc. If
 the user needs something the canonical configs don't cover, the
 divergence point is **the GCard** — they pick a closer canonical
 and edit it, or hand-author one. The binary, the geometry tree,
 and the physics list all come from upstream solid_gemc.
+
+## Non-negotiables
+
+Two hard rules that bound this skill's execution. Both apply
+every time the skill activates, no exceptions outside the narrow
+carve-outs at the bottom of each section.
+
+### 1. Plan first, approval gate always
+
+**This skill never creates files or runs commands without explicit
+user approval of the plan first — even when the user's initial
+message looks fully specified.** Your interpretation of "PVDIS LD2
+11 GeV 10000 events default analysis" is one of many. You might
+pick the wrong canonical GCard (`solid_PVDIS_LD2_moved_full` vs
+`solid_PVDIS_LD2_simple`), default to a wrong analysis shape, or
+seed a project subdir with an unintended name. Showing your
+interpretation first surfaces those misreads cheaply, before any
+artifact is written.
+
+The discipline:
+
+1. **Always derive the seven-field spec from the user's message**
+   (step 1). Even when the user appears to have given "all the
+   details", make the derivation explicit — what you read into
+   each field, and why.
+2. **Always ask via `AskUserQuestion`** for any field that is
+   ambiguous (not just missing). If "LD2" could resolve to two
+   canonicals, ask. Don't guess silently.
+3. **Always present the plan** (step 2) and gate execution on the
+   `AskUserQuestion` approval choice.
+4. **Never start step 3 without the explicit "Approve and run"
+   choice.** A user message that says "go" or "yes" before they
+   have seen the plan does not authorize execution — the plan
+   must be on screen first, presented in this turn.
+
+This rule holds even when the user is annoyed, says "stop asking,
+just run it", or has done this dance before. The plan
+presentation is cheap; the alternative is a wrong run, a
+mis-named project subdir, or a slow batch firing against the
+wrong canonical.
+
+Narrow exceptions, both already documented in "Do not load
+this skill when" below: (a) pure re-runs of an existing
+`<project>/analysis/<preset>.gcard`, where the user has already
+seen the GCard and is iterating; (b) `solid-gemc-analyze` against
+an existing `runs/<id>/`. Neither creates new artifacts that the
+user hasn't already seen.
+
+### 2. Log every user input + the final plan to `<project>/log.md`
+
+**Every orchestration leaves a verbatim trail in
+`<project>/log.md`.** The trail is what makes future Claude
+sessions (or a future human reader) able to tell what was asked
+versus what was inferred — paraphrasing erases that distinction.
+
+A complete log entry has four sections, prepended as a single
+dated block at the top of `<project>/log.md`:
+
+```
+## YYYY-MM-DD HH:MM UTC — <one-line headline>
+
+### User input (verbatim)
+
+> <user message 1, quoted verbatim — block-quote with `>` prefix>
+>
+> <user message 2 if the spec was revised mid-orchestration>
+>
+> <…every user message in this orchestration cycle, in order>
+
+### Final plan (the approved version)
+
+- Project name:  <…>
+- Physics goal:  <…>
+- SoLID config:  <…>
+- Beam:          <…>
+- GCard:         <preset + parameter overrides>
+- Output:        <…>
+- Analysis:      <…>
+
+Steps (the seven-field plan you presented in step 2):
+1. <…>
+2. <…>
+…
+
+Defaults applied (only if any):
+- <…>
+
+### Decision
+
+<"Approved and run" | "Edited spec to …, then approved" | "Plan only — did not run">
+
+### Outcome
+
+- Run id:  <id> (or "n/a — plan only" or "stopped at step <N>: <reason>")
+- Status:  <succeeded | failed at step <N> with <reason>>
+- Notes:   <one or two lines: what worked, what surprised, what's next>
+```
+
+The four sections are mandatory. Specifically:
+
+- **User input** must quote every user message verbatim
+  (using markdown `>` block-quote). Do not summarize. If the
+  user revised the spec, capture all revisions in order, not
+  just the final ask.
+- **Final plan** must be the approved version (after any user
+  edits), with all seven spec fields filled in plus the step
+  list and any defaults you applied. Future readers should be
+  able to tell from this block alone what would have been run.
+- **Decision** must record which option from step 2's
+  `AskUserQuestion` was picked, and any spec edits the user
+  made along the way.
+- **Outcome** must record the run id and status. Even if the
+  orchestration is "plan only", say so; even if it crashed at
+  step 3c, record the partial state with a pointer to
+  `<project>/analysis/runs/<id>/log.txt`.
+
+**When the log entry is written:** at the very end of the
+orchestration, after `analyze` completes (or after the
+unrecoverable failure that stopped the flow). If a crash leaves
+the run dir incomplete, still write the log entry with
+`Outcome: stopped at step <N>`. Never skip the log entry — a
+silent run is the worst possible outcome.
+
+Also append a one-line entry to the workspace-level `log.md`
+(the lightweight cross-project index at the workspace root):
+`YYYY-MM-DD — <project>: <one-line milestone>` plus a link to
+`<project>/log.md` for detail.
+
+This rule has no exceptions. Even the carve-out cases above
+(pure re-runs, `analyze` alone) log a short entry — at minimum
+the user's request + the run id + the outcome.
 
 ## When to load this skill
 
@@ -212,32 +346,71 @@ Open questions / risks
   path, etc. Don't manufacture caveats.>
 ```
 
-Then use `AskUserQuestion` with three options:
+Then use `AskUserQuestion` with three options. **This gate is
+mandatory** — present it even when the user's initial message
+already said "go" or "yes" (see "Non-negotiable: plan first,
+approval gate always" above).
 
 1. **Approve and run** — proceed with the steps above.
 2. **Edit the spec** — user wants to change something; loop back to step 1.
 3. **Just write the plan, don't run yet** — leaves the plan in the
    chat without executing; useful when the user wants a second look.
 
-Wait for the user's choice. Do not start writing files before
-approval.
+Wait for the user's explicit "Approve and run" choice. **Do not
+start writing files or running commands before that choice
+appears.** A pre-emptive "go" earlier in the conversation does
+not count — the plan must be on screen *in this turn* before
+authorization is meaningful.
 
 ## Step 3 — Execute, in order
 
 Only after the user picks "Approve and run". Each sub-step has a
 post-condition check; if it fails, stop and report.
 
-### 3a. `init` if needed
+### 3a. Force-check init; run it if anything is missing
+
+The simulation flow assumes a fully-initialized workspace. **Hard
+check** for all of:
+
+- The four workspace-common files at cwd: `CLAUDE.md`, `.gitignore`,
+  `log.md`, `result.md`.
+- `solid_gemc/.git/` (the upstream tree is cloned).
+- `solid_gemc/source/2.9/solid_gemc` (the binary exists and is
+  executable).
+- The `.sif` is cached (`bin/solid-gemc-run info` reports a path,
+  not `[not pulled]`).
+
+If **any** are missing, invoke `/solid-gemc-claude:init` immediately
+and wait for it to finish. Do not ask the user again — the plan
+they approved listed init as step 1 with "skip if already done", so
+running it when not-already-done is exactly what the approval covers.
 
 ```bash
-if [[ ! -x solid_gemc/source/2.9/solid_gemc ]]; then
-  echo "Running /solid-gemc-claude:init"  # or invoke directly
+init_needed=0
+for f in CLAUDE.md .gitignore log.md result.md; do
+  [[ -f "$f" ]] || { init_needed=1; break; }
+done
+[[ -d solid_gemc/.git ]]                  || init_needed=1
+[[ -x solid_gemc/source/2.9/solid_gemc ]] || init_needed=1
+
+if (( init_needed )); then
+  echo "[skill] workspace not fully initialized; invoking /solid-gemc-claude:init"
+  # Invoke the slash command (the agent dispatches; do not return
+  # control to the user until init reports success).
 fi
 ```
 
-Post-condition: `solid_gemc/source/2.9/solid_gemc` exists and is
-executable; `.sif` is cached; workspace-common files (`CLAUDE.md`,
-`.gitignore`, `log.md`, `result.md`) exist at the workspace root.
+Note that `bin/solid-gemc-run clone` and `build` are themselves
+idempotent — `clone` now prints the existing commit SHA and
+warns-but-continues when `solid_gemc/.git` is already present;
+`build` re-invokes scons which incrementally no-ops when nothing
+has changed. So invoking init on a partially-initialized workspace
+is safe.
+
+Post-condition: all four workspace-common files exist; `.sif` is
+cached; `solid_gemc/.git/` exists; `solid_gemc/source/2.9/solid_gemc`
+is executable. If init returns non-zero, **stop** — report the
+failure (last 20 lines of init's output) and do not proceed.
 
 ### 3b. Seed the project subdir if missing
 
@@ -406,26 +579,19 @@ do not paper over the error, do not move to the next step.
 
 ### Handoff documents
 
-Maintain `<project>/log.md` and `<project>/result.md` per the
-rule in `templates/workspace/CLAUDE.md` (the per-project rules
-file). The orchestrator slice:
+Apply **Non-negotiable #2** at the top of this skill (log every
+user input + final plan to `<project>/log.md`). The four-section
+block (User input verbatim → Final plan → Decision → Outcome)
+gets prepended at the top of `<project>/log.md` at the very end
+of step 3, after `analyze` completes (or after the failure that
+stopped the flow). Don't skip it; even a crashed run gets a log
+entry with `Outcome: stopped at step <N>`.
 
-- Capture the user's **original request verbatim** (don't
-  paraphrase — future readers need to tell what was asked vs.
-  what was inferred).
-- Capture the **plan** you presented (the seven-field spec + step
-  list shown in step 2 above).
-- Capture the user's **decision** (approved as-is, edited spec
-  to …, or plan-only).
-- Capture the **outcome** (run id, status, one or two lines on
-  what happened).
-
-Prepend all four as a single dated section at the top of
-`<project>/log.md` before reporting back to the user. Update
-`<project>/result.md` with the key numbers and plot paths after
-analysis. Also append a one-line entry to the workspace-level
-`log.md` (cross-project index) — just the date, project name,
-and one-line milestone. Use the templates that ship in each file.
+In addition: update `<project>/result.md` with the key numbers
+and plot paths after analysis (only for runs that produced
+notable results — skip for trivial smokes). Append a one-line
+entry to the workspace-level `log.md` (the cross-project index)
+pointing at `<project>/log.md` for detail.
 
 ## Step 4 — Final report
 
