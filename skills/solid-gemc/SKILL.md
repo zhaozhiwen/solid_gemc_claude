@@ -25,12 +25,12 @@ The plugin uses a **two-tier workspace**:
   `result.md`, plus the `solid_gemc/` build tree.
 - **Project subdirs** (one per SoLID study, named by the user)
   contain the per-project files: their own `CLAUDE.md`, `log.md`,
-  `result.md`, plus `geometry/` (custom detector authoring,
-  mimics `solid_gemc/geometry/hgc_moved/`) and `analysis/` (GCards
-  + run outputs + analysis scripts, mimics
-  `solid_gemc/analysis/hgc_study/`).
+  `result.md`. GCards, run outputs, analysis scripts, and (if
+  applicable) custom-detector Perl generators all live directly
+  in the project subdir — no enforced subdir split, mirroring
+  the flat style of upstream `solid_gemc/analysis/hgc_study/`.
 
-Per-run outputs land at `<project>/analysis/runs/<id>/`.
+Per-run outputs land at `<project>/runs/<id>/`.
 
 ## Default flow this skill drives
 
@@ -38,11 +38,11 @@ Per-run outputs land at `<project>/analysis/runs/<id>/`.
 init                                          (one-shot per workspace)
   → ensure <project>/ subdir exists           (seed from templates/workspace/ if not)
   → pick a GCard from solid_gemc/script/      (canonical) or solid_gemc/analysis/*/
-  → copy to <project>/analysis/<preset>.gcard + apply batch overrides
+  → copy to <project>/<preset>.gcard + apply batch overrides
   → bin/solid-gemc-run exec "solid_gemc <gcard>"     (run gemc; emits out.evio)
   → bin/solid-gemc-run exec "evio2root -INPUTF=out.evio"  (post-convert)
-  → write <project>/analysis/runs/<id>/{gcard.gcard, out.evio, out.root, log.txt, config.json}
-  → /solid-gemc-claude:analyze <project>/analysis/runs/<id>   (host-side uproot)
+  → write <project>/runs/<id>/{gcard.gcard, out.evio, out.root, log.txt, config.json}
+  → /solid-gemc-claude:analyze <project>/runs/<id>   (host-side uproot)
 ```
 
 `init` is one-shot per workspace and idempotent. **Step 3a force-
@@ -148,7 +148,7 @@ Only these two cases skip the gate, and they're carve-outs for
 **no new artifacts being created**:
 
 (a) **Pure re-run** of an existing
-`<project>/analysis/<preset>.gcard` that the user explicitly
+`<project>/<preset>.gcard` that the user explicitly
 named — the user has already seen and approved this GCard's
 content in a prior gated orchestration. The re-run produces a
 new `runs/<id>/` but uses the already-approved GCard.
@@ -228,7 +228,7 @@ The four sections are mandatory. Specifically:
 - **Outcome** must record the run id and status. Even if the
   orchestration is "plan only", say so; even if it crashed at
   step 3c, record the partial state with a pointer to
-  `<project>/analysis/runs/<id>/log.txt`.
+  `<project>/runs/<id>/log.txt`.
 
 **When the log entry is written:** at the very end of the
 orchestration, after `analyze` completes (or after the
@@ -266,14 +266,14 @@ Trigger on any of:
 
 Do **not** load this skill when:
 
-- The user already has a `<project>/analysis/runs/<id>/out.root`
+- The user already has a `<project>/runs/<id>/out.root`
   and only wants plots — call
   `/solid-gemc-claude:analyze` directly.
 - A previous run is failing and the user wants to debug — that's a
   debugging task, not a fresh orchestration. Read the run dir's
   `log.txt` + `config.json` and reason from there.
 - The user is iterating on an existing
-  `<project>/analysis/<preset>.gcard` and just wants a re-run —
+  `<project>/<preset>.gcard` and just wants a re-run —
   execute the run loop in step 3 below directly without re-running
   the gap-check.
 
@@ -298,8 +298,8 @@ it, whether a default is safe, or whether you must ask.
 | **SoLID config** | Magnet + spectrometer configuration that fixes the geometry | "PVDIS, LD2 target, full magnet config", "SIDIS He-3, heavy-gas Cherenkov in", "J/psi LH2 simple" |
 | **Beam** | Particle, energy, event count | "11 GeV e-, 10000 events" |
 | **GCard** | Preset from `solid_gemc/script/` or `solid_gemc/analysis/*/`, with any parameter overrides | `solid_PVDIS_LD2_moved_full.gcard` (canonical), `N=10000`, `OUTPUT=evio,out.evio` |
-| **Output** | gemc 2.9 writes **EVIO natively** (the build has no ROOT writer); the skill post-converts to ROOT via `evio2root` so uproot analysis works the same. | `<project>/analysis/runs/<id>/out.evio` (raw) + `out.root` (converted) |
-| **Analysis** | Plots / numbers to produce | "auto-histogram all numeric branches", "asymmetry binned in Q²", "PE yield vs radius via custom script in `<project>/analysis/`" |
+| **Output** | gemc 2.9 writes **EVIO natively** (the build has no ROOT writer); the skill post-converts to ROOT via `evio2root` so uproot analysis works the same. | `<project>/runs/<id>/out.evio` (raw) + `out.root` (converted) |
+| **Analysis** | Plots / numbers to produce | "auto-histogram all numeric branches", "asymmetry binned in Q²", "PE yield vs radius via custom script in `<project>/`" |
 
 ### What must be asked, never guessed
 
@@ -325,7 +325,7 @@ a default is not safe. Don't chain a bunch of guesses together.
   e.g. "PVDIS A_PV on LD2" → `pvdis_ld2_aPV`. Confirm with the
   user once in the plan. If a same-named `<project>/` already
   exists in the workspace, default to **using it** (the skill
-  adds runs to its `analysis/runs/`); ask only if the user
+  adds runs to its `runs/`); ask only if the user
   appeared to want a fresh project.
 - **GCard preset name** — once "SoLID config" is locked, the
   preset is derived from it. PVDIS + LD2 + full →
@@ -354,8 +354,8 @@ ready-made workflow with its own `load.sh` / `run.sh` /
 `analysis.C`. Two ways in:
 
 - **Skill-driven** — create a project subdir (e.g.
-  `hgc_study_<variant>/`), copy one of the hgc GCards into its
-  `analysis/`, run through this skill. The `analyze` step gives
+  `hgc_study_<variant>/`), copy one of the hgc GCards into it,
+  run through this skill. The `analyze` step gives
   host-side uproot plots from the EVIO → ROOT conversion.
 - **Upstream-driven** — `bin/solid-gemc-run shell` drops the user
   into a tcsh prompt with the env set; they
@@ -381,19 +381,19 @@ Spec
 - SoLID config:  <…>
 - Beam:          <…>
 - GCard:         <preset name + parameter overrides>
-- Output:        <<project>/analysis/runs/<id>/out.root | other if user asked>
-- Analysis:      <auto-plots | custom script in <project>/analysis/ | hgc_study upstream>
+- Output:        <<project>/runs/<id>/out.root | other if user asked>
+- Analysis:      <auto-plots | custom script in <project>/ | hgc_study upstream>
 
 Steps
 1. /solid-gemc-claude:init    — workspace + .sif pull + clone + 2× scons (skip if already done)
 2. seed <project>/ from templates/workspace/. (skip if already there)
-3. copy <project>/analysis/<preset>.gcard from solid_gemc/script/<preset>.gcard (or .../analysis/.../<preset>.gcard); apply USE_GUI=0 + OUTPUT=evio,out.evio + N=<n>
-4. <only if user wants non-default beam/physics:> edit <project>/analysis/<preset>.gcard
+3. copy <project>/<preset>.gcard from solid_gemc/script/<preset>.gcard (or .../analysis/.../<preset>.gcard); apply USE_GUI=0 + OUTPUT=evio,out.evio + N=<n>
+4. <only if user wants non-default beam/physics:> edit <project>/<preset>.gcard
 5. bin/solid-gemc-run exec "solid_gemc <abs gcard> -OUTPUT=evio,<abs run dir>/out.evio"  (from the gcard's upstream dir)
-   then bin/solid-gemc-run exec "evio2root -INPUTF=out.evio"   (from <project>/analysis/runs/<id>/)
-   write <project>/analysis/runs/<id>/{gcard.gcard, out.evio, out.root, log.txt, config.json}
-6. /solid-gemc-claude:analyze <project>/analysis/runs/<id>
-     <one line: auto-plots | custom <project>/analysis/<id>.py | container-side ROOT macro>
+   then bin/solid-gemc-run exec "evio2root -INPUTF=out.evio"   (from <project>/runs/<id>/)
+   write <project>/runs/<id>/{gcard.gcard, out.evio, out.root, log.txt, config.json}
+6. /solid-gemc-claude:analyze <project>/runs/<id>
+     <one line: auto-plots | custom <project>/<id>.py | container-side ROOT macro>
 
 Defaults applied
 - <only list defaults you actually filled in; skip section if none>
@@ -480,13 +480,13 @@ fi
 ```
 
 Post-condition: `<project>/` exists with `CLAUDE.md`, `log.md`,
-`result.md`, `geometry/`, `analysis/`. If it pre-existed, leave it
+`result.md` (flat — no enforced subdirs). If it pre-existed, leave it
 alone — never clobber a user's project files.
 
 ### 3c. Prepare the GCard
 
 Resolve the preset against `solid_gemc/script/` first, then
-`solid_gemc/analysis/*/`. Copy to `<project>/analysis/<preset>.gcard`.
+`solid_gemc/analysis/*/`. Copy to `<project>/<preset>.gcard`.
 Apply batch overrides **only inside the live `<gcard>…</gcard>`
 block** (canonicals often carry a `<!-- comment out … -->` example
 block; leave it alone). The robust regex strips any existing
@@ -498,7 +498,7 @@ the bottom of the live block:
 ```bash
 PRESET=<resolved>
 SRC=<solid_gemc/script/solid_${PRESET}.gcard or under solid_gemc/analysis/*/>
-DEST="${PROJECT}/analysis/$(basename "$SRC")"
+DEST="${PROJECT}/$(basename "$SRC")"
 SOURCE_DIR=$(dirname "$SRC")   # needed at run time; gemc 2.9 resolves <detector name="..."> relative to cwd, not the GCard's location
 
 cp "$SRC" "$DEST"
@@ -528,7 +528,7 @@ SOLID_GEMC_CLAUDE_CACHE="${CLAUDE_PLUGIN_DATA}/cache" \
   "${CLAUDE_PLUGIN_ROOT}/bin/solid-gemc-run" validate-gcard "$DEST"
 ```
 
-Post-condition: `<project>/analysis/<preset>.gcard` exists; the
+Post-condition: `<project>/<preset>.gcard` exists; the
 live `<gcard>` block contains the three overrides; `validate-gcard`
 returns 0.
 
@@ -544,7 +544,7 @@ via a tempfile (the harness shell may be either).
 
 ```bash
 RUN_ID=$(date -u +%Y%m%d-%H%M%S)-$(head -c 12 /dev/urandom | base32 | tr 'A-Z' 'a-z' | head -c 6)
-RUN_DIR="${PROJECT}/analysis/runs/${RUN_ID}"
+RUN_DIR="${PROJECT}/runs/${RUN_ID}"
 mkdir -p "$RUN_DIR"
 cp "$DEST" "$RUN_DIR/gcard.gcard"
 
@@ -578,7 +578,7 @@ END_ISO=$(date -u +%Y-%m-%dT%H:%M:%SZ); END_EPOCH=$(date +%s)
 EXIT_CODE=$([ "$GEMC_EXIT" = "0" ] && echo "$EVIO2ROOT_EXIT" || echo "$GEMC_EXIT")
 ```
 
-Post-condition: `<project>/analysis/runs/<id>/{gcard.gcard,
+Post-condition: `<project>/runs/<id>/{gcard.gcard,
 out.evio, out.root, log.txt}` exist and are non-empty;
 `EXIT_CODE` is 0.
 
@@ -617,16 +617,16 @@ pathlib.Path(sys.argv[1]).write_text(json.dumps(d, indent=2) + "\n")
 PY
 ```
 
-`<project>/analysis/runs/<id>/config.json` is the **provenance
+`<project>/runs/<id>/config.json` is the **provenance
 record**. Treat the run dir as immutable from this point on.
 
 ### 3f. Analyze
 
 Hand off to
-`/solid-gemc-claude:analyze <project>/analysis/runs/<id>`
+`/solid-gemc-claude:analyze <project>/runs/<id>`
 — host-side uproot, auto-plots numeric branches into PNGs
 alongside `out.root`. For asymmetries / fits / multi-run
-comparisons, write a script under `<project>/analysis/`.
+comparisons, write a script under `<project>/`.
 
 ### Failure handling
 
@@ -659,12 +659,12 @@ End with a single block:
 Done.
 - Project: <project>
 - Run id:  <id>
-- Output:  <project>/analysis/runs/<id>/out.root
-- Plots:   <project>/analysis/runs/<id>/<plot1>.png, …  (or "(histogram-only output; no auto-plots)")
+- Output:  <project>/runs/<id>/out.root
+- Plots:   <project>/runs/<id>/<plot1>.png, …  (or "(histogram-only output; no auto-plots)")
 - Updated: <project>/log.md, <project>/result.md, log.md
 
 Next: <one concrete suggestion — vary the beam energy, scale up n_events,
-       try a different canonical config, run a custom <project>/analysis/<id>.py>
+       try a different canonical config, run a custom <project>/<id>.py>
 ```
 
 No "let me know if you have more questions". No emoji. No recap

@@ -121,20 +121,21 @@ pass "solid_gemc binary present"
 
 # --- phase 3: seed project + gcard prep (cherenkov.gcard) -------------------
 # Mirrors the skill's per-project flow: seed a project subdir from the
-# per-project template, resolve the preset, copy from upstream into
-# <project>/analysis/, apply batch overrides on the live <gcard> block.
+# per-project template (flat — no geometry/ or analysis/ subdirs),
+# resolve the preset, copy from upstream into <project>/, apply batch
+# overrides on the live <gcard> block.
 log "phase 3 — seed project + prepare cherenkov.gcard (small, fast, self-contained)"
 PROJECT=cherenkov_smoke
 cp -r "${PLUGIN_ROOT}/templates/workspace/." "${PROJECT}/"
 [ -f "${PROJECT}/CLAUDE.md" ]            || fail "project CLAUDE.md missing under ${PROJECT}/"
-[ -d "${PROJECT}/geometry" ]             || fail "project geometry/ missing under ${PROJECT}/"
-[ -d "${PROJECT}/analysis" ]             || fail "project analysis/ missing under ${PROJECT}/"
+[ -f "${PROJECT}/log.md" ]               || fail "project log.md missing under ${PROJECT}/"
+[ -f "${PROJECT}/result.md" ]            || fail "project result.md missing under ${PROJECT}/"
 pass "seeded project ${PROJECT}/ from templates/workspace/"
 
 PRESET=cherenkov
 SRC=$(find solid_gemc/analysis -mindepth 2 -maxdepth 2 -name "${PRESET}.gcard" 2>/dev/null | head -1)
 [[ -n "$SRC" ]] || fail "${PRESET}.gcard not found under solid_gemc/analysis/"
-DEST="${PROJECT}/analysis/$(basename "${SRC}")"
+DEST="${PROJECT}/$(basename "${SRC}")"
 SOURCE_DIR=$(dirname "${SRC}")
 cp "${SRC}" "${DEST}"
 python3 - "${DEST}" 2 out.evio 0 <<'PY'
@@ -165,10 +166,10 @@ pass "cherenkov.gcard configured (2 events, USE_GUI=0, OUTPUT=evio,out.evio)"
 # $SOURCE_DIR is the cwd-relative-geometry-lookup discipline; absolute
 # GCARD_ABS / RUN_DIR_ABS paths are how we keep the workspace dirs in
 # scope from a different cwd. Per-run output lands under the project's
-# analysis/runs/<id>/.
+# runs/<id>/.
 log "phase 4 — run gemc + evio2root (N=2 events, ~10 s)"
 RUN_ID=$(date -u +%Y%m%d-%H%M%S)-$(head -c 12 /dev/urandom | base32 | tr 'A-Z' 'a-z' | head -c 6)
-RUN_DIR="${PROJECT}/analysis/runs/${RUN_ID}"
+RUN_DIR="${PROJECT}/runs/${RUN_ID}"
 mkdir -p "${RUN_DIR}"
 cp "${DEST}" "${RUN_DIR}/gcard.gcard"
 WORKSPACE_ABS=$(readlink -f .)

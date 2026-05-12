@@ -113,15 +113,15 @@ Pass:
 - On approving, the skill drives:
   - Project seed: `<project>/` appears under the workspace root,
     seeded from `templates/workspace/.` — contains its own
-    `CLAUDE.md`, `log.md`, `result.md`, plus empty `geometry/` and
-    `analysis/` dirs.
-  - GCard copy: `<project>/analysis/cherenkov.gcard` appears, with
+    `CLAUDE.md`, `log.md`, `result.md` (flat — no enforced
+    subdirs).
+  - GCard copy: `<project>/cherenkov.gcard` appears, with
     live `<gcard>` block containing
     `<option name="OUTPUT" value="evio,out.evio"/>`,
     `<option name="N" value="10"/>`,
     `<option name="USE_GUI" value="0"/>`. The canonical's
     `<!-- comment out … -->` example block is left intact.
-  - Run: a new `<project>/analysis/runs/<UTC-id>/` directory
+  - Run: a new `<project>/runs/<UTC-id>/` directory
     appears containing `gcard.gcard` (frozen), `out.evio`
     (non-empty; from solid_gemc), `out.root` (non-empty; from
     evio2root), `log.txt` (multi-KB; both gemc and evio2root
@@ -149,16 +149,16 @@ Pass:
 ## Phase 5 — `/solid-gemc-claude:analyze`
 
 ```text
-> /solid-gemc-claude:analyze <project>/analysis/runs/<UTC-id>
+> /solid-gemc-claude:analyze <project>/runs/<UTC-id>
 ```
 
 Pass:
 - The command lists at least one TTree from `out.root` with its
   branches and entry count.
 - At least 1 PNG histogram lands in
-  `<project>/analysis/runs/<UTC-id>/`, named
+  `<project>/runs/<UTC-id>/`, named
   `hist_<tree>_<branch>.png`.
-- The closing report points the user at `<project>/analysis/` for
+- The closing report points the user at `<project>/` for
   custom scripts.
 
 ## Phase 6 — Idempotency

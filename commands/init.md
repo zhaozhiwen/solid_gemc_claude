@@ -74,7 +74,7 @@ project subdirs).
    - `CLAUDE.md` — workspace-wide rules for future Claude sessions
      (non-negotiables, single-runtime-seam discipline, layout
      description).
-   - `.gitignore` — excludes per-project `*/analysis/runs/*/`, the
+   - `.gitignore` — excludes per-project `*/runs/*/`, the
      built `solid_gemc/`, `*.root`, `*.hipo`, `*.evio`,
      `__pycache__/`.
    - `log.md` — workspace-level chronological index (lightweight;
