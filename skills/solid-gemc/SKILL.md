@@ -65,44 +65,102 @@ carve-outs at the bottom of each section.
 
 ### 1. Plan first, approval gate always
 
-**This skill never creates files or runs commands without explicit
-user approval of the plan first — even when the user's initial
-message looks fully specified.** Your interpretation of "PVDIS LD2
-11 GeV 10000 events default analysis" is one of many. You might
-pick the wrong canonical GCard (`solid_PVDIS_LD2_moved_full` vs
-`solid_PVDIS_LD2_simple`), default to a wrong analysis shape, or
-seed a project subdir with an unintended name. Showing your
-interpretation first surfaces those misreads cheaply, before any
-artifact is written.
+**This skill never creates files or runs commands without an
+explicit `AskUserQuestion` "Approve and run" choice picked in the
+current turn — full stop. Not when the user says "go". Not when
+the user says "yes". Not when the user says "no clarifying
+questions". Not when the user says "just run it" or "skip the
+approval". Not when the initial message looks fully specified.**
 
-The discipline:
+Your interpretation of "PVDIS LD2 11 GeV 10000 events default
+analysis" is one of many. You might pick the wrong canonical
+GCard (`solid_PVDIS_LD2_moved_full` vs `solid_PVDIS_LD2_simple`),
+default to a wrong analysis shape, seed a project subdir with an
+unintended name, or pick wrong defaults for materials / mirror
+tilt / focal length / sensor QE. Showing your interpretation first
+surfaces those misreads cheaply, before any artifact is written.
 
-1. **Always derive the seven-field spec from the user's message**
-   (step 1). Even when the user appears to have given "all the
-   details", make the derivation explicit — what you read into
-   each field, and why.
-2. **Always ask via `AskUserQuestion`** for any field that is
-   ambiguous (not just missing). If "LD2" could resolve to two
-   canonicals, ask. Don't guess silently.
-3. **Always present the plan** (step 2) and gate execution on the
-   `AskUserQuestion` approval choice.
-4. **Never start step 3 without the explicit "Approve and run"
-   choice.** A user message that says "go" or "yes" before they
-   have seen the plan does not authorize execution — the plan
-   must be on screen first, presented in this turn.
+#### Clarifying questions ≠ approval gate
 
-This rule holds even when the user is annoyed, says "stop asking,
-just run it", or has done this dance before. The plan
-presentation is cheap; the alternative is a wrong run, a
-mis-named project subdir, or a slow batch firing against the
-wrong canonical.
+These are two different things, governed by two different rules.
+The user can waive one but not the other.
 
-Narrow exceptions, both already documented in "Do not load
-this skill when" below: (a) pure re-runs of an existing
-`<project>/analysis/<preset>.gcard`, where the user has already
-seen the GCard and is iterating; (b) `solid-gemc-analyze` against
-an existing `runs/<id>/`. Neither creates new artifacts that the
-user hasn't already seen.
+| Question type | What it covers | Waivable by user? |
+|---|---|---|
+| Clarifying (step 1) | Ambiguous spec fields — which GCard variant, what beam energy, which project name | **Yes** — if the user says "fill in sensible defaults" or "no clarifying questions", skip these and fill defaults |
+| Approval gate (step 2) | Final execution authorization for THIS plan in THIS turn | **Never. Mandatory regardless of what the user said about questions.** |
+
+If the user says "stop asking clarifying questions and just run
+my study": fill in defaults instead of asking, present the
+resulting plan, **then still gate on a final `AskUserQuestion`
+with Approve / Edit / Plan-only options.** The user can pick
+"Approve and run" in one click — cost to them: a few seconds. Cost
+of skipping: a wrong run, mis-named project, or hours of
+re-doing work because a default was wrong.
+
+#### What "always" means, concretely
+
+- The approval gate is **a specific `AskUserQuestion` tool call
+  with the three Approve / Edit / Plan-only options** — not a
+  text presentation that ends with "let me know if this looks
+  right", not a written question, not a prose summary asking
+  for confirmation. A tool call. The user must pick an option.
+- The gate fires **after** the plan is on screen as text in the
+  same turn. The order is: present the plan as text →
+  `AskUserQuestion` with three options → wait for the explicit
+  option pick → then and only then proceed to step 3.
+- A user message that said "go" or "yes" **before** the plan was
+  presented in this turn is **not** the approval. The approval
+  is the option the user picks **after** seeing the plan in this
+  turn.
+- Pre-fetched authorization from earlier in the conversation
+  (e.g., "any setting, just go") does not transfer across turns
+  or across plans. Every plan gets its own gate.
+
+#### Failure pattern to recognize and reject in yourself
+
+If your inner monologue contains any of these, **stop and fire
+the gate before proceeding**:
+
+> "The user said no clarifying questions, so I'll just run it."
+> (Wrong: clarifying questions ≠ approval gate.)
+
+> "The plan is on screen as text, so the user can read it before
+> I act."
+> (Wrong: text ≠ tool call. Without `AskUserQuestion`, the user
+> has no structured way to redirect.)
+
+> "The user already said 'go' / 'yes' in their first message."
+> (Wrong: pre-emptive authorization before seeing the plan does
+> not count.)
+
+> "This is the third turn in a row of the same plan, the user
+> obviously approves."
+> (Wrong: every plan, every turn, gets its own gate.)
+
+> "It's faster to just do it and ask forgiveness."
+> (Wrong: every wrong run is more expensive than the 3 seconds
+> the gate costs.)
+
+#### Narrow exceptions
+
+Only these two cases skip the gate, and they're carve-outs for
+**no new artifacts being created**:
+
+(a) **Pure re-run** of an existing
+`<project>/analysis/<preset>.gcard` that the user explicitly
+named — the user has already seen and approved this GCard's
+content in a prior gated orchestration. The re-run produces a
+new `runs/<id>/` but uses the already-approved GCard.
+
+(b) **`/solid-gemc-claude:analyze` against an existing
+`runs/<id>/`** — no new simulation artifacts; just plots from
+an existing ROOT file.
+
+**Neither** "the user said no questions" nor "the user said go
+already" nor "the user is annoyed" nor "the plan is obvious"
+qualifies as an exception. If you're tempted to add a new
+exception, you're wrong — fire the gate.
 
 ### 2. Log every user input + the final plan to `<project>/log.md`
 
