@@ -22,12 +22,12 @@ The plugin uses a **two-tier workspace**:
 
 - **Workspace root** (the dir `/solid-gemc-claude:init` was run in) holds
   workspace-common files: `CLAUDE.md`, `.gitignore`, `log.md`,
-  `result.md`, plus the `solid_gemc/` build tree.
+  `result.md`, `report.html`, plus the `solid_gemc/` build tree.
 - **Project subdirs** (one per SoLID study, named by the user)
   contain the per-project files: their own `CLAUDE.md`, `log.md`,
-  `result.md`. GCards, run outputs, analysis scripts, and (if
-  applicable) custom-detector Perl generators all live directly
-  in the project subdir — no enforced subdir split, mirroring
+  `result.md`, `report.html`. GCards, run outputs, analysis scripts,
+  and (if applicable) custom-detector Perl generators all live
+  directly in the project subdir — no enforced subdir split, mirroring
   the flat style of upstream `solid_gemc/analysis/hgc_study/`.
 
 Per-run outputs land at `<project>/runs/<id>/`.
@@ -430,8 +430,8 @@ post-condition check; if it fails, stop and report.
 The simulation flow assumes a fully-initialized workspace. **Hard
 check** for all of:
 
-- The four workspace-common files at cwd: `CLAUDE.md`, `.gitignore`,
-  `log.md`, `result.md`.
+- The five workspace-common files at cwd: `CLAUDE.md`, `.gitignore`,
+  `log.md`, `result.md`, `report.html`.
 - `solid_gemc/.git/` (the upstream tree is cloned).
 - `solid_gemc/source/2.9/solid_gemc` (the binary exists and is
   executable).
@@ -445,7 +445,7 @@ running it when not-already-done is exactly what the approval covers.
 
 ```bash
 init_needed=0
-for f in CLAUDE.md .gitignore log.md result.md; do
+for f in CLAUDE.md .gitignore log.md result.md report.html; do
   [[ -f "$f" ]] || { init_needed=1; break; }
 done
 [[ -d solid_gemc/.git ]]                  || init_needed=1
@@ -465,7 +465,7 @@ warns-but-continues when `solid_gemc/.git` is already present;
 has changed. So invoking init on a partially-initialized workspace
 is safe.
 
-Post-condition: all four workspace-common files exist; `.sif` is
+Post-condition: all five workspace-common files exist; `.sif` is
 cached; `solid_gemc/.git/` exists; `solid_gemc/source/2.9/solid_gemc`
 is executable. If init returns non-zero, **stop** — report the
 failure (last 20 lines of init's output) and do not proceed.
@@ -480,8 +480,8 @@ fi
 ```
 
 Post-condition: `<project>/` exists with `CLAUDE.md`, `log.md`,
-`result.md` (flat — no enforced subdirs). If it pre-existed, leave it
-alone — never clobber a user's project files.
+`result.md`, `report.html` (flat — no enforced subdirs). If it
+pre-existed, leave it alone — never clobber a user's project files.
 
 ### 3c. Prepare the GCard
 
@@ -647,9 +647,16 @@ entry with `Outcome: stopped at step <N>`.
 
 In addition: update `<project>/result.md` with the key numbers
 and plot paths after analysis (only for runs that produced
-notable results — skip for trivial smokes). Append a one-line
+notable results — skip for trivial smokes), then refresh
+`<project>/report.html` so the rendered summary (overview,
+configuration table, headline figures, run-index row) stays in
+sync with `result.md`. Use relative paths into `runs/<id>/` for
+embedded plots; do not inline images as base64 — the run dir is
+gitignored but it lives next to the report. Append a one-line
 entry to the workspace-level `log.md` (the cross-project index)
-pointing at `<project>/log.md` for detail.
+pointing at `<project>/log.md` for detail, and add/update the
+project's card + any cross-project headline plot in the
+workspace-level `report.html`.
 
 ## Step 4 — Final report
 
@@ -661,7 +668,7 @@ Done.
 - Run id:  <id>
 - Output:  <project>/runs/<id>/out.root
 - Plots:   <project>/runs/<id>/<plot1>.png, …  (or "(histogram-only output; no auto-plots)")
-- Updated: <project>/log.md, <project>/result.md, log.md
+- Updated: <project>/log.md, <project>/result.md, <project>/report.html, log.md, report.html
 
 Next: <one concrete suggestion — vary the beam energy, scale up n_events,
        try a different canonical config, run a custom <project>/<id>.py>

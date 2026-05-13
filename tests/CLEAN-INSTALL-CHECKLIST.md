@@ -81,8 +81,9 @@ In Claude Code:
 Pass:
 - Tool checks succeed for `apptainer`, `git`, `wget`.
 - Workspace-common files appear: `CLAUDE.md`, `.gitignore`,
-  `log.md`, `result.md` (no `gcards/`, `runs/`, `analysis/` at the
-  workspace root — those live inside each project subdir).
+  `log.md`, `result.md`, `report.html` (no `gcards/`, `runs/`,
+  `analysis/` at the workspace root — those live inside each project
+  subdir).
 - `.sif` lands at
   `~/.claude/plugins/data/solid-gemc-claude-solid-gemc-claude/cache/sif/jeffersonlab_jlabce_tag2.5_digest:sha256:9b9a9...sif`.
 - `solid_gemc/` is cloned into the workspace; `git rev-parse HEAD`
@@ -113,8 +114,8 @@ Pass:
 - On approving, the skill drives:
   - Project seed: `<project>/` appears under the workspace root,
     seeded from `templates/workspace/.` — contains its own
-    `CLAUDE.md`, `log.md`, `result.md` (flat — no enforced
-    subdirs).
+    `CLAUDE.md`, `log.md`, `result.md`, `report.html` (flat — no
+    enforced subdirs).
   - GCard copy: `<project>/cherenkov.gcard` appears, with
     live `<gcard>` block containing
     `<option name="OUTPUT" value="evio,out.evio"/>`,

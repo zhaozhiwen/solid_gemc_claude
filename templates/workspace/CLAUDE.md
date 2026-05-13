@@ -20,6 +20,7 @@ Files live directly under the project root — no subdir split.
 | `CLAUDE.md`    | this file — project rules |
 | `log.md`       | chronological work log for this project (prepend new entries at top) |
 | `result.md`    | per-run findings + plot paths |
+| `report.html`  | rich-text + plots summary, openable directly in a browser (`file://…/<project>/report.html`). Updated alongside `result.md` when a noteworthy run lands. |
 | `<preset>.gcard` | workspace-edited GCard(s). The orchestrator skill copies from `solid_gemc/script/` or `solid_gemc/analysis/*/` and applies batch overrides (`USE_GUI=0`, `OUTPUT=evio,out.evio`, `N=<n>`) on the live `<gcard>` block. |
 | `runs/<id>/`   | per-run output. The skill writes `gcard.gcard` (frozen), `out.evio`, `out.root`, `log.txt`, `config.json`. **Gitignored** at the workspace level. |
 | `*.py`, `*.C`, `*.pl`, … | your analysis scripts (uproot Python, ROOT macros) or custom detector authoring (Perl generators + factory text files), mixed at the project root |
@@ -87,6 +88,12 @@ uproot.
 - **`result.md`** — per noteworthy run. Key numbers + plot paths
   + a link back to `runs/<id>/`. See the template inside the
   file.
+- **`report.html`** — the human-facing version of `result.md`: rich
+  text, embedded plots (relative paths into `runs/<id>/`), tables
+  for setup + run index. Self-contained (no external CSS/JS);
+  open with `file://…/<project>/report.html`. Keep it and
+  `result.md` in sync — `result.md` is the source for facts,
+  `report.html` is the presentation layer.
 - **`../log.md`** (workspace level) — cross-project index. Add a
   one-line pointer here when a new project starts or a milestone
   lands. Detail belongs in the project log.

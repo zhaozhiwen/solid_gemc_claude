@@ -30,6 +30,7 @@ upstream organizes `solid_gemc/analysis/hgc_study/` and
 | `<name>/CLAUDE.md`  | Per-project rules (loaded as Claude context when the session's cwd is inside the project). |
 | `<name>/log.md`     | Chronological work log for this project. Prepend new entries at top. |
 | `<name>/result.md`  | Per-run findings, with paths to `<name>/runs/<id>/`. |
+| `<name>/report.html` | Browser-readable summary of the project (rich text + embedded plots from `runs/<id>/`). Self-contained HTML, open via `file://`. |
 | `<name>/runs/<id>/` | Per-run output dirs. The orchestrator skill writes `gcard.gcard`, `out.evio`, `out.root`, `log.txt`, `config.json` per run. **Gitignored.** |
 | `solid_gemc/`       | Cloned + built upstream tree (init artifact). **Gitignored.** Refresh via re-running init. |
 
@@ -57,18 +58,21 @@ upstream organizes `solid_gemc/analysis/hgc_study/` and
 5. **Don't commit `solid_gemc/`.** It's an upstream-managed working
    tree that init rebuilds. Same for `<name>/runs/`,
    `*.root`, `*.hipo`, `__pycache__/`.
-6. **Maintain `<name>/log.md` and `<name>/result.md`.** Every
-   simulation effort — orchestrator-driven or manual — leaves a
-   record in the relevant project's `log.md`. Prepend a new dated
-   section capturing four things: the user's **original request**
-   (verbatim), the **plan** Claude drew up (six-field spec —
-   physics goal, SoLID config, beam, GCard, output, analysis), the
-   user's **decision** (approved / edited / plan-only), and the
-   **outcome** (run id, status, one-line summary). After a
-   `/solid-gemc-claude:analyze` that produced a
+6. **Maintain `<name>/log.md`, `<name>/result.md`, and
+   `<name>/report.html`.** Every simulation effort — orchestrator-
+   driven or manual — leaves a record in the relevant project's
+   `log.md`. Prepend a new dated section capturing four things: the
+   user's **original request** (verbatim), the **plan** Claude drew
+   up (six-field spec — physics goal, SoLID config, beam, GCard,
+   output, analysis), the user's **decision** (approved / edited /
+   plan-only), and the **outcome** (run id, status, one-line
+   summary). After a `/solid-gemc-claude:analyze` that produced a
    noteworthy result, add or update a section in `<name>/result.md`
-   with key numbers + plot paths. Both files are load-bearing
-   handoff documents.
+   with key numbers + plot paths, and refresh `<name>/report.html`
+   so the rendered summary (overview, configuration table, headline
+   figures, run index) stays in sync. `result.md` is the source for
+   facts; `report.html` is the presentation layer. All three are
+   load-bearing handoff documents.
 
 ## Typical loop (skill-driven)
 

@@ -49,28 +49,29 @@ project subdirs).
    workspace-common files would touch:
    ```bash
    ls -A 2>/dev/null \
-     | grep -E '^(CLAUDE\.md|\.gitignore|log\.md|result\.md)$' \
+     | grep -E '^(CLAUDE\.md|\.gitignore|log\.md|result\.md|report\.html)$' \
      || true
    ```
    - **Non-empty and no `--force`:** stop, show the user what's there,
      ask whether to re-run with `--force`.
    - **`--force` passed:** proceed; overwrites `CLAUDE.md`,
-     `.gitignore`, `log.md`, `result.md`. `solid_gemc/` and any
-     existing project subdirs are left alone.
+     `.gitignore`, `log.md`, `result.md`, `report.html`. `solid_gemc/`
+     and any existing project subdirs are left alone.
    - **Empty:** proceed.
 
-3. **Copy the workspace-common files** into `.`. These are the four
+3. **Copy the workspace-common files** into `.`. These are the five
    files that apply across all projects in this workspace; they live
    at the top of the plugin's `templates/` directory (the
    `templates/workspace/` subdir is the per-project template, copied
    later by the skill or the user, not by init):
    ```bash
-   cp "${CLAUDE_PLUGIN_ROOT}/templates/CLAUDE.md"   ./CLAUDE.md
-   cp "${CLAUDE_PLUGIN_ROOT}/templates/.gitignore"  ./.gitignore
-   cp "${CLAUDE_PLUGIN_ROOT}/templates/log.md"      ./log.md
-   cp "${CLAUDE_PLUGIN_ROOT}/templates/result.md"   ./result.md
+   cp "${CLAUDE_PLUGIN_ROOT}/templates/CLAUDE.md"    ./CLAUDE.md
+   cp "${CLAUDE_PLUGIN_ROOT}/templates/.gitignore"   ./.gitignore
+   cp "${CLAUDE_PLUGIN_ROOT}/templates/log.md"       ./log.md
+   cp "${CLAUDE_PLUGIN_ROOT}/templates/result.md"    ./result.md
+   cp "${CLAUDE_PLUGIN_ROOT}/templates/report.html"  ./report.html
    ```
-   The four files:
+   The five files:
    - `CLAUDE.md` — workspace-wide rules for future Claude sessions
      (non-negotiables, single-runtime-seam discipline, layout
      description).
@@ -81,6 +82,9 @@ project subdirs).
      per-run detail lives in each project's `log.md`).
    - `result.md` — workspace-level results index (lightweight;
      headline numbers and pointers to project `result.md`).
+   - `report.html` — workspace-level browser-readable summary
+     (project cards + cross-project findings). Self-contained HTML;
+     open with `file://…/report.html`.
 
 4. **Pull the runtime image** through the wrapper. This is the only
    sanctioned way to invoke the solid_gemc runtime:
@@ -149,9 +153,9 @@ project subdirs).
 
 ## Outputs
 
-- Workspace under `cwd`: the four workspace-common files
-  (`CLAUDE.md`, `.gitignore`, `log.md`, `result.md`). No project
-  subdir is auto-created.
+- Workspace under `cwd`: the five workspace-common files
+  (`CLAUDE.md`, `.gitignore`, `log.md`, `result.md`, `report.html`).
+  No project subdir is auto-created.
 - Cached `.sif` at
   `${CLAUDE_PLUGIN_DATA}/cache/sif/jeffersonlab_jlabce_tag2.5_...sif`.
 - Cloned + built `solid_gemc/` tree (gitignored). The `solid_gemc`
@@ -170,7 +174,7 @@ project subdirs).
 ## Notes
 
 - Idempotent. Re-running in a populated workspace without `--force`
-  is a no-op; with `--force`, only the four workspace-common files
+  is a no-op; with `--force`, only the five workspace-common files
   are overwritten. `solid_gemc/` and any project subdirs are
   preserved.
 - The `.sif` URL, solid_gemc upstream, and `GEMC_VERSION=2.9` are

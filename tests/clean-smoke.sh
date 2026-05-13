@@ -84,18 +84,20 @@ sgrun() {
 log "phase 1 — workspace skeleton + image cache"
 WS="${SCRATCH}/ws"
 mkdir -p "${WS}" && cd "${WS}"
-# Workspace-common files only (the four at templates/, not the per-project
+# Workspace-common files only (the five at templates/, not the per-project
 # template at templates/workspace/). The per-project template is seeded
 # later in phase 3 for the smoke project.
-cp "${PLUGIN_ROOT}/templates/CLAUDE.md"   ./CLAUDE.md
-cp "${PLUGIN_ROOT}/templates/.gitignore"  ./.gitignore
-cp "${PLUGIN_ROOT}/templates/log.md"      ./log.md
-cp "${PLUGIN_ROOT}/templates/result.md"   ./result.md
+cp "${PLUGIN_ROOT}/templates/CLAUDE.md"    ./CLAUDE.md
+cp "${PLUGIN_ROOT}/templates/.gitignore"   ./.gitignore
+cp "${PLUGIN_ROOT}/templates/log.md"       ./log.md
+cp "${PLUGIN_ROOT}/templates/result.md"    ./result.md
+cp "${PLUGIN_ROOT}/templates/report.html"  ./report.html
 [ -f CLAUDE.md ]   || fail "workspace CLAUDE.md missing"
 [ -f .gitignore ]  || fail "workspace .gitignore missing"
 [ -f log.md ]      || fail "workspace log.md missing"
 [ -f result.md ]   || fail "workspace result.md missing"
-pass "workspace-common files copied (4 files)"
+[ -f report.html ] || fail "workspace report.html missing"
+pass "workspace-common files copied (5 files)"
 
 # Pull the .sif if not already reused.
 sgrun pull
@@ -130,6 +132,7 @@ cp -r "${PLUGIN_ROOT}/templates/workspace/." "${PROJECT}/"
 [ -f "${PROJECT}/CLAUDE.md" ]            || fail "project CLAUDE.md missing under ${PROJECT}/"
 [ -f "${PROJECT}/log.md" ]               || fail "project log.md missing under ${PROJECT}/"
 [ -f "${PROJECT}/result.md" ]            || fail "project result.md missing under ${PROJECT}/"
+[ -f "${PROJECT}/report.html" ]          || fail "project report.html missing under ${PROJECT}/"
 pass "seeded project ${PROJECT}/ from templates/workspace/"
 
 PRESET=cherenkov

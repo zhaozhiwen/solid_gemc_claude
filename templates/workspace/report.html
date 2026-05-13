@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>&lt;project&gt; — solid_gemc report</title>
+<style>
+  :root {
+    --ink:    #1a1d21;
+    --muted:  #5b6470;
+    --line:   #d8dde3;
+    --tint:   #f4f6f8;
+    --accent: #2a5d8f;
+    --warn:   #b45a00;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    color: var(--ink);
+    background: #fff;
+    font: 15px/1.55 -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  main {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 48px 28px 96px;
+  }
+  header.doc {
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 20px;
+    margin-bottom: 28px;
+  }
+  header.doc .eyebrow {
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  header.doc h1 {
+    font-size: 28px;
+    line-height: 1.2;
+    margin: 0 0 6px;
+    font-weight: 600;
+  }
+  header.doc .sub {
+    color: var(--muted);
+    font-size: 14px;
+  }
+  h2 {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 36px 0 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--line);
+  }
+  h3 {
+    font-size: 15px;
+    font-weight: 600;
+    margin: 20px 0 8px;
+  }
+  p { margin: 0 0 12px; }
+  code, kbd, samp, pre {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.92em;
+  }
+  code { background: var(--tint); padding: 1px 5px; border-radius: 3px; }
+  pre {
+    background: var(--tint);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 12px 14px;
+    overflow-x: auto;
+    line-height: 1.45;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  table.kv {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 8px 0 16px;
+  }
+  table.kv th, table.kv td {
+    text-align: left;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  table.kv th {
+    width: 28%;
+    font-weight: 500;
+    color: var(--muted);
+  }
+
+  table.runs {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+    margin: 8px 0 16px;
+  }
+  table.runs th, table.runs td {
+    text-align: left;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--line);
+  }
+  table.runs th {
+    font-weight: 500;
+    color: var(--muted);
+    border-bottom: 2px solid var(--line);
+  }
+  table.runs td.id code { background: none; padding: 0; }
+  .status-ok   { color: #1d6b3a; }
+  .status-fail { color: #a02020; }
+
+  .figgrid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 22px;
+    margin: 12px 0 8px;
+  }
+  @media (min-width: 640px) {
+    .figgrid.two { grid-template-columns: 1fr 1fr; }
+  }
+  figure {
+    margin: 0;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    overflow: hidden;
+    background: #fff;
+  }
+  figure img {
+    display: block;
+    width: 100%;
+    height: auto;
+    background: var(--tint);
+  }
+  figcaption {
+    padding: 8px 12px 10px;
+    font-size: 13px;
+    color: var(--muted);
+    border-top: 1px solid var(--line);
+  }
+  figcaption b { color: var(--ink); font-weight: 600; }
+
+  .note {
+    border-left: 3px solid var(--accent);
+    background: var(--tint);
+    padding: 10px 14px;
+    border-radius: 0 4px 4px 0;
+    font-size: 14px;
+    margin: 12px 0;
+  }
+  .note.todo { border-left-color: var(--warn); }
+  .note .label {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--warn);
+    font-weight: 600;
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  footer.doc {
+    margin-top: 48px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 13px;
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+</style>
+</head>
+<body>
+<main>
+
+<header class="doc">
+  <div class="eyebrow">solid_gemc project report</div>
+  <h1>&lt;project name&gt; — &lt;one-line headline&gt;</h1>
+  <div class="sub">Last updated <time datetime="YYYY-MM-DD">YYYY-MM-DD</time> · <a href="log.md">log.md</a> · <a href="result.md">result.md</a></div>
+</header>
+
+<section>
+  <h2>Overview</h2>
+  <p>
+    <!-- 2–4 sentences. What this project is studying, why, and what
+         the current status is. Keep it readable by a collaborator who
+         has never seen this project — assume zero context. -->
+    &lt;Physics goal in plain words. Motivation. Current status: planning /
+    runs in flight / first results / wrapped.&gt;
+  </p>
+</section>
+
+<section>
+  <h2>Configuration</h2>
+  <table class="kv">
+    <tr><th>Physics goal</th>     <td>&lt;e.g. PVDIS A<sub>PV</sub> as a function of Q²&gt;</td></tr>
+    <tr><th>SoLID config</th>     <td>&lt;PVDIS_LD2 / PVDIS_LH2 / SIDIS_He3 / J_psi / …&gt;</td></tr>
+    <tr><th>Beam</th>             <td>&lt;particle, energy, polarization, target&gt;</td></tr>
+    <tr><th>Canonical GCard</th>  <td><code>&lt;preset&gt;.gcard</code> (from <code>solid_gemc/script/</code>)</td></tr>
+    <tr><th>Overrides</th>        <td>&lt;non-default GCard fields: physics list, magnet, …&gt;</td></tr>
+    <tr><th>Analysis</th>         <td>&lt;observable + binning&gt; — see <code>&lt;analysis_script&gt;.py</code></td></tr>
+  </table>
+</section>
+
+<section>
+  <h2>Headline results</h2>
+  <!-- The one or two numbers / plots that summarize the project.
+       Anything that isn't shippable yet → leave a todo note. -->
+
+  <div class="figgrid two">
+    <figure>
+      <img src="runs/&lt;id&gt;/&lt;plot&gt;.png" alt="&lt;short alt text&gt;">
+      <figcaption><b>Figure 1.</b> &lt;What it shows. One sentence. Run
+        <code>runs/&lt;id&gt;</code>.&gt;</figcaption>
+    </figure>
+    <figure>
+      <img src="runs/&lt;id&gt;/&lt;plot&gt;.png" alt="&lt;short alt text&gt;">
+      <figcaption><b>Figure 2.</b> &lt;…&gt;</figcaption>
+    </figure>
+  </div>
+
+  <p>
+    <!-- Key numbers in prose. Asymmetry value ± stat, yield, σ,
+         acceptance — whatever the run was probing. -->
+    &lt;Asymmetry / yield / σ / acceptance, with uncertainties. Compare
+    against expectation if relevant.&gt;
+  </p>
+</section>
+
+<section>
+  <h2>Runs</h2>
+  <table class="runs">
+    <thead>
+      <tr>
+        <th>Run id</th><th>Date</th><th>GCard</th><th>n_events</th><th>Status</th><th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="id"><code><a href="runs/&lt;id&gt;/">&lt;id&gt;</a></code></td>
+        <td>YYYY-MM-DD</td>
+        <td><code>&lt;preset&gt;.gcard</code></td>
+        <td>10000</td>
+        <td class="status-ok">ok</td>
+        <td>&lt;one-line takeaway&gt;</td>
+      </tr>
+    </tbody>
+  </table>
+  <p style="font-size: 13px; color: var(--muted);">
+    Run directories are immutable — see each run's <code>config.json</code> for the
+    full provenance record (GCard hash, solid_gemc commit SHA, GEMC_VERSION,
+    container .sif, gemc + evio2root exit codes, wall time).
+  </p>
+</section>
+
+<section>
+  <h2>Methodology</h2>
+  <h3>Simulation</h3>
+  <p>
+    <!-- How runs are produced. Skill-driven or upstream-direct? Any
+         non-default GCard fields and why. Any geometry tweaks. -->
+    &lt;How the runs are produced. Container image, GCard preset, what
+    was overridden and why.&gt;
+  </p>
+  <h3>Analysis</h3>
+  <p>
+    <!-- How out.root is processed. uproot script path. Cuts, binning,
+         normalization. -->
+    &lt;Script(s), cuts, binning, normalization. Link to
+    <code>&lt;analysis_script&gt;.py</code> or <code>analysis.C</code>.&gt;
+  </p>
+</section>
+
+<section>
+  <h2>Open questions / next</h2>
+  <div class="note todo">
+    <span class="label">todo</span>
+    &lt;what's blocked, what's next, what needs more events / different
+    GCard / different cut.&gt;
+  </div>
+</section>
+
+<section>
+  <h2>References</h2>
+  <ul>
+    <li>Workspace report: <a href="../report.html">../report.html</a></li>
+    <li>Upstream HGC study (config + run + analyze worked example):
+        <code>../solid_gemc/analysis/hgc_study/</code></li>
+    <li>GCard option reference: <a href="https://gemc.jlab.org">gemc.jlab.org</a></li>
+  </ul>
+</section>
+
+<footer class="doc">
+  <span>solid_gemc_claude · per-project report template</span>
+  <span>Rendered from a static HTML file — open directly in a browser.</span>
+</footer>
+
+</main>
+</body>
+</html>

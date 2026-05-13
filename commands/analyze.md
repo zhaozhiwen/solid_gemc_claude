@@ -138,7 +138,8 @@ the final analysis.
    echo "Next:"
    echo "  - Inspect the plots."
    echo "  - For custom analysis, write analysis/${RUN_DIR##runs/}.py and read $ROOT with uproot."
-   echo "  - Update result.md with the key numbers + plot paths."
+   echo "  - Update result.md with the key numbers + plot paths,"
+   echo "    then refresh report.html so the rendered summary stays in sync."
    ```
 
 ## Outputs
