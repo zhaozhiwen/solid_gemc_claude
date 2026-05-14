@@ -40,7 +40,7 @@ init                                          (one-shot per workspace)
   → pick a GCard from solid_gemc/script/      (canonical) or solid_gemc/analysis/*/
   → copy to <project>/<preset>.gcard + apply batch overrides
   → bin/solid-gemc-run exec "solid_gemc <gcard>"     (run gemc; emits out.evio)
-  → bin/solid-gemc-run exec "evio2root -INPUTF=out.evio"  (post-convert)
+  → bin/solid-gemc-run exec "evio2root -INPUTF=out.evio -R=flux"  (post-convert; -R=flux publishes the raw integrated bank — see step 3d)
   → write <project>/runs/<id>/{gcard.gcard, out.evio, out.root, log.txt, config.json}
   → /solid-gemc-claude:analyze <project>/runs/<id>   (host-side uproot)
 ```
@@ -390,7 +390,7 @@ Steps
 3. copy <project>/<preset>.gcard from solid_gemc/script/<preset>.gcard (or .../analysis/.../<preset>.gcard); apply USE_GUI=0 + OUTPUT=evio,out.evio + N=<n>
 4. <only if user wants non-default beam/physics:> edit <project>/<preset>.gcard
 5. bin/solid-gemc-run exec "solid_gemc <abs gcard> -OUTPUT=evio,<abs run dir>/out.evio"  (from the gcard's upstream dir)
-   then bin/solid-gemc-run exec "evio2root -INPUTF=out.evio"   (from <project>/runs/<id>/)
+   then bin/solid-gemc-run exec "evio2root -INPUTF=out.evio -R=flux"   (from <project>/runs/<id>/; -R=flux requests the raw bank for the flux detector)
    write <project>/runs/<id>/{gcard.gcard, out.evio, out.root, log.txt, config.json}
 6. /solid-gemc-claude:analyze <project>/runs/<id>
      <one line: auto-plots | custom <project>/<id>.py | container-side ROOT macro>
@@ -534,13 +534,21 @@ returns 0.
 
 ### 3d. Run gemc + evio2root
 
-Two important disciplines: (1) **cwd-relative geometry lookup** —
+Three important disciplines: (1) **cwd-relative geometry lookup** —
 gemc 2.9 resolves `<detector name="…">` from the process cwd, not
 from the GCard's path, so we `cd "$SOURCE_DIR"` (the dir holding
 the canonical's geometry siblings) before invoking `solid_gemc`.
 (2) **Absolute paths** for the GCard and OUTPUT, since cwd has
 changed. Pipe-exit-code capture is portable across bash and zsh
 via a tempfile (the harness shell may be either).
+(3) **`evio2root -R=flux`** — without `-R=`, evio2root publishes only the
+**digitized** bank for each detector, and the `flux` hitprocess's
+digitized output is just `hitn` + `id` (a slim ~200 KB ROOT with no
+Edep, no positions, no times — useless for analysis). Adding
+`-R=flux` publishes the **raw** integrated bank for the flux
+detector with all 27 fields (Edep, x/y/z, t, pid, …). If a study
+uses non-flux hitprocesses that also need raw banks, append them
+comma-separated: `-R=flux,Hits,…`.
 
 ```bash
 RUN_ID=$(date -u +%Y%m%d-%H%M%S)-$(head -c 12 /dev/urandom | base32 | tr 'A-Z' 'a-z' | head -c 6)
@@ -570,7 +578,7 @@ if [[ "$GEMC_EXIT" = "0" && -f "${RUN_DIR_ABS}/out.evio" ]]; then
     SoLID_GEMC="${WORKSPACE_ABS}/solid_gemc" \
     SOLID_GEMC_CLAUDE_CACHE="${CLAUDE_PLUGIN_DATA}/cache" \
       "${CLAUDE_PLUGIN_ROOT}/bin/solid-gemc-run" exec \
-        "evio2root -INPUTF=out.evio"; \
+        "evio2root -INPUTF=out.evio -R=flux"; \
     echo $? > "${EVIO_EC_FILE}" ) 2>&1 | tee -a "${RUN_DIR_ABS}/log.txt"
   EVIO2ROOT_EXIT=$(cat "${EVIO_EC_FILE}"); rm -f "${EVIO_EC_FILE}"
 fi
@@ -609,7 +617,7 @@ d = {
   "gemc_exit_code":   ${GEMC_EXIT},
   "evio2root_exit":   ${EVIO2ROOT_EXIT},
   "exit_code":        ${EXIT_CODE},
-  "command":          "solid_gemc <gcard> -OUTPUT=evio,<run>/out.evio; evio2root -INPUTF=out.evio",
+  "command":          "solid_gemc <gcard> -OUTPUT=evio,<run>/out.evio; evio2root -INPUTF=out.evio -R=flux",
   "cwd_gemc":         "${SOURCE_DIR}",
   "cwd_evio2root":    "${RUN_DIR}",
 }

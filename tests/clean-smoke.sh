@@ -193,7 +193,7 @@ pass "gemc step: exit 0, out.evio=$(stat -c %s "${RUN_DIR}/out.evio") bytes"
 EVIO_EC_FILE=$(mktemp)
 ( cd "${RUN_DIR_ABS}" && \
   SoLID_GEMC="${WORKSPACE_ABS}/solid_gemc" \
-    sgrun exec "evio2root -INPUTF=out.evio"; \
+    sgrun exec "evio2root -INPUTF=out.evio -R=flux"; \
   echo $? > "${EVIO_EC_FILE}" ) 2>&1 | tee -a "${RUN_DIR_ABS}/log.txt" >/dev/null
 EVIO2ROOT_EXIT=$(cat "${EVIO_EC_FILE}"); rm -f "${EVIO_EC_FILE}"
 [[ "${EVIO2ROOT_EXIT}" = "0" ]] \
