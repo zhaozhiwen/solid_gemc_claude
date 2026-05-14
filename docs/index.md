@@ -1,88 +1,64 @@
 ---
-title: Home
 layout: default
-nav_order: 1
+title: solid_gemc_claude
 ---
 
-# solid-gemc-claude
+A public Claude Code plugin (MIT). solid_gemc + GEMC + Geant4 + ROOT in a pinned [JLabCE 2.5](https://github.com/JeffersonLab/solid_release) apptainer image; analysis on the host with [`uproot`](https://github.com/scikit-hep/uproot5).
 
-A Claude Code plugin for running [solid_gemc](https://github.com/JeffersonLab/solid_gemc)
-— the SoLID experiment's GEMC-based simulation — through a small set of
-slash commands. solid_gemc, GEMC, Geant4, and ROOT all live in a pinned
-[JLabCE 2.5](https://github.com/JeffersonLab/solid_release) apptainer
-image; analysis runs on the host with
-[`uproot`](https://github.com/scikit-hep/uproot5).
-
-> **Status: v0.0.3.** Two slash commands shipped (`init`, `analyze`); an
-> orchestrator skill drives the simulation loop in between.
-
-[View on GitHub](https://github.com/zhaozhiwen/solid_gemc_claude){: .btn .btn-primary }
-[Report an issue](https://github.com/zhaozhiwen/solid_gemc_claude/issues){: .btn }
-
----
-
-## Requirements
-
-- [apptainer](https://apptainer.org) ≥ 1.4 on Linux.
-- `wget`, `git` on the host. (No host-side `tcsh` needed — the wrapper
-  invokes `tcsh` *inside* the container.)
-- Python 3.9+ with `uproot numpy matplotlib` (only for the analyze step).
-- ~1.7 GB of disk for the cached JLabCE 2.5 image, plus ~1 GB for the
-  cloned + built `solid_gemc` tree per workspace.
-- Claude Code with plugin support.
-
-The plugin downloads the JLabCE 2.5 `.sif` on first use; URL is pinned
-in [`bin/solid-gemc-run`](https://github.com/zhaozhiwen/solid_gemc_claude/blob/main/bin/solid-gemc-run).
+**v0.0.3** · 2026-05-14 · [solid_gemc upstream](https://github.com/JeffersonLab/solid_gemc)
 
 ## Install
+
+In Claude Code:
 
 ```text
 /plugin marketplace add zhaozhiwen/solid_gemc_claude
 /plugin install solid-gemc-claude@solid-gemc-claude
 ```
 
-## Slash commands
+`/plugin update` handles upgrades. [Apptainer](https://apptainer.org) ≥ 1.4 must already be on the host; the plugin pulls its pinned `.sif` on first use via `wget`.
 
-| Command | Purpose |
-|---|---|
-| `/solid-gemc-claude:init` | Pull `.sif`, clone `solid_gemc`, run both scons builds, scaffold workspace. One-shot bootstrap. |
-| `/solid-gemc-claude:analyze runs/<id>` | uproot-based default plots from `out.root` (the post-converted file). |
+## Quickstart
 
-The workflow **between** init and analyze (pick a GCard, run
-`solid_gemc`, convert EVIO → ROOT, record provenance) is driven by the
-`solid-gemc` orchestrator skill — auto-loads on SoLID-flavored natural
-language ("run a PVDIS LD2 study at 11 GeV") and gap-checks against a
-six-field spec before executing. Users who want upstream's pattern
-directly can `bin/solid-gemc-run shell` and follow
-`solid_gemc/analysis/hgc_study/run.sh`.
+Two slash commands ship: `/solid-gemc-claude:init` (one-shot bootstrap — pull the `.sif`, clone `solid_gemc`, run both scons builds, scaffold a workspace) and `/solid-gemc-claude:analyze runs/<id>` (uproot plots from the post-converted ROOT file).
 
-## First-run flow (after `/solid-gemc-claude:init`)
+The simulation loop in between is driven by the `solid-gemc` orchestrator skill — it auto-loads on any SoLID-flavored request. Tell Claude what you want:
 
-There is no shipped "example" command. Two upstream worked examples
-live in your workspace after init, both fully self-contained:
+```text
+> Run the heavy-gas Cherenkov study on SIDIS He-3 at 11 GeV e-,
+  default solid_SIDIS_He3_hgc.gcard, 10000 events, then plot
+  photon yield per Cherenkov detector.
+```
 
-| Example | What it teaches |
-|---|---|
-| `solid_gemc/analysis/hgc_study/` | the **config + run + analyze** pipeline — GCards, batch run scripts (`load.sh` / `run.sh`), ROOT analysis (`analysis.C`, `compare_*.C`) |
-| `solid_gemc/geometry/hgc_moved/` | **custom detector authoring** — Perl generators (`solid_SIDIS_hgc_*.pl`), resulting factory text files referenced by `<detector name="..." factory="TEXT" ...>`, plus a `readme.md` |
+The skill gap-checks against a six-field spec (physics goal, SoLID config, beam, GCard, output, analysis), asks about anything missing, shows a plan, runs it on approval.
 
-`bin/solid-gemc-run shell` drops you into a tcsh prompt with the env
-exported (`SoLID_GEMC`, `GEMC`, `PATH`, `LD_LIBRARY_PATH`) so you can
-follow upstream's scripts directly. For HGC: `cd solid_gemc/analysis/hgc_study`,
-then `./run.sh`.
+After init, two upstream worked examples live in your workspace as templates:
 
-## Known limitations (v0.0.3)
+- **`solid_gemc/analysis/hgc_study/`** — the config + run + analyze pipeline (GCards, batch scripts, ROOT analysis macros).
+- **`solid_gemc/geometry/hgc_moved/`** — custom detector authoring (Perl generators, factory text files, GCard wiring).
 
-- The `.sif` is hosted at a personal Duke webhome
-  (`http://webhome.phy.duke.edu/~zz81/simg/`). No SLA, may move. Mirror
-  locally with `wget` if you need durability.
-- No upstream-pin for `solid_gemc` — `/solid-gemc-claude:init` clones HEAD
-  of master. The resolved commit SHA is recorded per-run in
-  `runs/<id>/config.json`.
-- ROOT analysis runs inside the container via `bin/solid-gemc-run root`.
-  Upstream's HGC study assumes host-side ROOT; we recommend the
-  in-container path for portability.
+## What it does
 
-## License
+- **NL-driven simulation as a first-class step.** The orchestrator turns a plain-English study spec into a validated GCard + run command. Edit the GCard or re-describe to iterate.
+- **Single runtime seam.** All `gemc`, `xmllint`, ROOT, and `evio2root` calls go through `bin/solid-gemc-run`. The container tag is pinned in one place. No host-side ROOT required.
+- **EVIO + post-convert to ROOT.** `gemc` 2.9 writes EVIO natively; the wrapper post-converts to ROOT inside the same container so analysis can stay Python via uproot. Both files end up in `runs/<id>/`.
 
-[MIT](https://github.com/zhaozhiwen/solid_gemc_claude/blob/main/LICENSE) — © 2026 Zhiwen Zhao.
+## Requirements
+
+- [Apptainer](https://apptainer.org) ≥ 1.4 on Linux.
+- `wget`, `git` on the host. (No host-side `tcsh` needed — the wrapper invokes `tcsh` *inside* the container.)
+- Python 3.9+ with `uproot numpy matplotlib` (only for the `analyze` step).
+- ~1.7 GB of disk for the cached JLabCE 2.5 image, plus ~1 GB per workspace for the cloned + built `solid_gemc` tree.
+- Claude Code with plugin support.
+
+## Links
+
+- [Source on GitHub](https://github.com/zhaozhiwen/solid_gemc_claude)
+- [License (MIT)](https://github.com/zhaozhiwen/solid_gemc_claude/blob/main/LICENSE)
+- [solid_gemc upstream](https://github.com/JeffersonLab/solid_gemc)
+
+## Acknowledgments
+
+- **solid_gemc** — the SoLID experiment's GEMC-based simulation. See [github.com/JeffersonLab/solid_gemc](https://github.com/JeffersonLab/solid_gemc).
+- **GEMC** — the geometry-and-tracking framework underneath. See [gemc.jlab.org](https://gemc.jlab.org).
+- **JLabCE 2.5 container** — built and maintained at Jefferson Lab; see [github.com/JeffersonLab/solid_release](https://github.com/JeffersonLab/solid_release).
