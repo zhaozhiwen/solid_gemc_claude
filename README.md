@@ -6,10 +6,12 @@ commands. solid_gemc, GEMC, Geant4, and ROOT all live in a pinned
 [JLabCE 2.5](https://github.com/JeffersonLab/solid_release) apptainer image;
 analysis runs on the host with [`uproot`](https://github.com/scikit-hep/uproot5).
 
+**Docs site:** [zhaozhiwen.github.io/solid_gemc_claude](https://zhaozhiwen.github.io/solid_gemc_claude/) (install + quickstart + two demo run reports).
+
 > **Status: v0.0.3.** Two slash commands shipped (`init`, `analyze`);
 > the orchestrator skill drives the simulation loop in between. See
-> `CLAUDE.md` for design intent; `PLAN.md` is the superseded original
-> plan, retained for historical context.
+> [`docs/DESIGN.md`](docs/DESIGN.md) for design intent and the rationale
+> behind the architecture.
 
 ## Requirements
 
