@@ -30,7 +30,7 @@ upstream organizes `solid_gemc/analysis/hgc_study/` and
 | `<name>/CLAUDE.md`  | Per-project rules (loaded as Claude context when the session's cwd is inside the project). |
 | `<name>/log.md`     | Chronological work log for this project. Prepend new entries at top. |
 | `<name>/result.md`  | Per-run findings, with paths to `<name>/runs/<id>/`. |
-| `<name>/report.html` | Browser-readable summary of the project (rich text + embedded plots from `runs/<id>/`). Self-contained HTML, open via `file://`. |
+| `<name>/report.html` | Browser-readable summary (rich text + plots referenced relatively from `runs/<id>/`). Opens via `file://` inside the workspace tree; for off-host sharing run the embed script (see non-negotiable #6). |
 | `<name>/runs/<id>/` | Per-run output dirs. The orchestrator skill writes `gcard.gcard`, `out.evio`, `out.root`, `log.txt`, `config.json` per run. **Gitignored.** |
 | `solid_gemc/`       | Cloned + built upstream tree (init artifact). **Gitignored.** Refresh via re-running init. |
 
@@ -73,6 +73,19 @@ upstream organizes `solid_gemc/analysis/hgc_study/` and
    figures, run index) stays in sync. `result.md` is the source for
    facts; `report.html` is the presentation layer. All three are
    load-bearing handoff documents.
+
+   When a `report.html` needs to leave the workspace tree (committed
+   to a public `docs/` folder, emailed, attached to a ticket), first
+   run the plugin's portability script:
+
+   ```sh
+   python3 "${CLAUDE_PLUGIN_ROOT}/templates/embed_html.py" <name>/report.html
+   ```
+
+   It rewrites each `<img src="runs/<id>/*.png">` as an inline
+   base64 data URI and writes a sibling `<name>/report_portable.html`.
+   Ship the `_portable.html`; the plain `report.html` keeps relative
+   paths and only renders correctly from inside the workspace tree.
 
 ## Typical loop (skill-driven)
 
