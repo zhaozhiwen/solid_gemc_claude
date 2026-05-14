@@ -1,0 +1,28 @@
+title: solid-gemc-claude
+description: Claude Code plugin for running solid_gemc (SoLID GEMC) simulations
+url: https://zhaozhiwen.github.io
+baseurl: /solid_gemc_claude
+
+remote_theme: just-the-docs/just-the-docs
+color_scheme: dark
+
+plugins:
+  - jekyll-remote-theme
+
+aux_links:
+  GitHub: https://github.com/zhaozhiwen/solid_gemc_claude
+
+aux_links_new_tab: true
+
+heading_anchors: true
+search_enabled: true
+
+footer_content: >
+  &copy; 2026 Zhiwen Zhao.
+  <a href="https://github.com/zhaozhiwen/solid_gemc_claude/blob/main/LICENSE">MIT licensed</a>.
+
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - vendor
+  - node_modules
