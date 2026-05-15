@@ -1,7 +1,14 @@
 title: solid_gemc_claude
 description: A Claude Code plugin for SoLID GEMC simulations — describe a study, run it, analyze it.
-theme: jekyll-theme-cayman
-show_downloads: false
 url: https://zhaozhiwen.github.io
 baseurl: /solid_gemc_claude
 repository: zhaozhiwen/solid_gemc_claude
+
+# No `theme:` — the layout is hand-rolled in _layouts/default.html
+# (warm-cream editorial; Fraunces / Newsreader / IBM Plex Mono).
+
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - vendor
+  - node_modules

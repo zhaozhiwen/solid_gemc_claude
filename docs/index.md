@@ -3,16 +3,13 @@ layout: default
 title: solid_gemc_claude
 ---
 
-A public Claude Code plugin (MIT). solid_gemc + GEMC + Geant4 + ROOT in a pinned [JLabCE 2.5](https://github.com/JeffersonLab/solid_release) apptainer image; analysis on the host with [`uproot`](https://github.com/scikit-hep/uproot5).
-
-**v0.0.3** · 2026-05-14 · [solid_gemc upstream](https://github.com/JeffersonLab/solid_gemc)
-
 ## See it in action
 
-Two browser-readable reports produced end-to-end by the plugin — same orchestrator, same `bin/solid-gemc-run`, two very different physics goals:
+Two browser-readable reports produced end-to-end by the plugin — same orchestrator, same `bin/solid-gemc-run`, two very different physics goals.
 
-- **[Cherenkov CO₂ + spherical-mirror radiator →](report_cherenkov_mirror.html)** &nbsp; 1 GeV e⁻ pencil beam into a 1 m³ CO₂ box; tilted spherical mirror focuses Cherenkov light onto an off-axis sensor. Three-volume detector authored from a plain-English spec.
-- **[DDVCS: FAMU μ⁻ vs π⁻ PID template at 5 GeV →](report_ddvcs_pid.html)** &nbsp; canonical SoLID J/ψ → μ⁺μ⁻ DDVCS geometry (CLEO magnet, LH2 target, forward-angle "moved_full" muon detector); per-layer Edep templates give the J/ψ trigger a quantitative μ/π separation handle.
+- **[Cherenkov CO₂ + spherical-mirror radiator](report_cherenkov_mirror.html)** &nbsp; 1 GeV e⁻ pencil beam into a 1 m³ CO₂ box; tilted spherical mirror focuses Cherenkov light onto an off-axis sensor. Three-volume detector authored from a plain-English spec.
+- **[DDVCS: FAMU μ⁻ vs π⁻ PID template at 5 GeV](report_ddvcs_pid.html)** &nbsp; canonical SoLID J/ψ → μ⁺μ⁻ DDVCS geometry (CLEO magnet, LH2 target, forward-angle "moved_full" muon detector); per-layer Edep templates give the J/ψ trigger a quantitative μ/π separation handle.
+{:.demo-list}
 
 ## Install
 
@@ -60,7 +57,6 @@ After init, two upstream worked examples live in your workspace as templates:
 
 ## Links
 
-- [Source on GitHub](https://github.com/zhaozhiwen/solid_gemc_claude)
 - [License (MIT)](https://github.com/zhaozhiwen/solid_gemc_claude/blob/main/LICENSE)
 - [solid_gemc upstream](https://github.com/JeffersonLab/solid_gemc)
 
