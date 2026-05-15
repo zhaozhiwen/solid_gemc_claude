@@ -76,10 +76,14 @@ ensure_sif() {
   log "downloading ${SIF_URL}"
   log "  -> ${SIF_PATH}"
   log "  (~1.7 GB .sif; first pull can take several minutes)"
+  # Fixed .part path + -c so an interrupted pull resumes on re-run instead
+  # of restarting from zero. The .sif host has no SLA (personal webhome),
+  # so a dropped connection on the ~1.7 GB transfer is expected. The
+  # partial is deliberately NOT deleted on failure — re-running `pull`
+  # continues it.
   local tmp="${SIF_PATH}.part"
-  if ! wget --show-progress -O "${tmp}" "${SIF_URL}"; then
-    rm -f "${tmp}"
-    die "wget failed for ${SIF_URL}"
+  if ! wget --show-progress -c -O "${tmp}" "${SIF_URL}"; then
+    die "wget failed for ${SIF_URL} (partial kept at ${tmp}; re-run 'pull' to resume)"
   fi
   mv "${tmp}" "${SIF_PATH}"
   log "image ready at ${SIF_PATH}"

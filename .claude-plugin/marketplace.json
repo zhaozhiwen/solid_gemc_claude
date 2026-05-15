@@ -7,7 +7,7 @@
     {
       "name": "solid-gemc-claude",
       "source": "./",
-      "description": "Run solid_gemc (SoLID/JLab) simulations via four slash commands: init, config, run, analyze. JLabCE 2.5 container; solid_gemc cloned + built per workspace; uproot analysis."
+      "description": "Run solid_gemc (SoLID experiment) simulations through Claude Code: two slash commands (init, analyze) plus an orchestrator skill that drives the simulation loop from plain language. JLabCE 2.5 container pulled via wget; solid_gemc cloned + built per workspace; host-side uproot analysis."
     }
   ]
 }

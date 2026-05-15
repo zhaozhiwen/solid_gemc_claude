@@ -144,7 +144,9 @@ project subdirs).
 
      # Path C — start an empty project manually:
      cp -r "${CLAUDE_PLUGIN_ROOT}/templates/workspace/." my_study/
-     # then edit my_study/CLAUDE.md, my_study/analysis/, my_study/geometry/
+     # then edit my_study/CLAUDE.md; GCards, analysis scripts, and any
+     # custom-detector files live flat in my_study/ (no analysis/ or
+     # geometry/ subdir — the per-project template is flat)
      ```
      Mention the detector-authoring example as a parallel reference:
      `solid_gemc/geometry/hgc_moved/` (Perl generators + factory

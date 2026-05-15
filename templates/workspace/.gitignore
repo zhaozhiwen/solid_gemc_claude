@@ -1,0 +1,18 @@
+# solid_gemc study — generated artifacts (this dir = one self-contained project)
+#
+# The workspace-root .gitignore also covers these when the git root is the
+# workspace. This file makes the project dir safe on its own, in case it is
+# `git init`-ed independently (each project is designed to be self-contained).
+
+# Per-run output
+runs/
+
+# File-type catches (gemc EVIO, post-converted ROOT, HIPO)
+*.root
+*.hipo
+*.evio
+
+# Python / Jupyter
+__pycache__/
+.venv/
+.ipynb_checkpoints/

@@ -17,9 +17,9 @@ is what solid_gemc outputs" assumption — whatever branches actually
 exist get histogrammed (numeric ones) or summarized (non-numeric).
 
 For custom analysis (asymmetries, kinematic cuts, multi-run
-comparisons), the user writes a Python script in `analysis/` and reads
-the same ROOT file. This command is the first-pass orientation, not
-the final analysis.
+comparisons), the user writes a Python script in the project dir and
+reads the same ROOT file. This command is the first-pass orientation,
+not the final analysis.
 
 ## Inputs
 
@@ -121,7 +121,7 @@ the final analysis.
            print(f"[analyze]     {cls}  {k.split(';')[0]}")
        if len(hists) > 10:
            print(f"[analyze]     ... and {len(hists) - 10} more.")
-       print("[analyze]   (post-processed file; write a script in analysis/ to plot these.)")
+       print("[analyze]   (post-processed file; write a script in the project dir to plot these.)")
 
    if not trees and not hists:
        print("[analyze] no TTree or histogram objects found. Empty or non-standard file?")
@@ -137,7 +137,7 @@ the final analysis.
    echo
    echo "Next:"
    echo "  - Inspect the plots."
-   echo "  - For custom analysis, write analysis/${RUN_DIR##runs/}.py and read $ROOT with uproot."
+   echo "  - For custom analysis, write ${RUN_DIR##runs/}.py in the project dir and read $ROOT with uproot."
    echo "  - Update result.md with the key numbers + plot paths,"
    echo "    then refresh report.html so the rendered summary stays in sync."
    ```
@@ -155,13 +155,14 @@ the final analysis.
 |---|---|---|
 | `no ROOT file at <path>` | Run didn't produce output, or the GCard's `OUTPUT` option pointed elsewhere. | Check `runs/<id>/log.txt` for solid_gemc errors; check `runs/<id>/gcard.gcard` for the `<option name="OUTPUT" .../>` value. |
 | `plugin venv missing` | SessionStart hook hasn't run yet (fresh install). | Exit and re-enter the Claude Code session so the hook installs `uproot`/`numpy`/`matplotlib`. |
-| `no numeric branches plotted` | ROOT file has only object branches (`TLorentzVector`, etc.) or empty trees. | Write a custom Python in `analysis/` that decodes those branches; gemc's output layout varies by detector. |
+| `no numeric branches plotted` | ROOT file has only object branches (`TLorentzVector`, etc.) or empty trees. | Write a custom Python script in the project dir that decodes those branches; gemc's output layout varies by detector. |
 
 ## Notes
 
 - This command is **diagnostic**, not the final analysis. Real
   physics analysis (asymmetries, fits, cuts) belongs in
-  `analysis/<id>.py` — a script under the user's control, versioned.
+  `<id>.py` at the project root — a script under the user's control,
+  versioned, flat alongside the run dirs (no `analysis/` subdir).
 - The schema summary is the most valuable part of the output for
   unfamiliar GCards — it tells you which trees solid_gemc populated
   and how many entries each got.
