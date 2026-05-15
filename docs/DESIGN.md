@@ -4,8 +4,6 @@ layout: default
 nav_order: 2
 ---
 
-# Design
-
 This page covers the *why* behind solid-gemc-claude. For *how to use it*,
 see [Home]({{ site.baseurl }}/).
 

@@ -18,7 +18,7 @@
       --bg-tint:   #ECE6D6;
       --bg-deep:   #2A2521;
       --ink:       #1B1916;
-      --ink-soft:  #5A554C;
+      --ink-soft:  #4A453C;
       --rule:      #D6CFBC;
       --rule-soft: #E4DECC;
       --accent:    #C15F3C;
@@ -371,7 +371,7 @@
     .content pre {
       background: var(--bg-deep);
       color: #E8E0CE;
-      padding: 22px 24px;
+      padding: 40px 24px 22px;
       border-radius: 4px;
       overflow-x: auto;
       margin: 24px 0;
@@ -398,7 +398,6 @@
       font-size: inherit;
       letter-spacing: 0;
       display: block;
-      margin-top: 18px;
     }
 
     .content blockquote {
@@ -432,6 +431,19 @@
     }
     footer a:hover { color: var(--accent); border-bottom-color: var(--accent); }
 
+    /* === FOCUS (keyboard) === */
+    a:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
+      border-radius: 1px;
+    }
+    .demo-list li a:focus-visible {
+      outline-offset: -3px;
+    }
+    /* Older engines without :focus-visible — keep a visible ring */
+    a:focus { outline: 2px solid var(--accent); outline-offset: 3px; }
+    a:focus:not(:focus-visible) { outline: none; }
+
     /* === RESPONSIVE === */
     @media (max-width: 640px) {
       .wrap { padding: 56px 22px 80px; }
@@ -454,7 +466,7 @@
 </head>
 <body>
   <main class="wrap">
-    {% if page.url == '/' or page.url == '/index.html' %}
+    {% if page.url == '/' %}
       <header class="hero">
         <p class="eyebrow"><span class="dot"></span>Claude Code plugin · solid_gemc_claude<span class="rule"></span></p>
         <h1 class="title">Describe a <em>SoLID</em> simulation. Run it. Analyze it.</h1>
