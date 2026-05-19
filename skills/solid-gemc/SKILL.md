@@ -319,6 +319,41 @@ For each missing required field, ask one focused question via
 one-line answers. Tell the user *which* field is missing and *why*
 a default is not safe. Don't chain a bunch of guesses together.
 
+### Project name contract (safety boundary — never waivable)
+
+The project name becomes a directory under the workspace root and
+is interpolated into `cp`/`mkdir` paths, the run dir, and the
+**unquoted** `config.json` heredoc in step 3e. An unconstrained
+name (`/`, `..`, whitespace, quotes, `$()`, backticks, a leading
+`-`, or empty) can write outside the workspace, corrupt the
+provenance JSON, or inject into later shell. So the resolved
+project name **must** match exactly:
+
+```
+^[A-Za-z0-9_][A-Za-z0-9._-]{0,63}$
+```
+
+One anchored rule closes every vector: no `/` (no traversal),
+first char alnum/`_` (so no leading `-` flag injection, no hidden
+dir, and `.`/`..` cannot match), no whitespace or shell
+metacharacters, length 1–64.
+
+- **Derived default** (from SoLID config + physics goal):
+  slugify to satisfy the contract by construction — map any run
+  of disallowed characters to `_`, strip a leading non-`[A-Za-z0-9_]`,
+  trim to 64. If slugification empties it, use `solid_run`.
+- **Explicit user-supplied name** that violates the contract:
+  **reject and ask for a compliant one**, quoting the rule. This
+  is a safety boundary, not a spec ambiguity — it is **not**
+  covered by "fill in sensible defaults" / "no clarifying
+  questions" and **not** by the approval gate. Silently rewriting
+  a name the user typed is also wrong (it changes where their
+  study lands); ask.
+
+Step 3b re-checks this with a hard fail-closed guard before the
+first filesystem write — that guard, not this prose, is the
+enforceable line of defense.
+
 ### What can default
 
 - **Project name** — derive from (SoLID config + physics goal):
@@ -474,10 +509,26 @@ failure (last 20 lines of init's output) and do not proceed.
 
 ```bash
 PROJECT=<resolved from spec>
+
+# Fail-closed safety guard — the enforceable line of defense for the
+# Step 1 "Project name contract". Runs BEFORE the first filesystem
+# write because $PROJECT also flows into mkdir/cp paths, RUN_DIR, and
+# the unquoted config.json heredoc in step 3e. Never weaken or skip.
+if ! printf '%s' "$PROJECT" | grep -Eq '^[A-Za-z0-9_][A-Za-z0-9._-]{0,63}$'; then
+  echo "[skill] refusing unsafe project name: '${PROJECT}'" >&2
+  echo "[skill] must match ^[A-Za-z0-9_][A-Za-z0-9._-]{0,63}\$ (no /, .., whitespace, quotes, shell metachars, leading -)" >&2
+  exit 1
+fi
+
 if [[ ! -d "$PROJECT" ]]; then
   cp -r "${CLAUDE_PLUGIN_ROOT}/templates/workspace/." "$PROJECT/"
 fi
 ```
+
+If the guard trips, **stop** — do not write anything, return to
+step 1, and get a contract-compliant name from the user. A tripped
+guard means step 1's slugify/reject logic was skipped; that is the
+bug, not the name.
 
 Post-condition: `<project>/` exists with `CLAUDE.md`, `log.md`,
 `result.md`, `report.html` (flat — no enforced subdirs). If it

@@ -113,31 +113,76 @@ setenv PATH ${SoLID_GEMC}/source/${GEMC_VERSION}:${GEMC}:${PATH}
 TCSH
 }
 
+path_is_under() {
+  local p="$1" dir="$2"
+  [[ "$p" == "$dir" || "$p" == "$dir"/* ]]
+}
+
 # Echo host paths needing an explicit --bind beyond the workspace and cache.
-# A path is auto-covered if it's already under the bound workdir or cache.
+# A path is auto-covered only if it is the bound workdir/cache or strictly
+# inside one — an exact-prefix test, not a glob, so /work/ab does not swallow
+# /work/abc. That distinction is load-bearing now that this feeds the core
+# run path (the workspace root is a real bind, not a no-op).
 extra_binds_for() {
   local wd="$1" cache_real="$2"; shift 2
   local p
   for p in "$@"; do
     [[ -z "$p" ]] && continue
-    if [[ "$p" != "${wd}"* && "$p" != "${cache_real}"* ]]; then
+    if ! path_is_under "$p" "$wd" && ! path_is_under "$p" "$cache_real"; then
       printf -- '--bind\n%s\n' "$p"
     fi
   done
 }
 
+# The bind set for any container invocation: cwd, cache, and — when
+# $SoLID_GEMC is set — both the resolved solid_gemc tree and its parent
+# (the workspace root). The skill/smoke cd into a deep subdir
+# (solid_gemc/script, …) for cwd-relative geometry lookup, then read/write
+# absolute paths in solid_gemc/{source,mod}/ (binary + libgemc.so) and
+# <project>/runs/<id>/ (GCard in, EVIO/ROOT out) — none under cwd. Binding
+# only cwd+cache made the run path work solely by accident of apptainer's
+# implicit $HOME/$TMPDIR mount covering the workspace, which breaks on hosts
+# with `mount home = no` or a workspace on /scratch|/work (violates
+# non-negotiable #4). Both binds are needed, not redundant: when solid_gemc
+# is a symlink out of the workspace (SGC_REUSE_SOLID_GEMC, or a user-linked
+# prebuilt tree) the build tree lives under the resolved target while the
+# run dir is a sibling of the symlink — the parent of the *unresolved* path.
+# extra_binds_for dedupes whatever is already under cwd/cache.
+container_binds() {
+  local wd="$1" cache_real="$2"
+  printf -- '--bind\n%s\n--bind\n%s\n' "${wd}" "${cache_real}"
+  [[ -n "${SoLID_GEMC:-}" && -d "${SoLID_GEMC}" ]] || return 0
+  local solid_real parent_real
+  solid_real="$(readlink -f "${SoLID_GEMC}")"
+  parent_real="$(readlink -f "$(dirname "${SoLID_GEMC}")")"
+  extra_binds_for "${wd}" "${cache_real}" "${solid_real}" "${parent_real}"
+}
+
 # Run a tcsh command inside the container with the env block applied and the
 # current working directory plus the cache bind-mounted.
 in_container() {
-  ensure_sif
   local cmd="$1"
   local wd cache_real env
   wd="$(container_workdir)"
+  # SOLID_GEMC_RUN_DRYRUN=1: print the resolved apptainer bind/pwd argv and
+  # return without touching the .sif. A container-free seam for the bind
+  # regression test in tests/clean-smoke.sh — short-circuits before
+  # ensure_sif so it needs neither the 1.7 GB image nor a network pull.
+  if [[ -n "${SOLID_GEMC_RUN_DRYRUN:-}" ]]; then
+    resolve_cache_dir
+    cache_real="$(container_cache_dir)"
+    container_binds "${wd}" "${cache_real}"
+    printf -- '--pwd\n%s\n' "${wd}"
+    return 0
+  fi
+  ensure_sif
   cache_real="$(container_cache_dir)"
   env="$(env_block)"
+  local -a binds=()
+  while IFS= read -r line; do binds+=("${line}"); done < <(
+    container_binds "${wd}" "${cache_real}")
   apptainer exec \
-    --bind "${wd}" \
-    --bind "${cache_real}" \
+    "${binds[@]}" \
     --pwd "${wd}" \
     "${SIF_PATH}" \
     tcsh -c "${env}
@@ -230,10 +275,12 @@ cmd_shell() {
   wd="$(container_workdir)"
   cache_real="$(container_cache_dir)"
   env="$(env_block)"
+  local -a binds=()
+  while IFS= read -r line; do binds+=("${line}"); done < <(
+    container_binds "${wd}" "${cache_real}")
   log "entering container ($(basename "${SIF_PATH}")). Type 'exit' to leave."
   apptainer exec \
-    --bind "${wd}" \
-    --bind "${cache_real}" \
+    "${binds[@]}" \
     --pwd "${wd}" \
     "${SIF_PATH}" \
     tcsh -c "${env}
