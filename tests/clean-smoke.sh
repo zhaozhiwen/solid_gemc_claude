@@ -121,6 +121,30 @@ fi
   || fail "solid_gemc binary missing at solid_gemc/source/2.9/solid_gemc"
 pass "solid_gemc binary present"
 
+# --- phase 2.5: container bind regression -----------------------------------
+# Regression for the cwd+cache-only bind bug: the skill cd's into a deep
+# subdir (solid_gemc/script) for cwd-relative geometry lookup, then the
+# in-container command reads/writes absolute paths under the workspace root
+# (binary, libgemc.so, the run dir) that are NOT under that cwd. The seam
+# must explicitly --bind the workspace tree, not lean on apptainer's
+# implicit $HOME/$TMPDIR mount. Container-free: SOLID_GEMC_RUN_DRYRUN prints
+# the resolved apptainer argv without the .sif.
+log "phase 2.5 — container bind regression (workspace root must be bound)"
+DEEP=solid_gemc/script
+[[ -d "${DEEP}" ]] || DEEP=$(find solid_gemc/analysis -mindepth 1 -maxdepth 1 -type d | head -1)
+[[ -n "${DEEP}" && -d "${DEEP}" ]] || fail "no deep subdir under solid_gemc to test cwd-relative run path"
+WS_REAL=$(readlink -f "${WS}")
+SOLID_REAL=$(readlink -f "${WS}/solid_gemc")
+BIND_ARGV=$(
+  cd "${DEEP}" && \
+  SoLID_GEMC="${WS}/solid_gemc" SOLID_GEMC_RUN_DRYRUN=1 sgrun exec true
+)
+grep -qxF -- "${WS_REAL}"    <<<"${BIND_ARGV}" \
+  || { printf '%s\n' "${BIND_ARGV}" >&2; fail "workspace root ${WS_REAL} not bound — run dir/GCard would be invisible in-container"; }
+grep -qxF -- "${SOLID_REAL}" <<<"${BIND_ARGV}" \
+  || { printf '%s\n' "${BIND_ARGV}" >&2; fail "solid_gemc tree ${SOLID_REAL} not bound — binary/libgemc.so would be invisible in-container"; }
+pass "workspace root + solid_gemc tree explicitly bound from a deep cwd"
+
 # --- phase 3: seed project + gcard prep (cherenkov.gcard) -------------------
 # Mirrors the skill's per-project flow: seed a project subdir from the
 # per-project template (flat — no geometry/ or analysis/ subdirs),

@@ -19,6 +19,12 @@ REQ="$ROOT/requirements.txt"
 STORED="$DATA/requirements.txt"
 VENV="$DATA/venv"
 
+# Minimum Python for the analyze deps (uproot>=5 / numpy>=1.24 /
+# matplotlib>=3.7 / pdg all floor here on current releases). Single
+# source of truth for both install paths below — KEEP IN SYNC with the
+# "Python 3.9+" line in README.md Requirements and docs/index.md.
+PY_MIN=3.9
+
 # Idempotency check — exit fast if already in sync.
 if diff -q "$REQ" "$STORED" >/dev/null 2>&1; then
     exit 0
@@ -32,8 +38,25 @@ echo "[solid_gemc_claude] installing Python deps into $VENV (one-time, ~30s)..."
 if [ ! -x "$VENV/bin/python" ]; then
     rm -rf "$VENV"
     if command -v uv >/dev/null 2>&1; then
-        uv venv "$VENV" --python 3.11 >/dev/null
+        # ">=$PY_MIN", not an exact "3.11" pin: uv reuses any discovered
+        # interpreter that satisfies the floor and downloads a managed
+        # CPython only if none on the host qualifies. An exact pin forced
+        # a download even with a fine 3.9/3.10 present and silently
+        # diverged from the python3 fallback path below.
+        uv venv "$VENV" --python ">=$PY_MIN" >/dev/null
     else
+        # Fallback uses whatever `python3` is — enforce the same floor
+        # here so a too-old interpreter fails with a clear message
+        # instead of a cryptic numpy/matplotlib build error mid-install.
+        if ! python3 - "$PY_MIN" <<'PY'
+import sys
+need = tuple(int(x) for x in sys.argv[1].split('.'))
+raise SystemExit(0 if sys.version_info[:2] >= need else 1)
+PY
+        then
+            echo "[solid_gemc_claude] python3 is $(python3 -V 2>&1 | awk '{print $2}'); need >= $PY_MIN (see README Requirements). Install a newer python3, or install 'uv'." >&2
+            exit 1
+        fi
         python3 -m venv "$VENV"
     fi
 fi
