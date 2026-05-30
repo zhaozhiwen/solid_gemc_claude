@@ -126,8 +126,11 @@ The `skills/solid-gemc/SKILL.md` orchestrator gap-checks user requests against:
 | Output | "`runs/<id>/out.root`" |
 | Analysis | "asymmetry binned in Q²" |
 
-Missing fields → ask via `AskUserQuestion`; present plan; user gate; execute
-with stop-on-failure post-condition checks.
+Flow: **Step 0 forces `init` first** — before spec-capture or any plan — gated
+by a one-time "Run init now" confirm when the workspace isn't initialized (its
+own approval, independent of the run gate; no waiver, applies even to plan-only
+requests). Then: missing fields → ask via `AskUserQuestion`; present plan; user
+gate; execute with stop-on-failure post-condition checks.
 
 ## Resolved decisions (phase 0 outcome)
 

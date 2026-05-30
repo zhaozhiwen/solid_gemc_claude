@@ -1,6 +1,6 @@
 ---
 name: solid-gemc
-description: Orchestrate the full solid_gemc (SoLID experiment) simulation flow from a single natural-language user request. Load whenever the user asks to "simulate", "run", "do a SoLID / solid_gemc / PVDIS / SIDIS / J/psi / He-3 / heavy-gas Cherenkov" study — including one-shot setups like "PVDIS A_PV asymmetry on LD2 at 11 GeV" or "SIDIS heavy-gas Cherenkov yield on He-3". Captures the physics spec across seven fields (including project name), asks targeted clarifying questions when something required is missing, presents a brief plan for approval, then drives the run end-to-end via `bin/solid-gemc-run` — `init` (one-shot workspace bootstrap), seed a project subdir from the per-project template if it doesn't exist, then the simulation (the skill writes the GCard edits, runs `solid_gemc` + `evio2root` inside the container, records provenance), then `analyze` for host-side uproot plots. Works on Claude Code and Codex CLI.
+description: Orchestrate the full solid_gemc (SoLID experiment) simulation flow from a single natural-language user request. Load whenever the user asks to "simulate", "run", "do a SoLID / solid_gemc / PVDIS / SIDIS / J/psi / He-3 / heavy-gas Cherenkov" study — including one-shot setups like "PVDIS A_PV asymmetry on LD2 at 11 GeV" or "SIDIS heavy-gas Cherenkov yield on He-3". Forces a gated `bin/solid-gemc-run init` (one-time workspace bootstrap) first when the workspace isn't initialized — before any plan — then captures the physics spec across seven fields (including project name), asks targeted clarifying questions when something required is missing, presents a brief plan for approval, and drives the run end-to-end — seed a project subdir from the per-project template if it doesn't exist, then the simulation (the skill writes the GCard edits, runs `solid_gemc` + `evio2root` inside the container, records provenance), then `analyze` for host-side uproot plots. Works on Claude Code and Codex CLI.
 ---
 
 # solid-gemc — full-flow orchestrator
@@ -56,7 +56,7 @@ Per-run outputs land at `<project>/runs/<id>/`.
 ## Default flow this skill drives
 
 ```
-init                                          (one-shot per workspace)
+init                                          (Step 0 — gated once, before planning)
   → ensure <project>/ subdir exists           (seed from templates/workspace/ if not)
   → pick a GCard from solid_gemc/script/      (canonical) or solid_gemc/analysis/*/
   → copy to <project>/<preset>.gcard + apply batch overrides
@@ -66,11 +66,12 @@ init                                          (one-shot per workspace)
   → solid-gemc-run analyze <project>/runs/<id>        (host-side uproot)
 ```
 
-`init` is one-shot per workspace and idempotent. **Step 3a force-
-checks the workspace state and invokes init if anything is missing**
-— no extra prompt at that point. The user has already approved when
-they approved the plan, and init is a prerequisite for everything
-else this skill does.
+`init` is one-shot per workspace and idempotent. **Step 0 force-
+checks the workspace state at the very front — before spec-capture
+and before any plan — and runs init (after a one-time confirm) if
+anything is missing.** init is a prerequisite for everything else
+this skill does, so it is resolved first; Step 3a only re-asserts the
+post-conditions defensively.
 
 There is no bring-your-own-binary alternative for solid_gemc. If
 the user needs something the canonical configs don't cover, the
@@ -92,6 +93,13 @@ current turn — full stop. Not when the user says "go". Not when
 the user says "yes". Not when the user says "no clarifying
 questions". Not when the user says "just run it" or "skip the
 approval". Not when the initial message looks fully specified.**
+
+The one command that runs *before* this gate is `init`, and it has
+its own dedicated approval in **Step 0** (a separate "Run init now"
+confirm). Approving init there does **not** authorize the simulation
+run — every file write and every `solid_gemc` invocation still waits
+for the Step 2 "Approve and run" choice. Two independent gates, never
+collapsed into one.
 
 Your interpretation of "PVDIS LD2 11 GeV 10000 events default
 analysis" is one of many. You might pick the wrong canonical
@@ -309,6 +317,57 @@ without any SoLID context, prefer the `geant4` skill. If a request
 mentions both ("simulate PVDIS using Geant4"), this skill wins —
 SoLID is more specific.
 
+## Step 0 — Ensure the workspace is initialized (before anything else)
+
+**init is a hard precondition for the entire skill — it runs before
+spec-capture, before clarifying questions, and before any plan is
+drafted.** A plan written against a workspace with no cloned
+`solid_gemc/` is speculative (the ~20 canonical GCard names can't be
+verified), and every real run needs the built binary regardless. So
+the skill resolves init *first*, on every activation.
+
+Resolve the runtime (`$SGC_RUN`, see "Locating the runtime"), then
+force-check the workspace state at cwd:
+
+```bash
+init_needed=0
+for f in CLAUDE.md .gitignore log.md result.md report.html; do
+  [[ -f "$f" ]] || { init_needed=1; break; }
+done
+[[ -d solid_gemc/.git ]]                  || init_needed=1
+[[ -x solid_gemc/source/2.9/solid_gemc ]] || init_needed=1
+```
+
+- **Already initialized** (`init_needed=0`): say nothing, proceed
+  straight to Step 1.
+- **Not initialized** (`init_needed=1`): fire a dedicated init gate
+  *before* doing anything else — an `AskUserQuestion` (or, on a
+  harness without it, a numbered question the user must answer) that
+  states plainly:
+
+  > This workspace isn't initialized. `init` will pull the ~1.7 GB
+  > JLabCE `.sif`, clone `solid_gemc`, and run two scons builds —
+  > several minutes, one-time. Run it now?
+  >
+  > 1. **Run init now** — bootstrap, then continue.
+  > 2. **Cancel** — stop here; nothing downloaded, no files written.
+
+  On **Run init now**: `"$SGC_RUN" init`, wait for it to finish, then
+  re-check the post-conditions above. If init returns non-zero or any
+  post-condition still fails, **stop** — report the last 20 lines of
+  init's output; do not proceed. On **Cancel**: stop entirely — do
+  not capture the spec or draft a plan.
+
+This gate is the approval for init **only**; it is independent of the
+Step 2 run-approval gate (see non-negotiable 1). The forced-init-first
+rule has **no waiver** — it holds even when the user only wants a plan
+("just sketch it"), because the plan is worth more drafted against the
+real cloned `solid_gemc/`. The sole carve-outs are the two in
+non-negotiable 1's "Narrow exceptions" (a pure re-run of an
+already-approved GCard, and `analyze` against an existing run) — both
+already assume an initialized workspace, so Step 0's check passes
+trivially.
+
 ## Step 1 — Capture and gap-check the spec
 
 A working solid_gemc simulation needs all seven fields below. Read
@@ -443,15 +502,14 @@ Spec
 - Output:        <<project>/runs/<id>/out.root | other if user asked>
 - Analysis:      <auto-plots | custom script in <project>/ | hgc_study upstream>
 
-Steps
-1. solid-gemc-run init    — workspace + .sif pull + clone + 2× scons (skip if already done)
-2. seed <project>/ from templates/workspace/. (skip if already there)
-3. copy <project>/<preset>.gcard from solid_gemc/script/<preset>.gcard (or .../analysis/.../<preset>.gcard); apply USE_GUI=0 + OUTPUT=evio,out.evio + N=<n>
-4. <only if user wants non-default beam/physics:> edit <project>/<preset>.gcard
-5. bin/solid-gemc-run exec "solid_gemc <abs gcard> -OUTPUT=evio,<abs run dir>/out.evio"  (from the gcard's upstream dir)
+Steps  (workspace already initialized in Step 0)
+1. seed <project>/ from templates/workspace/. (skip if already there)
+2. copy <project>/<preset>.gcard from solid_gemc/script/<preset>.gcard (or .../analysis/.../<preset>.gcard); apply USE_GUI=0 + OUTPUT=evio,out.evio + N=<n>
+3. <only if user wants non-default beam/physics:> edit <project>/<preset>.gcard
+4. bin/solid-gemc-run exec "solid_gemc <abs gcard> -OUTPUT=evio,<abs run dir>/out.evio"  (from the gcard's upstream dir)
    then bin/solid-gemc-run exec "evio2root -INPUTF=out.evio -R=flux"   (from <project>/runs/<id>/; -R=flux requests the raw bank for the flux detector)
    write <project>/runs/<id>/{gcard.gcard, out.evio, out.root, log.txt, config.json}
-6. solid-gemc-run analyze <project>/runs/<id>
+5. solid-gemc-run analyze <project>/runs/<id>
      <one line: auto-plots | custom <project>/<id>.py | container-side ROOT macro>
 
 Defaults applied
@@ -484,49 +542,27 @@ authorization is meaningful.
 Only after the user picks "Approve and run". Each sub-step has a
 post-condition check; if it fails, stop and report.
 
-### 3a. Force-check init; run it if anything is missing
+### 3a. Re-assert the workspace is initialized
 
-The simulation flow assumes a fully-initialized workspace. **Hard
-check** for all of:
-
-- The five workspace-common files at cwd: `CLAUDE.md`, `.gitignore`,
-  `log.md`, `result.md`, `report.html`.
-- `solid_gemc/.git/` (the upstream tree is cloned).
-- `solid_gemc/source/2.9/solid_gemc` (the binary exists and is
-  executable).
-- The `.sif` is cached (`bin/solid-gemc-run info` reports a path,
-  not `[not pulled]`).
-
-If **any** are missing, run `"$SGC_RUN" init` immediately and wait
-for it to finish. Do not ask the user again — the plan they approved
-listed init as step 1 with "skip if already done", so running it
-when not-already-done is exactly what the approval covers.
+init was already ensured in **Step 0** (gated and run before the
+plan), so this is a cheap defensive re-check, not a second init.
+Re-verify the same post-conditions:
 
 ```bash
-init_needed=0
+ok=1
 for f in CLAUDE.md .gitignore log.md result.md report.html; do
-  [[ -f "$f" ]] || { init_needed=1; break; }
+  [[ -f "$f" ]] || ok=0
 done
-[[ -d solid_gemc/.git ]]                  || init_needed=1
-[[ -x solid_gemc/source/2.9/solid_gemc ]] || init_needed=1
-
-if (( init_needed )); then
-  echo "[skill] workspace not fully initialized; running init"
-  "$SGC_RUN" init
-fi
+[[ -d solid_gemc/.git ]]                  || ok=0
+[[ -x solid_gemc/source/2.9/solid_gemc ]] || ok=0
 ```
 
-Note that `bin/solid-gemc-run clone` and `build` are themselves
-idempotent — `clone` now prints the existing commit SHA and
-warns-but-continues when `solid_gemc/.git` is already present;
-`build` re-invokes scons which incrementally no-ops when nothing
-has changed. So invoking init on a partially-initialized workspace
-is safe.
-
-Post-condition: all five workspace-common files exist; `.sif` is
-cached; `solid_gemc/.git/` exists; `solid_gemc/source/2.9/solid_gemc`
-is executable. If init returns non-zero, **stop** — report the
-failure (last 20 lines of init's output) and do not proceed.
+If `ok=0` here, the workspace lost its initialized state between
+Step 0 and now (rare — e.g. a long session where files were moved).
+**Stop and report** — do not silently re-run init mid-execution;
+surface it so the user can re-trigger Step 0. The `.sif` cache is
+likewise assumed present from Step 0 (`bin/solid-gemc-run info`
+reports a path, not `[not pulled]`).
 
 ### 3b. Seed the project subdir if missing
 
