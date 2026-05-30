@@ -18,8 +18,9 @@ gate. Run it on a host with apptainer + git + wget + python3.
 
 ## 1. Install
 
-- [ ] Install the plugin in Codex; confirm it caches under
-      `~/.codex/plugins/cache/…` and the bundled `solid-gemc` skill loads
+- [ ] `codex plugin marketplace add zhaozhiwen/solid_gemc_claude` then
+      `codex plugin add solid-gemc-claude@solid-gemc-claude`; confirm it caches
+      under `~/.codex/plugins/cache/…` and the bundled `solid-gemc` skill loads
       (ask "is the solid-gemc skill available?"). **No YAML load error** in the
       logs (frontmatter must be strict-YAML clean — CI lint guards this).
 - [ ] `solid-gemc-run` resolves: either `command -v solid-gemc-run` succeeds,

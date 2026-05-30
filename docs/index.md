@@ -20,7 +20,14 @@ In Claude Code:
 /plugin install solid-gemc-claude@solid-gemc-claude
 ```
 
-`/plugin update` handles upgrades. [Apptainer](https://apptainer.org) ≥ 1.4 must already be on the host; the plugin pulls its pinned `.sif` on first use via `wget`.
+In Codex CLI:
+
+```text
+codex plugin marketplace add zhaozhiwen/solid_gemc_claude
+codex plugin add solid-gemc-claude@solid-gemc-claude
+```
+
+`/plugin update` (Claude) handles upgrades. [Apptainer](https://apptainer.org) ≥ 1.4 must already be on the host; the plugin pulls its pinned `.sif` on first use via `wget`.
 
 ## Quickstart
 

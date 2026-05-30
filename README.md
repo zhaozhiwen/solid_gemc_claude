@@ -52,13 +52,16 @@ pre-install).
 
 ### Codex CLI
 
-Install as a Codex plugin (cached under `~/.codex/plugins/cache/`); the repo
-ships a local-source marketplace descriptor at
-`.agents/plugins/marketplace.json` so Codex can discover the plugin from a
-clone. The bundled `solid-gemc` skill auto-activates on SoLID-flavored
-requests, the same as on Claude Code. Ensure `solid-gemc-run` is on `PATH` (the skill resolves the
-wrapper via `CLAUDE_PLUGIN_ROOT` on Claude, else `command -v solid-gemc-run`);
-if needed, symlink it:
+```text
+codex plugin marketplace add zhaozhiwen/solid_gemc_claude
+codex plugin add solid-gemc-claude@solid-gemc-claude
+```
+
+Cached under `~/.codex/plugins/cache/`; the bundled `solid-gemc` skill
+auto-activates on SoLID-flavored requests, the same as on Claude Code. Ensure
+`solid-gemc-run` is on `PATH` (the skill resolves the wrapper via
+`CLAUDE_PLUGIN_ROOT` on Claude, else `command -v solid-gemc-run`); if needed,
+symlink it:
 
 ```sh
 ln -s <plugin-cache-dir>/bin/solid-gemc-run ~/.local/bin/solid-gemc-run
