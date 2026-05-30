@@ -1,0 +1,41 @@
+name: lint
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  skill-frontmatter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Install PyYAML
+        run: pip install pyyaml
+      - name: Strict-YAML lint of every SKILL.md frontmatter
+        # Catches the colon-space class of frontmatter bug that Codex's strict
+        # YAML parser rejects (and Claude silently tolerates). See BUILD_LOG
+        # Phase 19 for the original incident.
+        run: python3 tests/lint-skill-frontmatter.py
+      - name: AGENTS.md must mirror CLAUDE.md (real files, not symlinks)
+        # codex plugin add drops symlinks, so AGENTS.md are real copies; this
+        # guards against drift. See BUILD_LOG Phase 19.
+        run: tests/lint-agents-mirror.sh
+
+  shell-syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: bash -n the shell scripts
+        run: |
+          set -e
+          for f in bin/solid-gemc-run hooks/install-deps.sh tests/clean-smoke.sh; do
+            bash -n "$f" && echo "ok: $f"
+          done
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: py_compile the Python helpers
+        run: python3 -m py_compile bin/solid-gemc-analyze.py tests/lint-skill-frontmatter.py

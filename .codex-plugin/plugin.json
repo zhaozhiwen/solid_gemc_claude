@@ -1,0 +1,32 @@
+{
+  "name": "solid-gemc-claude",
+  "description": "Build, run, and analyze solid_gemc (SoLID experiment) simulations from natural language. The orchestrator skill drives the full flow through bin/solid-gemc-run: JLabCE 2.5 container pulled via wget, tcsh runtime inside the container, host-side analysis with uproot. Same repo as the Claude Code plugin; this manifest is the Codex CLI surface.",
+  "version": "0.0.4",
+  "author": {
+    "name": "Zhiwen Zhao"
+  },
+  "license": "MIT",
+  "keywords": [
+    "solid",
+    "solid_gemc",
+    "gemc",
+    "geant4",
+    "simulation",
+    "particle-physics",
+    "nuclear-physics",
+    "jlab",
+    "jefferson-lab",
+    "apptainer",
+    "uproot"
+  ],
+  "homepage": "https://github.com/zhaozhiwen/solid_gemc_claude",
+  "repository": "https://github.com/zhaozhiwen/solid_gemc_claude.git",
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "solid_gemc",
+    "shortDescription": "Run SoLID experiment (solid_gemc) simulations from natural language: container-based gemc + host-side uproot analysis.",
+    "developerName": "Zhiwen Zhao",
+    "category": "Developer Tools",
+    "capabilities": ["Interactive", "Read", "Write"]
+  }
+}
