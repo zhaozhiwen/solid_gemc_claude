@@ -6,17 +6,15 @@ description: Orchestrate the full solid_gemc (SoLID experiment) simulation flow 
 # solid-gemc — full-flow orchestrator
 
 Use this skill the moment the user asks for a SoLID-flavored
-simulation. It is the front door for everything else this plugin
-does. The whole workflow runs through one wrapper,
-`bin/solid-gemc-run`: `init` (workspace bootstrap), the
+simulation. It is the front door for everything this plugin does —
+there are no slash commands. The whole workflow runs through one
+wrapper, `bin/solid-gemc-run`: `init` (workspace bootstrap), the
 simulation loop in between, and `analyze` (host-side uproot plots).
-On Claude Code those endpoints are also exposed as the
-`/solid-gemc-claude:init` and `/solid-gemc-claude:analyze` slash
-commands; on Codex (and any other harness) this skill calls the
-wrapper subcommands directly. Either way the wrapper is the single
-seam. This keeps the plugin a thin layer over upstream `solid_gemc`
-(which already ships canonical GCards, `hgc_study/run.sh`, and
-`hgc_moved/` for detector authoring).
+This skill calls those subcommands directly, the same way on Claude
+Code and Codex CLI — the wrapper is the single seam. This keeps the
+plugin a thin layer over upstream `solid_gemc` (which already ships
+canonical GCards, `hgc_study/run.sh`, and `hgc_moved/` for detector
+authoring).
 
 ## Locating the runtime (all platforms)
 
@@ -294,8 +292,7 @@ Trigger on any of:
 Do **not** load this skill when:
 
 - The user already has a `<project>/runs/<id>/out.root`
-  and only wants plots — run `solid-gemc-run analyze` directly
-  (or the `/solid-gemc-claude:analyze` slash command on Claude Code).
+  and only wants plots — run `bin/solid-gemc-run analyze <run>` directly.
 - A previous run is failing and the user wants to debug — that's a
   debugging task, not a fresh orchestration. Read the run dir's
   `log.txt` + `config.json` and reason from there.
@@ -503,9 +500,7 @@ check** for all of:
 If **any** are missing, run `"$SGC_RUN" init` immediately and wait
 for it to finish. Do not ask the user again — the plan they approved
 listed init as step 1 with "skip if already done", so running it
-when not-already-done is exactly what the approval covers. (On Claude
-Code the `/solid-gemc-claude:init` slash command is the equivalent
-shortcut; the wrapper call works on every platform.)
+when not-already-done is exactly what the approval covers.
 
 ```bash
 init_needed=0
@@ -707,10 +702,9 @@ record**. Treat the run dir as immutable from this point on.
 ### 3f. Analyze
 
 Run `"$SGC_RUN" analyze <project>/runs/<id>` — host-side uproot,
-auto-plots numeric branches into PNGs alongside `out.root`. (On
-Claude Code the `/solid-gemc-claude:analyze` slash command is the
-equivalent shortcut.) For asymmetries / fits / multi-run
-comparisons, write a script under `<project>/`.
+auto-plots numeric branches into PNGs alongside `out.root`. For
+asymmetries / fits / multi-run comparisons, write a script under
+`<project>/`.
 
 ### Failure handling
 
@@ -763,13 +757,11 @@ of the plan — the plots and numbers are the recap.
 
 ## Cross-references
 
-- `commands/init.md` — workspace bootstrap (the four
-  workspace-common files + image + clone + build).
-- `commands/analyze.md` — uproot inspect + auto-plot
-  TTrees, enumerate pre-built histograms.
-- `bin/solid-gemc-run` — the maintainer-side wrapper this skill
-  drives via `exec`, `validate-gcard`, `shell`, `root`. Single
-  seam for everything that needs the JLabCE 2.5 container.
+- `bin/solid-gemc-run` — the single seam this skill drives. `init`
+  bootstraps the workspace (image + clone + build); `analyze` does
+  uproot inspect + auto-plot; `exec` / `validate-gcard` / `shell` /
+  `root` cover everything that needs the JLabCE 2.5 container. There
+  are no slash commands — this wrapper is the only command surface.
 - `templates/CLAUDE.md` — workspace-wide rules loaded into
   Claude's context for every session in the workspace.
 - `templates/workspace/CLAUDE.md` — per-project rules; copied
@@ -792,6 +784,5 @@ of the plan — the plots and numbers are the recap.
   worked example for **custom detector authoring** (factory text
   files via `<detector name="..." factory="TEXT" ...>`). Has a
   `readme.md` plus the full Perl-generator → text-file pipeline.
-  If a user needs to write a new detector, point them here. The
-  plugin doesn't ship a detector-authoring slash command at
-  v0.0.3.
+  If a user needs to write a new detector, point them here — the
+  plugin has no detector-authoring surface; follow upstream.

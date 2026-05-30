@@ -53,7 +53,7 @@ generators producing factory text files** that gemc loads via
   generated text files (what gemc actually reads).
 - `config_<sub>.dat` — parameter file the generators consume.
 
-The plugin does **not** ship a slash command for this — follow
+The plugin has **no** surface for this — follow
 upstream's `hgc_moved/readme.md` directly. See also
 `${CLAUDE_PLUGIN_ROOT}/reference/gemc_simulation_general_note.md`
 (mirror of the SoLID wiki) for field-by-field semantics of the
@@ -75,8 +75,8 @@ project dir. Convention from `solid_gemc/analysis/hgc_study/`:
   orchestrator skill writes `gcard.gcard`, `out.evio`,
   `out.root`, `log.txt`, `config.json` per run.
 
-For host-side default plots from `runs/<id>/out.root`, use
-`/solid-gemc-claude:analyze` — it bypasses container ROOT via
+For host-side default plots from `runs/<id>/out.root`, run
+`bin/solid-gemc-run analyze <run>` — it bypasses container ROOT via
 uproot.
 
 ## Project handoff documents

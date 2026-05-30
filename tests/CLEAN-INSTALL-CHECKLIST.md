@@ -1,9 +1,9 @@
 # Clean-install checklist
 
 Pre-release smoke test that exercises the parts of the plugin
-`tests/clean-smoke.sh` *can't* reach: Claude Code's slash-command
-dispatch, the orchestrator skill's NL-trigger + `AskUserQuestion`
-flow, and namespace lookup.
+`tests/clean-smoke.sh` *can't* reach: the orchestrator skill's
+NL-trigger + `AskUserQuestion` flow inside Claude Code, the approval
+gate, and the plugin's marketplace install.
 
 **Run this before tagging any release.** ~15 minutes once the
 container is cached + `solid_gemc` is built (otherwise add the
@@ -64,21 +64,23 @@ Pass:
   verified in Phase 5).
 - No MCP approval prompt fires (the plugin ships no `.mcp.json`).
 
-## Phase 3 — `/solid-gemc-claude:init`
+## Phase 3 — Workspace bootstrap (`bin/solid-gemc-run init`)
 
 ```bash
 mkdir /tmp/sgc_clean_smoke && cd /tmp/sgc_clean_smoke
 ```
 
-In Claude Code:
+There are no slash commands — bootstrap via the skill (just describe a run;
+it calls `init` in step 3a) or run the wrapper directly. To test init in
+isolation, ask Claude to run it:
 
 ```text
-> /solid-gemc-claude:init
+> Run bin/solid-gemc-run init here.
 ```
 
 Pass:
 - Tool checks succeed for `apptainer`, `git`, `wget`.
-- Workspace-common files appear: `CLAUDE.md`, `.gitignore`,
+- Workspace-common files appear: `CLAUDE.md`, `AGENTS.md`, `.gitignore`,
   `log.md`, `result.md`, `report.html` (no `gcards/`, `runs/`,
   `analysis/` at the workspace root — those live inside each project
   subdir).
@@ -88,13 +90,12 @@ Pass:
   there is reported in the command's final summary.
 - Two scons builds complete (first run: several minutes); the binary
   `solid_gemc/source/2.9/solid_gemc` is executable.
-- The command's closing summary lists the three paths in
-  (skill-driven, upstream-direct, manual `cp -r`) and recommends
-  the upstream HGC study as the first thing to try.
+- `init` finishes by printing `bin/solid-gemc-run info` (pinned image /
+  cache / repo / GEMC version) plus the cloned commit and built binary path.
 
 ## Phase 4 — Orchestrator skill drives a simulation
 
-Type a SoLID-flavored NL request that doesn't name a slash command:
+Type a SoLID-flavored NL request:
 
 ```text
 > Run the heavy-gas Cherenkov study from solid_gemc/analysis/hgc_study, He-3, 10 events, default analysis.
@@ -145,10 +146,10 @@ Pass:
   `geant4` skill should load instead. This is the description-match
   arbitration test.
 
-## Phase 5 — `/solid-gemc-claude:analyze`
+## Phase 5 — Analyze (`bin/solid-gemc-run analyze`)
 
 ```text
-> /solid-gemc-claude:analyze <project>/runs/<UTC-id>
+> Run bin/solid-gemc-run analyze <project>/runs/<UTC-id>
 ```
 
 Pass:
@@ -159,13 +160,11 @@ Pass:
   branches and entry count.
 - At least 1 PNG histogram lands in
   `<project>/runs/<UTC-id>/`, named
-  `hist_<tree>_<branch>.png`.
-- The closing report points the user at `<project>/` for
-  custom scripts.
+  `hist_<tree>_<branch>.png` (the wrapper lists them on stdout).
 
 ## Phase 6 — Idempotency
 
-Re-run `/solid-gemc-claude:init` in the same workspace:
+Re-run `bin/solid-gemc-run init` in the same workspace:
 
 Pass:
 - The command refuses to overwrite without `--force`.

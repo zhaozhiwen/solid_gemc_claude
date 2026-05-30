@@ -74,22 +74,26 @@ bin/solid-gemc-run analyze runs/<id>    # uproot plots (venv self-installs)
 
 Cache/venv fall back to `~/.cache` / `~/.local/share` when not under a plugin.
 
-## Slash commands (Claude Code)
+## How you drive it
+
+There are **no slash commands**. The `solid-gemc` orchestrator skill
+auto-loads on SoLID-flavored natural language ("run a PVDIS LD2 study at
+11 GeV"), gap-checks a seven-field spec, presents a plan, gates on your
+approval, then drives the whole run through `bin/solid-gemc-run` (bootstrap
+the workspace, pick + edit a GCard, run `solid_gemc`, convert EVIO → ROOT,
+record provenance, plot). Works the same on Claude Code and Codex CLI.
+
+You can also drive the wrapper directly:
 
 | Command | Purpose |
 |---|---|
-| `/solid-gemc-claude:init` | Pull .sif, clone solid_gemc, run both scons builds, scaffold workspace. One-shot bootstrap. |
-| `/solid-gemc-claude:analyze runs/<id>` | uproot-based default plots from `out.root` (the post-converted file). |
+| `bin/solid-gemc-run init` | Pull .sif, clone solid_gemc, run both scons builds, scaffold workspace. One-shot bootstrap. |
+| `bin/solid-gemc-run analyze runs/<id>` | uproot-based default plots from `out.root` (the post-converted file). |
 
-The workflow **between** init and analyze (pick a GCard, run
-`solid_gemc`, convert EVIO → ROOT, record provenance) is driven by the
-`solid-gemc` orchestrator skill — auto-loads on SoLID-flavored natural
-language ("run a PVDIS LD2 study at 11 GeV") and gap-checks against a
-six-field spec before executing. Users who want upstream's pattern
-directly can `bin/solid-gemc-run shell` and follow
-`solid_gemc/analysis/hgc_study/run.sh`.
+Users who want upstream's pattern directly can `bin/solid-gemc-run shell`
+and follow `solid_gemc/analysis/hgc_study/run.sh`.
 
-## First-run flow (after `/solid-gemc-claude:init`)
+## First-run flow (after `bin/solid-gemc-run init`)
 
 There is no shipped "example" command. Two upstream worked examples
 live in your workspace after init, both fully self-contained:
@@ -111,7 +115,7 @@ detector.
 - The .sif is hosted at a personal Duke webhome
   (`http://webhome.phy.duke.edu/~zz81/simg/`). No SLA, may move. Mirror
   locally with `wget` if you need durability.
-- No upstream-pin for solid_gemc — `/solid-gemc-claude:init` clones HEAD of master.
+- No upstream-pin for solid_gemc — `bin/solid-gemc-run init` clones HEAD of master.
   The resolved commit SHA is recorded per-run in `runs/<id>/config.json`.
 - ROOT analysis runs inside the container via `bin/solid-gemc-run root`.
   Upstream's HGC study assumes host-side ROOT; we recommend the

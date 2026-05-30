@@ -24,9 +24,9 @@ In Claude Code:
 
 ## Quickstart
 
-Two slash commands ship: `/solid-gemc-claude:init` (one-shot bootstrap — pull the `.sif`, clone `solid_gemc`, run both scons builds, scaffold a workspace) and `/solid-gemc-claude:analyze runs/<id>` (uproot plots from the post-converted ROOT file).
+There are no slash commands. The whole run goes through `bin/solid-gemc-run`: `init` (one-shot bootstrap — pull the `.sif`, clone `solid_gemc`, run both scons builds, scaffold a workspace) and `analyze runs/<id>` (uproot plots from the post-converted ROOT file).
 
-The simulation loop in between is driven by the `solid-gemc` orchestrator skill — it auto-loads on any SoLID-flavored request. Tell Claude what you want:
+The full simulation loop is driven by the `solid-gemc` orchestrator skill — it auto-loads on any SoLID-flavored request (Claude Code or Codex CLI). Tell it what you want:
 
 ```text
 > Run the heavy-gas Cherenkov study on SIDIS He-3 at 11 GeV e-,

@@ -55,11 +55,10 @@ thin adapter that calls it.
                  bin/solid-gemc-run  (pure bash, platform-neutral)
                  init │ analyze │ setup-python │ pull/clone/build/exec/…
                         ▲            ▲              ▲
-        ┌───────────────┤            │              │
-   Claude Code      orchestrator   Codex CLI
-   commands/*.md    skill          .codex-plugin manifest
-   (thin callers)   SKILL.md        + AGENTS.md (bundled in plugin)
-                    (one canonical, platform-neutral phrasing)
+        ┌───────────────┴────────────┐              │
+   orchestrator skill (SKILL.md)      Codex CLI: .codex-plugin manifest
+   one canonical, platform-neutral    Claude Code: .claude-plugin manifest
+   (no slash commands — see Phase 21) + AGENTS.md (bundled in plugin)
 ```
 
 One skill, one workflow implementation, two thin discovery layers. Both
@@ -82,7 +81,7 @@ still holds whenever `CLAUDE_PLUGIN_DATA` is set).
 Move the **non-interactive** logic out of the Claude command/hook files:
 - `setup-python` — idempotent venv install (extracted from `hooks/install-deps.sh`).
 - `init [--force]` — workspace scaffold + `pull` + `clone` + `build`
-  (deterministic parts of `commands/init.md`).
+  (deterministic parts of the former `commands/init.md`).
 - `analyze <run-dir|id|path>` — uproot plots; extract the embedded Python into a
   new `bin/solid-gemc-analyze.py` the subcommand calls (reusable by both platforms).
 
@@ -98,16 +97,19 @@ simplicity — one install path, not two.)
 ### C. Make the orchestrator skill platform-neutral
 `skills/solid-gemc/SKILL.md`:
 - Replace "call `/solid-gemc-claude:init` / `:analyze`" with
-  "run `bin/solid-gemc-run init` / `analyze`" (works everywhere); note the Claude
-  slash commands are equivalent shortcuts.
+  "run `bin/solid-gemc-run init` / `analyze`" (works everywhere).
 - Replace `AskUserQuestion` references with neutral phrasing: "ask the user
   (Claude Code: via `AskUserQuestion`; Codex: a plain prompt / `/skills` / `$`)."
   Keep the plan-first + log-every-user-input non-negotiables intact.
 
-### D. Slim the Claude adapters to thin callers
-- `commands/init.md` → call `bin/solid-gemc-run init`; keep only the interactive
-  collision/`--force` prompt + status report.
-- `commands/analyze.md` → call `bin/solid-gemc-run analyze`.
+### D. Adapter cleanup
+> **Phase 21 update:** the `commands/` slash-command surface and the `hooks/`
+> directory were both **removed** — the orchestrator skill + `bin/solid-gemc-run`
+> cover everything on both platforms. The bullets below describe the
+> intermediate "thin caller" step that those removals superseded.
+
+- ~~`commands/init.md` → call `bin/solid-gemc-run init`~~ (commands removed).
+- ~~`commands/analyze.md` → call `bin/solid-gemc-run analyze`~~ (commands removed).
 - `hooks/` removed entirely — no `SessionStart` hook. The venv installs lazily
   on first `analyze` (the same path Codex/standalone use).
 
@@ -165,7 +167,7 @@ user's workspace; each CLI reads only its own.
 | `bin/solid-gemc-run` | + `init`/`analyze`/`setup-python` subcommands; generalize cache+venv resolution; lazy-venv ensure |
 | `bin/solid-gemc-analyze.py` | **new** — extracted uproot plotting helper |
 | `skills/solid-gemc/SKILL.md` | platform-neutral phrasing (wrapper calls, neutral "ask user") |
-| `commands/init.md`, `commands/analyze.md` | slim to thin callers of the wrapper |
+| `commands/` | **removed** (Phase 21) — no slash commands; skill + wrapper only |
 | `hooks/` | **removed** — no `SessionStart` hook; venv installs lazily |
 | `.codex-plugin/plugin.json` | **new** — Codex manifest mirroring the Claude one |
 | `AGENTS.md` (root), `templates/AGENTS.md`, `templates/workspace/AGENTS.md` | **new** real copies of the sibling `CLAUDE.md` (guarded by `tests/lint-agents-mirror.sh`) |
@@ -178,7 +180,7 @@ user's workspace; each CLI reads only its own.
   add cases to the existing `bin/solid-gemc-run`, don't restructure.
 - venv install logic: lives in the wrapper's `setup-python` (uv-or-pip,
   Python 3.9+ guard) — the single install path, invoked lazily by `analyze`.
-- uproot plotting: lift the Python from `commands/analyze.md` into `bin/solid-gemc-analyze.py`.
+- uproot plotting: lifted from the former `commands/analyze.md` into `bin/solid-gemc-analyze.py`.
 - `evio2root -R=flux` and `LIBRARY=shared` flags: keep — load-bearing.
 - Structural model: mirror superpowers' side-by-side manifest dirs + dual root
   rules files; do **not** copy its marketplace-sync script yet.

@@ -4,12 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repo state
 
-v0.0.3 surface complete. Two slash commands shipped
-(`/solid-gemc-claude:init` and
-`/solid-gemc-claude:analyze`); the workflow between them is
-driven by the `solid-gemc` orchestrator skill against
-`bin/solid-gemc-run`. The earlier `…-config` and `…-run` slash commands
-were removed in favor of the skill — see BUILD_LOG.md phase 7 for why.
+v0.0.4 surface: dual-platform (Claude Code + Codex CLI). There are **no
+slash commands** — the whole workflow runs through the `solid-gemc`
+orchestrator skill (auto-loads on SoLID-flavored natural language) driving
+`bin/solid-gemc-run` (`init` / `analyze` / `setup-python` subcommands). The
+earlier `init`/`analyze` slash commands were removed in Phase 21 (BUILD_LOG)
+because they were a Claude-only surface that the skill + wrapper already
+covered on both platforms.
 
 `PLAN.md` is the **original plan** (generic GEMC plugin); scope has
 since shifted to solid_gemc specifically. The post-pivot design spec is
@@ -68,9 +69,9 @@ Pattern improvements propagate by deliberate sync, not by linking.
    tokens, no personal email in committed files. The one allowed exception is
    `gemc.jlab.org` as a documentation reference URL — call this out in any new
    doc that uses it.
-6. **Idempotent commands.** Running any slash command twice must not corrupt
-   state. `/solid-gemc-claude:init` re-detects existing files and refuses to
-   overwrite without `--force`.
+6. **Idempotent operations.** Running anything twice must not corrupt state.
+   `bin/solid-gemc-run init` re-detects existing files and refuses to overwrite
+   without `--force`.
 7. **Cache resolution, tiered.** `$SOLID_GEMC_CLAUDE_CACHE` →
    `$CLAUDE_PLUGIN_DATA/cache` → `${XDG_CACHE_HOME:-~/.cache}/solid-gemc-claude`.
    The XDG/home tier exists **only** for use outside Claude Code (Codex CLI,
@@ -87,11 +88,12 @@ Pattern improvements propagate by deliberate sync, not by linking.
 | Plugin name (Claude Code + Codex spec) | `solid-gemc-claude` — kebab-case, mandatory |
 | Claude manifest | `.claude-plugin/plugin.json` |
 | Codex manifest | `.codex-plugin/plugin.json` (mirror; same `name`/`version`) |
-| Slash commands (Claude only) | `/solid-gemc-claude:solid-gemc-<verb>` — namespaced |
 | GitHub repo | `solid_gemc_claude` — underscore, mirrors `geant4_claude` |
 | Run IDs | `YYYYMMDD-HHMMSS-<6char>` (UTC) |
-| Command files | `commands/<verb>.md` (verb only — invocation namespace already encodes "solid-gemc") |
 | Skill dirs | `skills/solid-gemc-<topic>/` (plus the one orchestrator `skills/solid-gemc/`) |
+
+There is **no `commands/` slash-command surface** — removed in Phase 21. Entry
+points are the orchestrator skill (natural language) and `bin/solid-gemc-run`.
 
 The name keeps its `-claude` suffix even though the plugin now also targets
 Codex CLI — renaming the published repo / marketplace / docs site was judged
@@ -128,7 +130,7 @@ with stop-on-failure post-condition checks.
   image (`ghcr.io/gemc/g4install`) does not contain `gemc`; the JLabCE
   image has Geant4 + the deps to build GEMC and solid_gemc on top.
 - **`solid_` directory prefix.** Confirmed correct. Local dir, repo
-  name, plugin manifest, and slash-command namespace all use the
+  name, and both plugin manifests use the
   `solid_gemc_claude` / `solid-gemc-claude` form.
 - **Output format.** gemc 2.9 in JLabCE 2.5 writes **EVIO natively
   only** (`-help-output` reports `Supported output: evio, txt`).
@@ -157,23 +159,19 @@ with stop-on-failure post-condition checks.
 ## Common commands
 
 ```bash
-# Slash commands (v0.0.3 surface — two only)
-/solid-gemc-claude:init             # workspace skeleton + pull .sif + clone + 2× scons build (one-shot bootstrap)
-/solid-gemc-claude:analyze runs/<id>  # host-side uproot plots from out.root (post-converted via evio2root)
+# No slash commands. The orchestrator skill at skills/solid-gemc/SKILL.md
+# auto-loads on SoLID-flavored natural-language requests, gap-checks the
+# seven-field spec, presents a plan, gates on approval, then drives the run
+# through bin/solid-gemc-run. The wrapper is the one seam for everything:
 
-# Workflow (between init and analyze) is driven by the orchestrator skill
-# at skills/solid-gemc/SKILL.md. It auto-loads on SoLID-flavored
-# natural-language requests, gap-checks the six-field spec, presents a
-# plan, then drives: gcard prep → solid_gemc + evio2root in the container
-# → runs/<id>/{out.evio, out.root, log.txt, config.json}.
-# Users who want the upstream pattern instead can `bin/solid-gemc-run shell`
-# and follow `solid_gemc/analysis/hgc_study/run.sh` directly.
-
-# Maintainer-side wrapper (host shell, from this repo)
+bin/solid-gemc-run init [--force]             # workspace skeleton + pull .sif + clone + 2× scons build
+bin/solid-gemc-run analyze <run|id|root> [N]  # host-side uproot plots from out.root (post-converted via evio2root)
+bin/solid-gemc-run setup-python               # idempotently install the analysis venv (else lazy on first analyze)
 bin/solid-gemc-run pull                       # wget the .sif into cache
 bin/solid-gemc-run clone [dest]               # git clone solid_gemc (default: ./solid_gemc)
 bin/solid-gemc-run build [dest]               # two scons builds inside container: mod/gemc/2.9 → source/2.9
 bin/solid-gemc-run info                       # .sif URL, cache, solid_gemc repo, GEMC_VERSION
+bin/solid-gemc-run paths                      # resolved root/cache/data/venv/templates/reference paths
 bin/solid-gemc-run shell                      # interactive tcsh in container with env applied
 bin/solid-gemc-run exec <cmd...>              # run cmd inside container with env applied
 bin/solid-gemc-run root <args...>             # ROOT (-l -b -q) inside container
@@ -182,8 +180,7 @@ bin/solid-gemc-run validate-gcard <file>      # xmllint a GCard inside container
 tests/clean-smoke.sh                          # end-to-end smoke (workspace + image + clone/build + gemc + evio2root + analyze)
 ```
 
-There is no `example`, no `config`, and no `run` slash command.
-After `/solid-gemc-claude:init`, the upstream
+After `bin/solid-gemc-run init`, the upstream
 HGC study at `solid_gemc/analysis/hgc_study/` (cloned into the
 workspace by init) is the recommended first run — drive it through the
 orchestrator skill in plain language ("run the heavy-gas Cherenkov

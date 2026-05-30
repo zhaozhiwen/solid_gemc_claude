@@ -15,51 +15,54 @@ Geant4, GEMC, ROOT, and a working tcsh build chain — each with its own
 version pin. The standard install path is a multi-hour scons-and-
 environment setup that varies per host.
 
-The plugin wraps that complexity behind two slash commands and a
-natural-language skill, so a user can go from `git clone` to `out.root`
-without ever touching the underlying toolchain.
+The plugin wraps that complexity behind a natural-language skill and one
+runtime wrapper, so a user can go from `git clone` to `out.root`
+without ever touching the underlying toolchain. It runs on both Claude
+Code and Codex CLI.
 
 ## Architecture
 
 ```
                             host                          container
                             ────                          ─────────
-  /solid-gemc-claude:init  ──┐
-  /solid-gemc-claude:analyze ┤      bin/                  JLabCE 2.5 .sif
-                             │  solid-gemc-run            ┌─────────────┐
-  skills/solid-gemc/        ─┼──────────► apptainer ─────►│ gemc, ROOT, │
-  (orchestrator)             │              exec          │ evio2root,  │
-                             │                            │ solid_gemc  │
-  Python (uproot, numpy)     │                            └──────┬──────┘
+  skills/solid-gemc/        ─┐                            JLabCE 2.5 .sif
+  (orchestrator, NL)         │      bin/                  ┌─────────────┐
+                             ┼  solid-gemc-run ─► apptainer│ gemc, ROOT, │
+  bin/solid-gemc-run         │   init/analyze/    exec ───►│ evio2root,  │
+  init / analyze / …        ─┤   exec/…                    │ solid_gemc  │
+                             │                            └──────┬──────┘
+  Python (uproot, numpy)     │                                   │
   for analysis  ◄────────────┴── runs/<id>/out.root ──────────── ┘
 ```
 
-Three components live on the host:
+Two components live on the host (no slash commands):
 
-- **Two slash commands** — `init` and `analyze`. Bookend the workflow.
-- **One orchestrator skill** — `skills/solid-gemc/`. Drives the
-  simulation loop in between; auto-loads on SoLID-flavored natural
-  language.
-- **One runtime wrapper** — `bin/solid-gemc-run`. Every container call
-  goes through it: pull / clone / build / shell / exec / root /
+- **One orchestrator skill** — `skills/solid-gemc/`. Drives the whole
+  workflow from natural language; auto-loads on SoLID-flavored requests.
+- **One runtime wrapper** — `bin/solid-gemc-run`. The single command
+  surface and the single container seam: `init` / `analyze` /
+  `setup-python` / pull / clone / build / shell / exec / root /
   validate-gcard.
 
 Everything else lives inside the JLabCE 2.5 apptainer image: gemc 2.9,
 Geant4, ROOT, evio2root, plus the freshly cloned and built `solid_gemc`
 tree.
 
-## Why a skill, not a third slash command?
+## Why a skill, not slash commands?
 
-Two slash commands (`init`, `analyze`) cover bootstrap and post-run
-analysis. The simulation loop in between has too many parameters —
-physics goal, SoLID config, beam energy/particle/count, GCard variant,
-output path, analysis type — to fit a flag-heavy command.
+The workflow has too many parameters — physics goal, SoLID config, beam
+energy/particle/count, GCard variant, output path, analysis type, project
+name — to fit a flag-heavy command, and slash commands are Claude-only
+anyway (Codex has no equivalent). So the plugin ships **no slash
+commands**: the orchestrator skill is the entry point and `bin/solid-gemc-run`
+does the work, identically on both platforms.
 
-The orchestrator skill at `skills/solid-gemc/SKILL.md` solves this with
-a **six-field spec**: it gap-checks the user's natural-language request
-against six required fields, asks for what's missing via
-`AskUserQuestion`, presents a plan, gates on user approval, then
-executes with stop-on-failure post-condition checks.
+The orchestrator skill at `skills/solid-gemc/SKILL.md` works from a
+**seven-field spec**: it gap-checks the user's natural-language request
+against the required fields, asks for what's missing (via `AskUserQuestion`
+on Claude, a plain numbered question on Codex), presents a plan, gates on
+user approval, then drives `bin/solid-gemc-run` with stop-on-failure
+post-condition checks.
 
 | Field | Example |
 |---|---|
@@ -98,9 +101,9 @@ the maintainer's `$HOME` or absolute `/home/$USER` paths.
 or personal email in committed files. The one allowed exception is
 `gemc.jlab.org` as a documentation reference URL.
 
-**Idempotent commands.** Running any slash command twice doesn't
-corrupt state. `init` re-detects existing files and refuses to
-overwrite without `--force`.
+**Idempotent operations.** Running anything twice doesn't corrupt
+state. `bin/solid-gemc-run init` re-detects existing files and refuses
+to overwrite without `--force`.
 
 **Cache resolution, no `$HOME` fallback.** Cache location resolves
 `$SOLID_GEMC_CLAUDE_CACHE` → `$CLAUDE_PLUGIN_DATA/cache` → fatal error.

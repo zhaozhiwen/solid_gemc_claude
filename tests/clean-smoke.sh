@@ -6,8 +6,8 @@
 # template + the simulation loop the orchestrator skill drives (gcard prep +
 # solid_gemc + evio2root) + the analyze step, against a sandboxed
 # CLAUDE_PLUGIN_DATA. Does NOT go through Claude Code or Codex, so it does not
-# test slash-command/skill dispatch, MCP approval, the approval gate, or
-# NL-trigger auto-load — see tests/CLEAN-INSTALL-CHECKLIST.md
+# test skill dispatch, MCP approval, the approval gate, or NL-trigger
+# auto-load — see tests/CLEAN-INSTALL-CHECKLIST.md
 # (Claude) and tests/CODEX-CHECKLIST.md (Codex) for the manual flows.
 #
 # Usage:

@@ -3,19 +3,18 @@
 Rules for Claude when working in this solid_gemc simulation workspace.
 The `solid-gemc-claude` plugin scaffolded these directories.
 
-`/solid-gemc-claude:init` (which created this workspace) also
+`bin/solid-gemc-run init` (which created this workspace) also
 cloned and built solid_gemc into `./solid_gemc/` — that's where SoLID
 geometry, the canonical GCards (`solid_gemc/script/`), and the built
 binary (`solid_gemc/source/2.9/solid_gemc`) live.
 
-The plugin ships **two slash commands** —
-`/solid-gemc-claude:init` (already done) and
-`/solid-gemc-claude:analyze` (host-side uproot plots after a
-run). Everything in between (picking a GCard, running gemc, converting
-EVIO → ROOT) is driven by the **`solid-gemc` orchestrator skill** which
-auto-loads on SoLID-flavored natural-language requests, or by
-`bin/solid-gemc-run` directly for users following upstream's
-`hgc_study/run.sh` pattern.
+There are **no slash commands**. The whole workflow — bootstrap
+(`init`), picking + editing a GCard, running gemc, converting EVIO →
+ROOT, and plotting (`analyze`) — runs through `bin/solid-gemc-run`,
+driven by the **`solid-gemc` orchestrator skill** which auto-loads on
+SoLID-flavored natural-language requests (Claude Code or Codex CLI). You
+can also call `bin/solid-gemc-run` directly (e.g. following upstream's
+`hgc_study/run.sh` pattern).
 
 ## Workspace layout
 
@@ -38,7 +37,7 @@ upstream organizes `solid_gemc/analysis/hgc_study/` and
 
 1. **All solid_gemc / scons / ROOT calls go through the plugin's wrapper.**
    Never invoke `apptainer`, `solid_gemc`, `scons`, or `root` directly.
-   Use `bin/solid-gemc-run` (or the skill / slash commands that wrap it).
+   Use `bin/solid-gemc-run` (or the orchestrator skill that wraps it).
    In-container shell is tcsh.
 2. **Run directories are immutable.** Once a run finishes, treat
    `<name>/runs/<id>/` as read-only. New analysis = new
@@ -66,7 +65,7 @@ upstream organizes `solid_gemc/analysis/hgc_study/` and
    up (six-field spec — physics goal, SoLID config, beam, GCard,
    output, analysis), the user's **decision** (approved / edited /
    plan-only), and the **outcome** (run id, status, one-line
-   summary). After a `/solid-gemc-claude:analyze` that produced a
+   summary). After an `analyze` run that produced a
    noteworthy result, add or update a section in `<name>/result.md`
    with key numbers + plot paths, and refresh `<name>/report.html`
    so the rendered summary (overview, configuration table, headline
@@ -105,8 +104,7 @@ the six-field spec, presents a plan, and on approval drives:
 3. Post-convert `out.evio` → `out.root` via `evio2root` in the
    same container, from the run directory. Capture combined log +
    provenance.
-4. Hand off to `/solid-gemc-claude:analyze
-   <name>/runs/<id>`.
+4. Run `bin/solid-gemc-run analyze <name>/runs/<id>`.
 
 For variations: edit `<name>/<preset>.gcard` between steps
 1 and 2 (beam energy, physics list, target). GCard option
@@ -153,8 +151,8 @@ the rest of the project, no `geometry/` subdir):
   generated text files (what gemc actually reads at runtime).
 - `config_<sub>.dat` — parameter file the Perl generators consume.
 
-The plugin's v0.0.3 surface doesn't include a custom-detector
-authoring slash command — for that work, follow upstream conventions
+The plugin has no custom-detector authoring surface — for that work,
+follow upstream conventions
 in `solid_gemc/geometry/hgc_moved/` directly (edit the `.pl`,
 regenerate the `.txt`, reference from your GCard with
 `<detector name="..." factory="TEXT" ...>`).
@@ -165,6 +163,6 @@ regenerate the `.txt`, reference from your GCard with
 - `solid_gemc` crashes at runtime → `<name>/runs/<id>/log.txt`;
   usually the failing volume, material, or magnet field config.
 - Missing binary at `solid_gemc/source/2.9/solid_gemc` → re-run
-  `/solid-gemc-claude:init` or `bin/solid-gemc-run build`.
+  `bin/solid-gemc-run init` or `bin/solid-gemc-run build`.
 - Image missing → `bin/solid-gemc-run info` shows `[not pulled]`; run
   `bin/solid-gemc-run pull`.
