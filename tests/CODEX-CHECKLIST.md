@@ -53,20 +53,22 @@ gate. Run it on a host with apptainer + git + wget + python3.
 - [ ] The simulation produces `<project>/runs/<id>/{gcard.gcard, out.evio,
       out.root, log.txt, config.json}`.
 - [ ] `analyze` installs the venv lazily on first use (no `SessionStart` hook
-      on Codex), under the Codex plugin install
-      (`$CODEX_HOME/plugins/cache/solid-gemc-claude/solid-gemc-claude/<ver>/venv`;
-      `CODEX_HOME` defaults to `~/.codex` but may be a custom dir), and writes
-      PNGs into the run dir.
+      on Codex), under the plugin install at `${PLUGIN_ROOT}/venv` (i.e.
+      `$CODEX_HOME/plugins/cache/solid-gemc-claude/solid-gemc-claude/<ver>/venv`),
+      and writes PNGs into the run dir.
 - [ ] `<project>/log.md` gets the four-section verbatim entry (user input →
       plan → decision → outcome).
 
 ## 5. Path hygiene
 
-- [ ] Cache (the `.sif`) landed under the Codex plugin install
-      (`$CODEX_HOME/plugins/cache/solid-gemc-claude/solid-gemc-claude/<ver>/cache/sif`),
-      **not** in `~/.cache` or `$HOME` root. This is the regression from the
-      2026-05-30 field report: a custom `CODEX_HOME` (e.g. `…/codex_home`, no
-      leading dot) used to miss the Codex tier and fall to `~/.cache`. Confirm
-      with `solid-gemc-run info` — cache line tagged `[Codex plugin install …]`,
-      not `[XDG/home fallback …]`.
+- [ ] Cache (the `.sif`) landed at `${PLUGIN_ROOT}/cache/sif` — i.e.
+      `$CODEX_HOME/plugins/cache/solid-gemc-claude/solid-gemc-claude/<ver>/cache/sif`,
+      next to the wrapper — **not** in `~/.cache` or `$HOME` root. (Tier 3 is
+      unconditional and co-locates with the install; there is no `~/.cache`
+      tier anymore — the 2026-05-30 field report where a custom `CODEX_HOME`
+      orphaned the `.sif` in `~/.cache` can no longer happen.) Confirm with
+      `solid-gemc-run info` — cache line tagged `[PLUGIN_ROOT/cache …]`.
+- [ ] Optional: `$SOLID_GEMC_CLAUDE_CACHE` overrides the location (e.g. point
+      it at a shared/pre-staged `.sif`); `info` then tags the cache line
+      `[SOLID_GEMC_CLAUDE_CACHE override]`.
 - [ ] Re-running `init` is idempotent (existing files skipped without `--force`).

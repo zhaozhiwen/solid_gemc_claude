@@ -72,21 +72,20 @@ Pattern improvements propagate by deliberate sync, not by linking.
 6. **Idempotent operations.** Running anything twice must not corrupt state.
    `bin/solid-gemc-run init` re-detects existing files and refuses to overwrite
    without `--force`.
-7. **Cache resolution, tiered.** `$SOLID_GEMC_CLAUDE_CACHE` →
-   `$CLAUDE_PLUGIN_DATA/cache` → `${PLUGIN_ROOT}/cache` (Codex plugin install) →
-   `${XDG_CACHE_HOME:-~/.cache}/solid-gemc-claude` (bare shell). Tiers 2 and 3
-   co-locate the `.sif` with the plugin install so each harness manages its own
-   copy. The Codex tier fires when the wrapper runs from a `$CODEX_HOME/plugins/cache/`
-   install — detected via `PLUGIN_ROOT` (Codex exposes no `CLAUDE_PLUGIN_DATA`
-   equivalent). `CODEX_HOME` defaults to `~/.codex` but is configurable, so the
-   match keys on the stable `/plugins/cache/` path segment (and an explicit
-   `$CODEX_HOME` prefix when exported), **not** a literal `.codex` — a custom
-   `codex_home/` install must still resolve to the Codex tier. The XDG tier is the
-   last resort for a bare git clone — added for dual-platform support. When `CLAUDE_PLUGIN_DATA`
-   **is** set we stay strictly inside it (no `$HOME` fallback), so the plugin's
-   own `.sif` is never shadowed by a phantom re-download. Venv resolution
-   mirrors this: `$CLAUDE_PLUGIN_DATA/venv` → `${PLUGIN_ROOT}/venv` (Codex) →
-   `${XDG_DATA_HOME:-~/.local/share}/solid-gemc-claude/venv`.
+7. **Cache resolution, three tiers.** `$SOLID_GEMC_CLAUDE_CACHE` →
+   `$CLAUDE_PLUGIN_DATA/cache` → `${PLUGIN_ROOT}/cache`. Tier 3 is the
+   **unconditional** non-Claude fallback — it co-locates the `.sif` with the
+   wrapper whatever installed it (Codex, standalone, bare clone), with **no**
+   platform detection and **no** `$HOME`/XDG tier. This is deliberate: an
+   earlier `is_codex_install` heuristic keyed on a `.codex` path segment and
+   mis-fired on custom `CODEX_HOME` dirs, silently orphaning the `.sif` in
+   `~/.cache`; dropping detection entirely removes that whole bug class. Tier 1
+   is the escape hatch — point it at a stable shared location to reuse a
+   pre-staged `.sif` or to avoid re-downloading on every version-pinned install
+   bump (Codex install paths carry the version, so co-located caches don't
+   survive a bump; the override does). When `CLAUDE_PLUGIN_DATA` **is** set we
+   stay strictly inside it. Venv resolution mirrors this:
+   `$CLAUDE_PLUGIN_DATA/venv` → `${PLUGIN_ROOT}/venv`.
 
 ## Naming
 

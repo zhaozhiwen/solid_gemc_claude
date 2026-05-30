@@ -33,9 +33,10 @@ SGC_RUN="${CLAUDE_PLUGIN_ROOT:+${CLAUDE_PLUGIN_ROOT}/bin/solid-gemc-run}"
 SGC_ROOT="$("$SGC_RUN" paths | awk '/^root:/{print $2}')"
 ```
 
-The wrapper resolves its own cache and venv (it falls back to
-`~/.cache` / `~/.local/share` off Claude), so this skill no longer
-prefixes `SOLID_GEMC_CLAUDE_CACHE=…` on every call.
+The wrapper resolves its own cache and venv (off Claude they sit at
+`${PLUGIN_ROOT}/cache` and `${PLUGIN_ROOT}/venv`, next to the wrapper),
+so this skill no longer prefixes `SOLID_GEMC_CLAUDE_CACHE=…` on every
+call.
 
 ## Workspace layout
 

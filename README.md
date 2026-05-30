@@ -81,7 +81,10 @@ bin/solid-gemc-run init                 # scaffold + pull + clone + build
 bin/solid-gemc-run analyze runs/<id>    # uproot plots (venv self-installs)
 ```
 
-Cache/venv fall back to `~/.cache` / `~/.local/share` when not under a plugin.
+Off a managed plugin (standalone / bare clone) the `.sif` and venv live in
+`<clone>/cache` and `<clone>/venv`, next to the wrapper. Set
+`$SOLID_GEMC_CLAUDE_CACHE` to point the `.sif` somewhere else (e.g. a shared
+scratch location, or a pre-staged image).
 
 ## How you drive it
 

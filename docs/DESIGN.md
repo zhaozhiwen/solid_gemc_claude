@@ -106,9 +106,12 @@ state. `bin/solid-gemc-run init` re-detects existing files and refuses
 to overwrite without `--force`.
 
 **Cache resolution, no `$HOME` fallback.** Cache location resolves
-`$SOLID_GEMC_CLAUDE_CACHE` → `$CLAUDE_PLUGIN_DATA/cache` → fatal error.
-Silent `$HOME` fallback would hide state divergence between dev
-machines.
+`$SOLID_GEMC_CLAUDE_CACHE` → `$CLAUDE_PLUGIN_DATA/cache` →
+`${PLUGIN_ROOT}/cache`. The last tier is unconditional and co-locates
+the `.sif` with the wrapper (Codex, standalone, bare clone) — no
+platform detection, no silent `$HOME`/XDG fallback that would orphan
+the image or hide state divergence between dev machines. Tier 1 is the
+escape hatch for a pre-staged or shared `.sif`.
 
 ## Resolved decisions
 

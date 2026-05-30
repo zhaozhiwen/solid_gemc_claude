@@ -31,31 +31,19 @@ PLUGIN_ROOT="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
 log()  { printf '[solid-gemc-run] %s\n' "$*" >&2; }
 die()  { printf '[solid-gemc-run] error: %s\n' "$*" >&2; exit 1; }
 
-# True when this script runs from a Codex CLI plugin install
-# ($CODEX_HOME/plugins/cache/<marketplace>/<plugin>/<version>/). Codex exposes no
-# env var like CLAUDE_PLUGIN_DATA, so PLUGIN_ROOT is the ground-truth signal.
-# CODEX_HOME defaults to ~/.codex but is configurable (e.g. a project-local
-# `codex_home/`), so the literal `.codex/plugins` is NOT reliable — key off the
-# stable structural marker every Codex install shares, a `/plugins/cache/` path
-# segment, and prefer an explicit CODEX_HOME match when the harness exports it.
-# A bare git clone is under neither and keeps the XDG fallback. (A Claude install
-# path also contains `/plugins/cache/`, but that's moot: the CLAUDE_PLUGIN_DATA
-# tier is resolved before this function is ever consulted.)
-is_codex_install() {
-  [[ -n "${CODEX_HOME:-}" && "${PLUGIN_ROOT}/" == "${CODEX_HOME%/}/"* ]] && return 0
-  [[ "${PLUGIN_ROOT}" == *"/plugins/cache/"* ]]
-}
-
-# Cache resolution (four tiers, in order):
+# Cache resolution (three tiers, in order):
 #   1. $SOLID_GEMC_CLAUDE_CACHE        explicit override (any platform)
 #   2. $CLAUDE_PLUGIN_DATA/cache       Claude Code plugin data dir
-#   3. ${PLUGIN_ROOT}/cache            Codex plugin install ($CODEX_HOME/plugins/cache)
-#   4. ${XDG_CACHE_HOME:-~/.cache}/solid-gemc-claude   bare shell / standalone
-# Tiers 2 and 3 co-locate the .sif with the plugin install so each harness
-# manages its own copy and the big artifact is never orphaned in ~/.cache. The
-# XDG tier is the last resort for a bare git clone. When CLAUDE_PLUGIN_DATA *is*
-# set we stay strictly inside it (no $HOME fallback), so the plugin's own .sif
-# is never shadowed by a phantom re-download. See CLAUDE.md non-negotiable #7.
+#   3. ${PLUGIN_ROOT}/cache            everyone else (Codex, standalone, bare clone)
+# Tier 3 is the unconditional non-Claude fallback: it co-locates the .sif with
+# the wrapper, whatever installed it. No platform detection — under Codex
+# PLUGIN_ROOT is the (version-pinned) plugin install dir; from a bare clone it is
+# the clone dir. This deliberately has no $HOME/XDG tier: the .sif lives next to
+# the code that uses it, so it is never orphaned and never needs a platform guess
+# (an earlier `is_codex_install` heuristic mis-fired on custom CODEX_HOME dirs).
+# Tier 1 is the escape hatch — point it at a stable shared location to reuse a
+# pre-staged .sif or to avoid re-downloading on every version-pinned bump. When
+# CLAUDE_PLUGIN_DATA *is* set we stay strictly inside it. See non-negotiable #7.
 # Resolution is lazy so `solid-gemc-run help` works without any env vars set.
 CACHE_DIR=""
 SIF_DIR=""
@@ -66,10 +54,8 @@ resolve_cache_dir() {
     CACHE_DIR="${SOLID_GEMC_CLAUDE_CACHE}"
   elif [[ -n "${CLAUDE_PLUGIN_DATA:-}" ]]; then
     CACHE_DIR="${CLAUDE_PLUGIN_DATA}/cache"
-  elif is_codex_install; then
-    CACHE_DIR="${PLUGIN_ROOT}/cache"
   else
-    CACHE_DIR="${XDG_CACHE_HOME:-${HOME}/.cache}/solid-gemc-claude"
+    CACHE_DIR="${PLUGIN_ROOT}/cache"
   fi
   SIF_DIR="${CACHE_DIR}/sif"
   SIF_PATH="${SIF_DIR}/${SIF_NAME}"
@@ -77,8 +63,7 @@ resolve_cache_dir() {
 
 # Data dir (venv home) resolution, mirroring the cache tiers:
 #   1. $CLAUDE_PLUGIN_DATA              Claude Code plugin data dir
-#   2. ${PLUGIN_ROOT}                   Codex plugin install ($CODEX_HOME/plugins/cache)
-#   3. ${XDG_DATA_HOME:-~/.local/share}/solid-gemc-claude   bare shell / standalone
+#   2. ${PLUGIN_ROOT}                   everyone else (Codex, standalone, bare clone)
 # The venv is installed lazily on first use (see ensure_venv_python below) on
 # every platform — no session hook. Run `setup-python` to pre-install it.
 DATA_DIR=""
@@ -87,10 +72,8 @@ resolve_data_dir() {
   [[ -n "${DATA_DIR}" ]] && return 0
   if [[ -n "${CLAUDE_PLUGIN_DATA:-}" ]]; then
     DATA_DIR="${CLAUDE_PLUGIN_DATA}"
-  elif is_codex_install; then
-    DATA_DIR="${PLUGIN_ROOT}"
   else
-    DATA_DIR="${XDG_DATA_HOME:-${HOME}/.local/share}/solid-gemc-claude"
+    DATA_DIR="${PLUGIN_ROOT}"
   fi
   VENV_DIR="${DATA_DIR}/venv"
 }
@@ -292,10 +275,8 @@ cmd_info() {
     cache_src="SOLID_GEMC_CLAUDE_CACHE override"
   elif [[ -n "${CLAUDE_PLUGIN_DATA:-}" ]]; then
     cache_src="CLAUDE_PLUGIN_DATA (Claude Code plugin)"
-  elif is_codex_install; then
-    cache_src="Codex plugin install (\$CODEX_HOME/plugins/cache)"
   else
-    cache_src="XDG/home fallback (bare shell / standalone)"
+    cache_src="PLUGIN_ROOT/cache (Codex / standalone / bare clone)"
   fi
   echo "sif url:        ${SIF_URL}"
   echo "sif file:       ${SIF_PATH} $([[ -f ${SIF_PATH} ]] && echo '[present]' || echo '[not pulled]')"
@@ -485,9 +466,9 @@ solid_gemc: ${SOLID_GEMC_REPO} (HEAD of master)
 GEMC_VERSION: ${GEMC_VERSION}
 
 Cache resolution order:
-  1. \$SOLID_GEMC_CLAUDE_CACHE                          (explicit override; any platform)
-  2. \$CLAUDE_PLUGIN_DATA/cache                          (auto-set under Claude Code)
-  3. \${XDG_CACHE_HOME:-~/.cache}/solid-gemc-claude      (off-Claude: Codex, standalone)
+  1. \$SOLID_GEMC_CLAUDE_CACHE     (explicit override; any platform)
+  2. \$CLAUDE_PLUGIN_DATA/cache     (auto-set under Claude Code)
+  3. \${PLUGIN_ROOT}/cache          (everyone else: Codex, standalone, bare clone)
 Run \`solid-gemc-run info\` to see the resolved cache path.
 EOF
 }

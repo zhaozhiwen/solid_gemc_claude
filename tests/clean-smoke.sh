@@ -95,28 +95,36 @@ sgrun paths | grep -qx "cache:      ${CLAUDE_PLUGIN_DATA}/cache" \
   || fail "Claude-tier cache did not resolve to \$CLAUDE_PLUGIN_DATA/cache"
 pass "Claude tier: cache inside \$CLAUDE_PLUGIN_DATA"
 
-# Off Claude (no CLAUDE_PLUGIN_DATA, no override) it falls to XDG/home.
-OFF_XDG="${SCRATCH}/xdg-cache"
+# Off Claude (no CLAUDE_PLUGIN_DATA, no override): cache co-locates with the
+# wrapper at PLUGIN_ROOT/cache (here PLUGIN_ROOT is this repo clone).
 OFF_CACHE=$(env -u CLAUDE_PLUGIN_DATA -u SOLID_GEMC_CLAUDE_CACHE \
-  XDG_CACHE_HOME="${OFF_XDG}" "${PLUGIN_ROOT}/bin/solid-gemc-run" paths \
-  | awk '/^cache:/{print $2}')
-[[ "${OFF_CACHE}" == "${OFF_XDG}/solid-gemc-claude" ]] \
-  || fail "off-Claude cache resolved to '${OFF_CACHE}', expected '${OFF_XDG}/solid-gemc-claude'"
-pass "off-Claude tier: cache falls back to \$XDG_CACHE_HOME/solid-gemc-claude"
+  "${PLUGIN_ROOT}/bin/solid-gemc-run" paths | awk '/^cache:/{print $2}')
+[[ "${OFF_CACHE}" == "${PLUGIN_ROOT}/cache" ]] \
+  || fail "off-Claude cache resolved to '${OFF_CACHE}', expected '${PLUGIN_ROOT}/cache'"
+pass "non-Claude tier: cache co-locates at \$PLUGIN_ROOT/cache"
 
-# Codex tier: wrapper run from a $CODEX_HOME/plugins/cache/... install must
-# co-locate the cache with the install, NOT fall to XDG. Regression guard for
-# the 2026-05-30 field report (custom CODEX_HOME = .../codex_home, no leading
-# dot, missed the Codex tier). Copy the wrapper into a replica install path so
-# readlink -f resolves PLUGIN_ROOT into it.
+# The override (tier 1) wins over everything — the escape hatch for a pre-staged
+# .sif or a shared cache across version-pinned installs.
+OVR="${SCRATCH}/shared-sif"
+OVR_CACHE=$(env -u CLAUDE_PLUGIN_DATA SOLID_GEMC_CLAUDE_CACHE="${OVR}" \
+  "${PLUGIN_ROOT}/bin/solid-gemc-run" paths | awk '/^cache:/{print $2}')
+[[ "${OVR_CACHE}" == "${OVR}" ]] \
+  || fail "override cache resolved to '${OVR_CACHE}', expected '${OVR}'"
+pass "override tier: \$SOLID_GEMC_CLAUDE_CACHE wins"
+
+# Realistic Codex install path (deep, version-pinned, custom CODEX_HOME with no
+# leading dot) must still co-locate at PLUGIN_ROOT/cache — regression guard for
+# the 2026-05-30 field report. Copy the wrapper in so readlink -f resolves
+# PLUGIN_ROOT into the replica. (No platform detection now — tier 3 is
+# unconditional — so this just confirms a deep install path resolves cleanly.)
 CDX_ROOT="${SCRATCH}/codex_home/plugins/cache/solid-gemc-claude/solid-gemc-claude/0.0.4"
 mkdir -p "${CDX_ROOT}/bin"
 cp "${PLUGIN_ROOT}/bin/solid-gemc-run" "${CDX_ROOT}/bin/solid-gemc-run"
 CDX_CACHE=$(env -u CLAUDE_PLUGIN_DATA -u SOLID_GEMC_CLAUDE_CACHE -u CODEX_HOME \
   "${CDX_ROOT}/bin/solid-gemc-run" paths | awk '/^cache:/{print $2}')
 [[ "${CDX_CACHE}" == "${CDX_ROOT}/cache" ]] \
-  || fail "Codex-tier cache resolved to '${CDX_CACHE}', expected '${CDX_ROOT}/cache' (custom CODEX_HOME regression)"
-pass "Codex tier: cache co-locates with the \$CODEX_HOME/plugins/cache install"
+  || fail "Codex install cache resolved to '${CDX_CACHE}', expected '${CDX_ROOT}/cache'"
+pass "Codex install: deep version-pinned path co-locates at \$PLUGIN_ROOT/cache"
 
 # --- phase 1: workspace template + image cache ------------------------------
 log "phase 1 — workspace skeleton + image cache"
