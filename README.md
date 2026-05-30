@@ -13,7 +13,7 @@ analysis runs on the host with [`uproot`](https://github.com/scikit-hep/uproot5)
 
 **Docs site:** [zhaozhiwen.github.io/solid_gemc_claude](https://zhaozhiwen.github.io/solid_gemc_claude/) (install + quickstart + two demo run reports).
 
-> **Status: v0.0.4.** Dual-platform (Claude Code + Codex CLI). The
+> **Status: v0.0.5.** Dual-platform (Claude Code + Codex CLI). The
 > orchestrator skill drives the full simulation loop through the wrapper. See
 > [`docs/DESIGN.md`](docs/DESIGN.md) for design intent and the cross-platform
 > architecture.
@@ -96,7 +96,7 @@ then `./run.sh`. For detector authoring: edit the `.pl` in
 `solid_gemc/geometry/hgc_moved/`, regenerate, run gemc against your new
 detector.
 
-## Known limitations (v0.0.4)
+## Known limitations (v0.0.5)
 
 - The .sif is hosted at a personal Duke webhome
   (`http://webhome.phy.duke.edu/~zz81/simg/`). No SLA, may move. Mirror

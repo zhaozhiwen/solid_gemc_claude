@@ -2,7 +2,7 @@
 # tests/clean-smoke.sh — plumbing smoke test for solid-gemc-claude.
 #
 # Exercises bin/solid-gemc-run (including the init/analyze/setup-python/paths
-# subcommands and the off-Claude XDG/home path fallback) + the workspace
+# subcommands and the off-Claude PLUGIN_ROOT/cache fallback) + the workspace
 # template + the simulation loop the orchestrator skill drives (gcard prep +
 # solid_gemc + evio2root) + the analyze step, against a sandboxed
 # CLAUDE_PLUGIN_DATA. Does NOT go through Claude Code or Codex, so it does not
@@ -117,7 +117,7 @@ pass "override tier: \$SOLID_GEMC_CLAUDE_CACHE wins"
 # the 2026-05-30 field report. Copy the wrapper in so readlink -f resolves
 # PLUGIN_ROOT into the replica. (No platform detection now — tier 3 is
 # unconditional — so this just confirms a deep install path resolves cleanly.)
-CDX_ROOT="${SCRATCH}/codex_home/plugins/cache/solid-gemc-claude/solid-gemc-claude/0.0.4"
+CDX_ROOT="${SCRATCH}/codex_home/plugins/cache/solid-gemc-claude/solid-gemc-claude/0.0.5"
 mkdir -p "${CDX_ROOT}/bin"
 cp "${PLUGIN_ROOT}/bin/solid-gemc-run" "${CDX_ROOT}/bin/solid-gemc-run"
 CDX_CACHE=$(env -u CLAUDE_PLUGIN_DATA -u SOLID_GEMC_CLAUDE_CACHE -u CODEX_HOME \
