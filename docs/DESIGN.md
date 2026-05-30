@@ -58,14 +58,17 @@ commands**: the orchestrator skill is the entry point and `bin/solid-gemc-run`
 does the work, identically on both platforms.
 
 The orchestrator skill at `skills/solid-gemc/SKILL.md` works from a
-**seven-field spec**: it gap-checks the user's natural-language request
-against the required fields, asks for what's missing (via `AskUserQuestion`
-on Claude, a plain numbered question on Codex), presents a plan, gates on
-user approval, then drives `bin/solid-gemc-run` with stop-on-failure
-post-condition checks.
+**seven-field spec**. It first ensures the workspace is bootstrapped — a
+one-time `init` (Step 0) gated by its own confirm runs before any plan, since
+a plan written against an un-cloned `solid_gemc/` is speculative. Then it
+gap-checks the user's natural-language request against the required fields, asks
+for what's missing (via `AskUserQuestion` on Claude, a plain numbered question
+on Codex), presents a plan, gates on user approval, and drives
+`bin/solid-gemc-run` with stop-on-failure post-condition checks.
 
 | Field | Example |
 |---|---|
+| Project name | `pvdis_ld2_aPV` (the `<name>/` subdir under the workspace root) |
 | Physics goal | "PVDIS A_PV asymmetry vs Q²" |
 | SoLID config | "PVDIS, LD2 target, full magnet config" |
 | Beam | "11 GeV e⁻ on LD2, 10000 events" |
