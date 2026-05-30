@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # tests/clean-smoke.sh — plumbing smoke test for solid-gemc-claude.
 #
-# Exercises bin/solid-gemc-run + the workspace template + the simulation
-# loop the orchestrator skill drives (gcard prep + solid_gemc +
-# evio2root) + the analyze step, against a sandboxed CLAUDE_PLUGIN_DATA.
-# Does NOT go through Claude Code, so it does not test slash-command
-# dispatch, the SessionStart hook, MCP approval, the skill's
-# AskUserQuestion gate, or the orchestrator's NL-trigger auto-load —
-# see tests/CLEAN-INSTALL-CHECKLIST.md for the manual flow that covers
-# those.
+# Exercises bin/solid-gemc-run (including the init/analyze/setup-python/paths
+# subcommands and the off-Claude PLUGIN_ROOT/cache fallback) + the workspace
+# template + the simulation loop the orchestrator skill drives (gcard prep +
+# solid_gemc + evio2root) + the analyze step, against a sandboxed
+# CLAUDE_PLUGIN_DATA. Does NOT go through Claude Code or Codex, so it does not
+# test skill dispatch, MCP approval, the approval gate, or NL-trigger
+# auto-load — see tests/CLEAN-INSTALL-CHECKLIST.md
+# (Claude) and tests/CODEX-CHECKLIST.md (Codex) for the manual flows.
 #
 # Usage:
 #   tests/clean-smoke.sh
@@ -80,6 +80,52 @@ sgrun() {
     "${PLUGIN_ROOT}/bin/solid-gemc-run" "$@"
 }
 
+# --- phase 0: wrapper subcommands + off-Claude path resolution --------------
+# Container-free, no network. Verifies the new subcommands exist and that the
+# three-tier cache/venv resolution does the right thing on and off Claude.
+log "phase 0 — wrapper subcommands + path resolution (no container)"
+for sub in init analyze setup-python paths; do
+  "${PLUGIN_ROOT}/bin/solid-gemc-run" help | grep -qE "^  ${sub} " \
+    || fail "subcommand '${sub}' missing from help"
+done
+pass "init/analyze/setup-python/paths present in help"
+
+# Under Claude (CLAUDE_PLUGIN_DATA set) cache stays strictly inside it.
+sgrun paths | grep -qx "cache:      ${CLAUDE_PLUGIN_DATA}/cache" \
+  || fail "Claude-tier cache did not resolve to \$CLAUDE_PLUGIN_DATA/cache"
+pass "Claude tier: cache inside \$CLAUDE_PLUGIN_DATA"
+
+# Off Claude (no CLAUDE_PLUGIN_DATA, no override): cache co-locates with the
+# wrapper at PLUGIN_ROOT/cache (here PLUGIN_ROOT is this repo clone).
+OFF_CACHE=$(env -u CLAUDE_PLUGIN_DATA -u SOLID_GEMC_CLAUDE_CACHE \
+  "${PLUGIN_ROOT}/bin/solid-gemc-run" paths | awk '/^cache:/{print $2}')
+[[ "${OFF_CACHE}" == "${PLUGIN_ROOT}/cache" ]] \
+  || fail "off-Claude cache resolved to '${OFF_CACHE}', expected '${PLUGIN_ROOT}/cache'"
+pass "non-Claude tier: cache co-locates at \$PLUGIN_ROOT/cache"
+
+# The override (tier 1) wins over everything — the escape hatch for a pre-staged
+# .sif or a shared cache across version-pinned installs.
+OVR="${SCRATCH}/shared-sif"
+OVR_CACHE=$(env -u CLAUDE_PLUGIN_DATA SOLID_GEMC_CLAUDE_CACHE="${OVR}" \
+  "${PLUGIN_ROOT}/bin/solid-gemc-run" paths | awk '/^cache:/{print $2}')
+[[ "${OVR_CACHE}" == "${OVR}" ]] \
+  || fail "override cache resolved to '${OVR_CACHE}', expected '${OVR}'"
+pass "override tier: \$SOLID_GEMC_CLAUDE_CACHE wins"
+
+# Realistic Codex install path (deep, version-pinned, custom CODEX_HOME with no
+# leading dot) must still co-locate at PLUGIN_ROOT/cache — regression guard for
+# the 2026-05-30 field report. Copy the wrapper in so readlink -f resolves
+# PLUGIN_ROOT into the replica. (No platform detection now — tier 3 is
+# unconditional — so this just confirms a deep install path resolves cleanly.)
+CDX_ROOT="${SCRATCH}/codex_home/plugins/cache/solid-gemc-claude/solid-gemc-claude/0.0.5"
+mkdir -p "${CDX_ROOT}/bin"
+cp "${PLUGIN_ROOT}/bin/solid-gemc-run" "${CDX_ROOT}/bin/solid-gemc-run"
+CDX_CACHE=$(env -u CLAUDE_PLUGIN_DATA -u SOLID_GEMC_CLAUDE_CACHE -u CODEX_HOME \
+  "${CDX_ROOT}/bin/solid-gemc-run" paths | awk '/^cache:/{print $2}')
+[[ "${CDX_CACHE}" == "${CDX_ROOT}/cache" ]] \
+  || fail "Codex install cache resolved to '${CDX_CACHE}', expected '${CDX_ROOT}/cache'"
+pass "Codex install: deep version-pinned path co-locates at \$PLUGIN_ROOT/cache"
+
 # --- phase 1: workspace template + image cache ------------------------------
 log "phase 1 — workspace skeleton + image cache"
 WS="${SCRATCH}/ws"
@@ -88,16 +134,18 @@ mkdir -p "${WS}" && cd "${WS}"
 # template at templates/workspace/). The per-project template is seeded
 # later in phase 3 for the smoke project.
 cp "${PLUGIN_ROOT}/templates/CLAUDE.md"    ./CLAUDE.md
+cp -L "${PLUGIN_ROOT}/templates/AGENTS.md" ./AGENTS.md
 cp "${PLUGIN_ROOT}/templates/.gitignore"   ./.gitignore
 cp "${PLUGIN_ROOT}/templates/log.md"       ./log.md
 cp "${PLUGIN_ROOT}/templates/result.md"    ./result.md
 cp "${PLUGIN_ROOT}/templates/report.html"  ./report.html
 [ -f CLAUDE.md ]   || fail "workspace CLAUDE.md missing"
+[ -f AGENTS.md ]   || fail "workspace AGENTS.md missing (Codex project rules)"
 [ -f .gitignore ]  || fail "workspace .gitignore missing"
 [ -f log.md ]      || fail "workspace log.md missing"
 [ -f result.md ]   || fail "workspace result.md missing"
 [ -f report.html ] || fail "workspace report.html missing"
-pass "workspace-common files copied (5 files)"
+pass "workspace-common files copied (6 files incl. AGENTS.md)"
 
 # Pull the .sif if not already reused.
 sgrun pull
@@ -234,48 +282,18 @@ grep -q "Input File set to: out.evio" "${RUN_DIR}/log.txt" \
   || fail "log.txt missing evio2root marker"
 pass "log.txt captured (${LOG_SIZE} bytes, both phases visible)"
 
-# --- phase 5: analyze (optional — requires plugin venv) ---------------------
-log "phase 5 — analyze (requires plugin venv with uproot/numpy/matplotlib)"
-VENV_PY="${CLAUDE_PLUGIN_DATA}/venv/bin/python"
-if [[ -x "${VENV_PY}" ]] && "${VENV_PY}" -c 'import uproot,numpy,matplotlib' 2>/dev/null; then
-  "${VENV_PY}" - "${RUN_DIR}/out.root" "${RUN_DIR}" 4 <<'PY' >/dev/null
-import sys, pathlib
-import uproot, numpy as np
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-root_path, run_dir, max_plots = sys.argv[1], sys.argv[2], int(sys.argv[3])
-f = uproot.open(root_path)
-cn = f.classnames()
-trees = {k: f[k] for k, v in cn.items() if v.startswith("TTree")}
-plotted = 0
-for tname, tree in trees.items():
-    short = tname.split(";")[0]
-    if tree.num_entries == 0: continue
-    for bname in tree.keys():
-        if plotted >= max_plots: break
-        try: arr = tree[bname].array(library="np")
-        except Exception: continue
-        try: flat = np.concatenate(arr).astype(float)
-        except (TypeError, ValueError):
-            try: flat = np.asarray(arr, dtype=float)
-            except: continue
-        if flat.size == 0 or not np.isfinite(flat).any(): continue
-        plt.figure(); plt.hist(flat[np.isfinite(flat)], bins=40)
-        plt.xlabel(bname); plt.ylabel("count"); plt.title(f"{short}/{bname}")
-        safe = bname.replace("/", "_").replace(" ", "_")
-        plt.savefig(pathlib.Path(run_dir) / f"hist_{short}_{safe}.png",
-                    dpi=110, bbox_inches="tight")
-        plt.close()
-        plotted += 1
-    if plotted >= max_plots: break
-print(plotted)
-PY
+# --- phase 5: analyze (real subcommand — self-installs the venv) ------------
+# Exercises `solid-gemc-run analyze`, which lazily runs `setup-python` (the
+# shared venv install) and then bin/solid-gemc-analyze.py. This is the same
+# code path Codex/standalone use, so it covers analyze + setup-python at once.
+log "phase 5 — analyze subcommand (lazily installs venv, then plots)"
+if sgrun setup-python; then
+  sgrun analyze "${RUN_DIR}" 4 >/dev/null
   PNG_COUNT=$(ls "${RUN_DIR}"/*.png 2>/dev/null | wc -l)
   (( PNG_COUNT >= 1 )) || fail "analyze: no PNGs produced from out.root"
-  pass "analyze: ${PNG_COUNT} PNGs written to ${RUN_DIR}/"
+  pass "analyze: ${PNG_COUNT} PNGs written to ${RUN_DIR}/ (venv via setup-python)"
 else
-  printf '  [SKIP] plugin venv missing or uproot not installed at %s\n' "${VENV_PY}"
+  printf '  [SKIP] setup-python failed (no network / no python3+uv); analyze skipped\n'
 fi
 
 # --- phase 6: leakage scan --------------------------------------------------

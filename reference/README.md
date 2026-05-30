@@ -53,7 +53,7 @@ checking simulation output against analytic expectations.
 ### Runtime particle data
 
 Not a file in this dir — but worth knowing: the plugin venv installed
-by the SessionStart hook (`requirements.txt`) includes the
+by `solid-gemc-run setup-python` (`requirements.txt`) includes the
 [`pdg`](https://pypi.org/project/pdg/) Python package. Runtime access
 to the PDG particle database for masses, lifetimes, widths, branching
 ratios, and PDG Monte Carlo IDs.

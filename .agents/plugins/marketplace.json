@@ -1,0 +1,20 @@
+{
+  "name": "solid-gemc-claude",
+  "interface": {
+    "displayName": "solid-gemc-claude"
+  },
+  "plugins": [
+    {
+      "name": "solid-gemc-claude",
+      "source": {
+        "source": "local",
+        "path": "./plugins/solid-gemc-claude"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Science"
+    }
+  ]
+}

@@ -31,13 +31,20 @@ PLUGIN_ROOT="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
 log()  { printf '[solid-gemc-run] %s\n' "$*" >&2; }
 die()  { printf '[solid-gemc-run] error: %s\n' "$*" >&2; exit 1; }
 
-# Cache resolution: explicit env wins, else CLAUDE_PLUGIN_DATA/cache, else
-# error. There is intentionally no $HOME/.solid_gemc_claude fallback — silent
-# fallback to a non-plugin path leads to phantom re-downloads when the plugin's
-# own .sif already exists at $CLAUDE_PLUGIN_DATA/cache/sif/. If you're
-# invoking solid-gemc-run outside a Claude Code plugin context, set
-# SOLID_GEMC_CLAUDE_CACHE explicitly. Resolution is lazy so `solid-gemc-run
-# help` works without any env vars set.
+# Cache resolution (three tiers, in order):
+#   1. $SOLID_GEMC_CLAUDE_CACHE        explicit override (any platform)
+#   2. $CLAUDE_PLUGIN_DATA/cache       Claude Code plugin data dir
+#   3. ${PLUGIN_ROOT}/cache            everyone else (Codex, standalone, bare clone)
+# Tier 3 is the unconditional non-Claude fallback: it co-locates the .sif with
+# the wrapper, whatever installed it. No platform detection — under Codex
+# PLUGIN_ROOT is the (version-pinned) plugin install dir; from a bare clone it is
+# the clone dir. This deliberately has no $HOME/XDG tier: the .sif lives next to
+# the code that uses it, so it is never orphaned and never needs a platform guess
+# (an earlier `is_codex_install` heuristic mis-fired on custom CODEX_HOME dirs).
+# Tier 1 is the escape hatch — point it at a stable shared location to reuse a
+# pre-staged .sif or to avoid re-downloading on every version-pinned bump. When
+# CLAUDE_PLUGIN_DATA *is* set we stay strictly inside it. See non-negotiable #7.
+# Resolution is lazy so `solid-gemc-run help` works without any env vars set.
 CACHE_DIR=""
 SIF_DIR=""
 SIF_PATH=""
@@ -48,10 +55,27 @@ resolve_cache_dir() {
   elif [[ -n "${CLAUDE_PLUGIN_DATA:-}" ]]; then
     CACHE_DIR="${CLAUDE_PLUGIN_DATA}/cache"
   else
-    die "no cache path: set SOLID_GEMC_CLAUDE_CACHE or invoke from a plugin context that exports CLAUDE_PLUGIN_DATA. Slash commands should prefix every solid-gemc-run call with SOLID_GEMC_CLAUDE_CACHE=\"\${CLAUDE_PLUGIN_DATA}/cache\"."
+    CACHE_DIR="${PLUGIN_ROOT}/cache"
   fi
   SIF_DIR="${CACHE_DIR}/sif"
   SIF_PATH="${SIF_DIR}/${SIF_NAME}"
+}
+
+# Data dir (venv home) resolution, mirroring the cache tiers:
+#   1. $CLAUDE_PLUGIN_DATA              Claude Code plugin data dir
+#   2. ${PLUGIN_ROOT}                   everyone else (Codex, standalone, bare clone)
+# The venv is installed lazily on first use (see ensure_venv_python below) on
+# every platform — no session hook. Run `setup-python` to pre-install it.
+DATA_DIR=""
+VENV_DIR=""
+resolve_data_dir() {
+  [[ -n "${DATA_DIR}" ]] && return 0
+  if [[ -n "${CLAUDE_PLUGIN_DATA:-}" ]]; then
+    DATA_DIR="${CLAUDE_PLUGIN_DATA}"
+  else
+    DATA_DIR="${PLUGIN_ROOT}"
+  fi
+  VENV_DIR="${DATA_DIR}/venv"
 }
 
 require_apptainer() {
@@ -189,6 +213,59 @@ in_container() {
 ${cmd}"
 }
 
+# --- python venv -------------------------------------------------------------
+
+# Idempotently install requirements.txt into the resolved venv. Diffs the
+# bundled requirements against a stored copy; no-op when in sync. Uses `uv`
+# when available (fast), else python3 -m venv + pip. Invoked lazily by
+# ensure_venv_python, or run by hand to pre-install. KEEP PY_MIN in sync with
+# the "Python 3.9+" line in README/docs.
+PY_MIN=3.9
+cmd_setup_python() {
+  resolve_data_dir
+  local req="${PLUGIN_ROOT}/requirements.txt"
+  local stored="${DATA_DIR}/requirements.txt"
+  [[ -f "${req}" ]] || die "requirements.txt not found at ${req}"
+  diff -q "${req}" "${stored}" >/dev/null 2>&1 && return 0
+
+  mkdir -p "${DATA_DIR}"
+  log "installing Python deps into ${VENV_DIR} (one-time, ~30s)..."
+  if [[ ! -x "${VENV_DIR}/bin/python" ]]; then
+    rm -rf "${VENV_DIR}"
+    if command -v uv >/dev/null 2>&1; then
+      uv venv "${VENV_DIR}" --python ">=${PY_MIN}" >/dev/null
+    else
+      if ! python3 - "${PY_MIN}" <<'PY'
+import sys
+need = tuple(int(x) for x in sys.argv[1].split('.'))
+raise SystemExit(0 if sys.version_info[:2] >= need else 1)
+PY
+      then
+        die "python3 is $(python3 -V 2>&1 | awk '{print $2}'); need >= ${PY_MIN} (see README Requirements). Install a newer python3, or install 'uv'."
+      fi
+      python3 -m venv "${VENV_DIR}"
+    fi
+  fi
+
+  local py="${VENV_DIR}/bin/python"
+  if command -v uv >/dev/null 2>&1; then
+    uv pip install --python "${py}" -r "${req}" >/dev/null
+  else
+    "${py}" -m pip install --upgrade pip >/dev/null
+    "${py}" -m pip install -r "${req}" >/dev/null
+  fi
+  cp "${req}" "${stored}"   # mark success only after install succeeds
+  log "Python deps ready."
+}
+
+# Echo the venv python, installing the venv first if absent. This is the only
+# venv-install trigger (no session hook), so `analyze` always self-heals.
+ensure_venv_python() {
+  resolve_data_dir
+  [[ -x "${VENV_DIR}/bin/python" ]] || cmd_setup_python >&2
+  printf '%s' "${VENV_DIR}/bin/python"
+}
+
 # --- subcommands -------------------------------------------------------------
 
 cmd_info() {
@@ -196,8 +273,10 @@ cmd_info() {
   local cache_src
   if [[ -n "${SOLID_GEMC_CLAUDE_CACHE:-}" ]]; then
     cache_src="SOLID_GEMC_CLAUDE_CACHE override"
+  elif [[ -n "${CLAUDE_PLUGIN_DATA:-}" ]]; then
+    cache_src="CLAUDE_PLUGIN_DATA (Claude Code plugin)"
   else
-    cache_src="CLAUDE_PLUGIN_DATA (plugin default)"
+    cache_src="PLUGIN_ROOT/cache (Codex / standalone / bare clone)"
   fi
   echo "sif url:        ${SIF_URL}"
   echo "sif file:       ${SIF_PATH} $([[ -f ${SIF_PATH} ]] && echo '[present]' || echo '[not pulled]')"
@@ -299,6 +378,68 @@ cmd_validate_gcard() {
   log "GCard well-formed: ${gcard}"
 }
 
+# One-shot workspace bootstrap: scaffold the workspace-common files, pull the
+# .sif, clone solid_gemc, build it. Non-interactive — the collision/overwrite
+# prompt lives in the adapter layer (Claude command / skill). Per-file
+# skip-unless-force keeps it idempotent; solid_gemc/ and project subdirs are
+# never touched.
+cmd_init() {
+  local force=0
+  [[ "${1:-}" == "--force" ]] && force=1
+  require_apptainer; require_git; require_wget
+
+  local tdir="${PLUGIN_ROOT}/templates" f src dst
+  for f in CLAUDE.md AGENTS.md .gitignore log.md result.md report.html; do
+    src="${tdir}/${f}"; dst="./${f}"
+    [[ -e "${src}" ]] || continue
+    if [[ -e "${dst}" && ${force} -eq 0 ]]; then
+      log "exists, skipping (use --force to overwrite): ${dst}"
+      continue
+    fi
+    cp -L "${src}" "${dst}"   # -L derefs the AGENTS.md->CLAUDE.md symlink
+    log "wrote ${dst}"
+  done
+
+  cmd_pull
+  cmd_clone
+  cmd_build
+}
+
+# Host-side uproot plots from a run's out.root. Accepts a run dir, a bare run
+# id (looked up under runs/), or a direct path to a .root file. Ensures the
+# venv lazily, then delegates the schema inspection + plotting to the Python
+# helper (shared by every platform).
+cmd_analyze() {
+  local arg="${1:-}"
+  [[ -n "${arg}" ]] || die "usage: solid-gemc-run analyze <run-dir|id|out.root> [max-plots]"
+  local max_plots="${2:-12}"
+  local root run_dir
+  if   [[ -f "${arg}" ]];      then root="${arg}";               run_dir="$(dirname "${arg}")"
+  elif [[ -d "${arg}" ]];      then root="${arg}/out.root";      run_dir="${arg}"
+  elif [[ -d "runs/${arg}" ]]; then root="runs/${arg}/out.root"; run_dir="runs/${arg}"
+  else die "no run found for '${arg}'; check 'ls runs/'"
+  fi
+  [[ -f "${root}" ]] \
+    || die "no ROOT file at ${root} (did the run succeed? see ${run_dir}/log.txt)"
+
+  local py; py="$(ensure_venv_python)"
+  "${py}" "${PLUGIN_ROOT}/bin/solid-gemc-analyze.py" "${root}" "${run_dir}" "${max_plots}"
+  ls -1 "${run_dir}"/*.png 2>/dev/null || true
+}
+
+# Print resolved paths so a platform-neutral skill can locate the plugin's
+# templates/reference dirs and the cache/venv without knowing the host's
+# env-var conventions.
+cmd_paths() {
+  resolve_cache_dir; resolve_data_dir
+  echo "root:       ${PLUGIN_ROOT}"
+  echo "cache:      ${CACHE_DIR}"
+  echo "data:       ${DATA_DIR}"
+  echo "venv:       ${VENV_DIR}"
+  echo "templates:  ${PLUGIN_ROOT}/templates"
+  echo "reference:  ${PLUGIN_ROOT}/reference"
+}
+
 usage() {
   cat <<EOF
 solid-gemc-run — apptainer wrapper for solid-gemc-claude
@@ -306,11 +447,15 @@ solid-gemc-run — apptainer wrapper for solid-gemc-claude
 Usage: solid-gemc-run <subcommand> [args]
 
 Subcommands:
+  init [--force]                Bootstrap workspace: scaffold files + pull + clone + build.
+  analyze <run|id|root> [N]     Host-side uproot plots from a run's out.root (max N plots).
+  setup-python                  Idempotently install the analysis venv (uproot/numpy/...).
   pull                          Download the pinned .sif from upstream (wget).
   clone [dest]                  git clone solid_gemc into dest (default: ./solid_gemc).
   build [dest]                  Two scons builds inside container: mod/gemc/<v>, then source/<v>.
   env                           Print the tcsh env block (setenv SoLID_GEMC, GEMC, PATH, ...).
   info                          Show .sif URL, cache path, solid_gemc repo, GEMC_VERSION, apptainer.
+  paths                         Print resolved root/cache/data/venv/templates/reference paths.
   shell                         Open an interactive tcsh inside the container with env set.
   exec <cmd...>                 Run a command inside the container with env set.
   root <args...>                Run ROOT (-l -b -q) inside the container with env set.
@@ -321,8 +466,9 @@ solid_gemc: ${SOLID_GEMC_REPO} (HEAD of master)
 GEMC_VERSION: ${GEMC_VERSION}
 
 Cache resolution order:
-  1. \$SOLID_GEMC_CLAUDE_CACHE         (explicit override; required outside plugin context)
-  2. \$CLAUDE_PLUGIN_DATA/cache         (auto-set when invoked via Claude Code)
+  1. \$SOLID_GEMC_CLAUDE_CACHE     (explicit override; any platform)
+  2. \$CLAUDE_PLUGIN_DATA/cache     (auto-set under Claude Code)
+  3. \${PLUGIN_ROOT}/cache          (everyone else: Codex, standalone, bare clone)
 Run \`solid-gemc-run info\` to see the resolved cache path.
 EOF
 }
@@ -333,6 +479,10 @@ case "${sub}" in
   ""|-h|--help|help) usage; exit 0 ;;
 esac
 case "${sub}" in
+  init)            cmd_init "$@" ;;
+  analyze)         cmd_analyze "$@" ;;
+  setup-python)    cmd_setup_python "$@" ;;
+  paths)           cmd_paths "$@" ;;
   pull)            cmd_pull "$@" ;;
   clone)           cmd_clone "$@" ;;
   build)           cmd_build "$@" ;;

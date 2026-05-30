@@ -15,54 +15,60 @@ Geant4, GEMC, ROOT, and a working tcsh build chain — each with its own
 version pin. The standard install path is a multi-hour scons-and-
 environment setup that varies per host.
 
-The plugin wraps that complexity behind two slash commands and a
-natural-language skill, so a user can go from `git clone` to `out.root`
-without ever touching the underlying toolchain.
+The plugin wraps that complexity behind a natural-language skill and one
+runtime wrapper, so a user can go from `git clone` to `out.root`
+without ever touching the underlying toolchain. It runs on both Claude
+Code and Codex CLI.
 
 ## Architecture
 
 ```
                             host                          container
                             ────                          ─────────
-  /solid-gemc-claude:init  ──┐
-  /solid-gemc-claude:analyze ┤      bin/                  JLabCE 2.5 .sif
-                             │  solid-gemc-run            ┌─────────────┐
-  skills/solid-gemc/        ─┼──────────► apptainer ─────►│ gemc, ROOT, │
-  (orchestrator)             │              exec          │ evio2root,  │
-                             │                            │ solid_gemc  │
-  Python (uproot, numpy)     │                            └──────┬──────┘
+  skills/solid-gemc/        ─┐                            JLabCE 2.5 .sif
+  (orchestrator, NL)         │      bin/                  ┌─────────────┐
+                             ┼  solid-gemc-run ─► apptainer│ gemc, ROOT, │
+  bin/solid-gemc-run         │   init/analyze/    exec ───►│ evio2root,  │
+  init / analyze / …        ─┤   exec/…                    │ solid_gemc  │
+                             │                            └──────┬──────┘
+  Python (uproot, numpy)     │                                   │
   for analysis  ◄────────────┴── runs/<id>/out.root ──────────── ┘
 ```
 
-Three components live on the host:
+Two components live on the host (no slash commands):
 
-- **Two slash commands** — `init` and `analyze`. Bookend the workflow.
-- **One orchestrator skill** — `skills/solid-gemc/`. Drives the
-  simulation loop in between; auto-loads on SoLID-flavored natural
-  language.
-- **One runtime wrapper** — `bin/solid-gemc-run`. Every container call
-  goes through it: pull / clone / build / shell / exec / root /
+- **One orchestrator skill** — `skills/solid-gemc/`. Drives the whole
+  workflow from natural language; auto-loads on SoLID-flavored requests.
+- **One runtime wrapper** — `bin/solid-gemc-run`. The single command
+  surface and the single container seam: `init` / `analyze` /
+  `setup-python` / pull / clone / build / shell / exec / root /
   validate-gcard.
 
 Everything else lives inside the JLabCE 2.5 apptainer image: gemc 2.9,
 Geant4, ROOT, evio2root, plus the freshly cloned and built `solid_gemc`
 tree.
 
-## Why a skill, not a third slash command?
+## Why a skill, not slash commands?
 
-Two slash commands (`init`, `analyze`) cover bootstrap and post-run
-analysis. The simulation loop in between has too many parameters —
-physics goal, SoLID config, beam energy/particle/count, GCard variant,
-output path, analysis type — to fit a flag-heavy command.
+The workflow has too many parameters — physics goal, SoLID config, beam
+energy/particle/count, GCard variant, output path, analysis type, project
+name — to fit a flag-heavy command, and slash commands are Claude-only
+anyway (Codex has no equivalent). So the plugin ships **no slash
+commands**: the orchestrator skill is the entry point and `bin/solid-gemc-run`
+does the work, identically on both platforms.
 
-The orchestrator skill at `skills/solid-gemc/SKILL.md` solves this with
-a **six-field spec**: it gap-checks the user's natural-language request
-against six required fields, asks for what's missing via
-`AskUserQuestion`, presents a plan, gates on user approval, then
-executes with stop-on-failure post-condition checks.
+The orchestrator skill at `skills/solid-gemc/SKILL.md` works from a
+**seven-field spec**. It first ensures the workspace is bootstrapped — a
+one-time `init` (Step 0) gated by its own confirm runs before any plan, since
+a plan written against an un-cloned `solid_gemc/` is speculative. Then it
+gap-checks the user's natural-language request against the required fields, asks
+for what's missing (via `AskUserQuestion` on Claude, a plain numbered question
+on Codex), presents a plan, gates on user approval, and drives
+`bin/solid-gemc-run` with stop-on-failure post-condition checks.
 
 | Field | Example |
 |---|---|
+| Project name | `pvdis_ld2_aPV` (the `<name>/` subdir under the workspace root) |
 | Physics goal | "PVDIS A_PV asymmetry vs Q²" |
 | SoLID config | "PVDIS, LD2 target, full magnet config" |
 | Beam | "11 GeV e⁻ on LD2, 10000 events" |
@@ -98,14 +104,17 @@ the maintainer's `$HOME` or absolute `/home/$USER` paths.
 or personal email in committed files. The one allowed exception is
 `gemc.jlab.org` as a documentation reference URL.
 
-**Idempotent commands.** Running any slash command twice doesn't
-corrupt state. `init` re-detects existing files and refuses to
-overwrite without `--force`.
+**Idempotent operations.** Running anything twice doesn't corrupt
+state. `bin/solid-gemc-run init` re-detects existing files and refuses
+to overwrite without `--force`.
 
 **Cache resolution, no `$HOME` fallback.** Cache location resolves
-`$SOLID_GEMC_CLAUDE_CACHE` → `$CLAUDE_PLUGIN_DATA/cache` → fatal error.
-Silent `$HOME` fallback would hide state divergence between dev
-machines.
+`$SOLID_GEMC_CLAUDE_CACHE` → `$CLAUDE_PLUGIN_DATA/cache` →
+`${PLUGIN_ROOT}/cache`. The last tier is unconditional and co-locates
+the `.sif` with the wrapper (Codex, standalone, bare clone) — no
+platform detection, no silent `$HOME`/XDG fallback that would orphan
+the image or hide state divergence between dev machines. Tier 1 is the
+escape hatch for a pre-staged or shared `.sif`.
 
 ## Resolved decisions
 
@@ -118,7 +127,7 @@ SoLID build environment.
 JLabCE 2.5 supports only EVIO and TXT output (`-help-output` confirms).
 We post-convert EVIO → ROOT inside the container with `evio2root`, so
 both `out.evio` and `out.root` end up in `runs/<id>/`. Analysis stays
-Python via uproot. HIPO output deferred past v0.0.3.
+Python via uproot. HIPO output deferred past v0.0.5.
 
 **Why `wget` to pull the `.sif`, not `apptainer pull docker://`?** The
 `.sif` is hosted at a webhome URL, not a container registry. Direct
@@ -130,7 +139,7 @@ passes: `mod/gemc/2.9` produces `libgemc.so` (requires
 `LIBRARY=shared`), then `source/2.9` links against it. Skipping or
 reordering produces an unlinked binary that segfaults on first run.
 
-## Known limitations (v0.0.3)
+## Known limitations (v0.0.5)
 
 - The `.sif` is at a personal Duke webhome
   (`webhome.phy.duke.edu`). No SLA. Mirror locally if you need
