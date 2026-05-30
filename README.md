@@ -57,49 +57,37 @@ codex plugin marketplace add zhaozhiwen/solid_gemc_claude
 codex plugin add solid-gemc-claude@solid-gemc-claude
 ```
 
-Cached under `$CODEX_HOME/plugins/cache/` (`CODEX_HOME` defaults to `~/.codex`);
-the bundled `solid-gemc` skill auto-activates on SoLID-flavored requests, the
-same as on Claude Code. `solid-gemc-run` does **not** need to be on `PATH` — the
-skill invokes it by absolute path, discovering it under the plugin-cache install
-location. PATH is only a convenience if you want to type `solid-gemc-run`
-yourself; to get that, symlink it:
+Codex reads `AGENTS.md` — the canonical project-rules file.
+`CLAUDE.md` is a symlink to it and Claude Code reads it.
+`codex plugin add` drops the symlink but keeps the real `AGENTS.md`.
 
-```sh
-ln -s <plugin-cache-dir>/bin/solid-gemc-run ~/.local/bin/solid-gemc-run
+## Try this after install
+
+You can ask your agent harness to
+
+```text
+Follow the examples at solid_gemc repo "solid_gemc/analysis/hgc_study/" and "solid_gemc/geometry/hgc_moved/" to run the heavy gas Cherenkov study on SIDIS He3 at 5 GeV pi- with the moved configuration, 1000 events, then plot number of photoelectron yield in various illustrative ways and show me the result in the html file
 ```
-
-Codex reads `AGENTS.md` — the canonical project-rules file. (`CLAUDE.md` is a
-symlink to it; `codex plugin add` drops the symlink but keeps the real
-`AGENTS.md`, which is the one Codex reads.)
 
 ## How you drive it
 
-There are **no slash commands**. The `solid-gemc` orchestrator skill
-auto-loads on SoLID-flavored natural language ("run a PVDIS LD2 study at
-11 GeV"), gap-checks a seven-field spec, presents a plan, gates on your
-approval, then drives the whole run through `bin/solid-gemc-run` (bootstrap
+The `solid-gemc` orchestrator skill auto-loads on SoLID-flavored natural language,
+gap-checks a seven-field spec, presents a plan, gates on your approval,
+then drives the whole run through `bin/solid-gemc-run` (bootstrap
 the workspace, pick + edit a GCard, run `solid_gemc`, convert EVIO → ROOT,
 record provenance, plot). Works the same on Claude Code and Codex CLI.
 
-You can also drive the wrapper directly:
+You can ask your agent harness to init solid-gemc-claude,
+which will run `bin/solid-gemc-run init` to pull .sif, clone solid_gemc, run both scons builds, scaffold workspace as a one-shot bootstrap. Or it will run at the first time you use it.
 
-| Command | Purpose |
-|---|---|
-| `bin/solid-gemc-run init` | Pull .sif, clone solid_gemc, run both scons builds, scaffold workspace. One-shot bootstrap. |
-| `bin/solid-gemc-run analyze runs/<id>` | uproot-based default plots from `out.root` (the post-converted file). |
-
-Users who want upstream's pattern directly can `bin/solid-gemc-run shell`
-and follow `solid_gemc/analysis/hgc_study/run.sh`.
-
-## First-run flow (after `bin/solid-gemc-run init`)
-
-There is no shipped "example" command. Two upstream worked examples
-live in your workspace after init, both fully self-contained:
+Two upstream worked examples live in your workspace after init, both fully self-contained:
 
 | Example | What it teaches |
 |---|---|
 | `solid_gemc/analysis/hgc_study/` | the **config + run + analyze** pipeline — GCards (`cherenkov.gcard`, `solid_SIDIS_He3_hgc.gcard`, …), batch run scripts (`load.sh` / `run.sh`), ROOT analysis (`analysis.C` and the `compare_*.C` scripts) |
 | `solid_gemc/geometry/hgc_moved/` | **custom detector authoring** — Perl generators (`solid_SIDIS_hgc_*.pl`), the resulting factory text files (`*__geometry_Original.txt` etc.) referenced by `<detector name="..." factory="TEXT" ...>`, plus a `readme.md` |
+
+`bin/solid-gemc-run analyze runs/<id>` would produce uproot-based default plots from out.root (the post-converted file).
 
 `bin/solid-gemc-run shell` drops you into a tcsh prompt with the env
 exported (`SoLID_GEMC`, `GEMC`, `PATH`, `LD_LIBRARY_PATH`) so you can

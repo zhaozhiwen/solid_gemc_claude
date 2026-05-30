@@ -31,22 +31,26 @@ codex plugin add solid-gemc-claude@solid-gemc-claude
 
 ## Quickstart
 
-There are no slash commands. The whole run goes through `bin/solid-gemc-run`: `init` (one-shot bootstrap — pull the `.sif`, clone `solid_gemc`, run both scons builds, scaffold a workspace) and `analyze runs/<id>` (uproot plots from the post-converted ROOT file).
+There are no slash commands. The `solid-gemc` orchestrator skill auto-loads on any SoLID-flavored request (Claude Code or Codex CLI), gap-checks a seven-field spec (project name, physics goal, SoLID config, beam, GCard, output, analysis), shows a plan, and runs it on approval — driving everything through `bin/solid-gemc-run` (bootstrap the workspace, pick + edit a GCard, run `solid_gemc`, convert EVIO → ROOT, record provenance, plot).
 
-The full simulation loop is driven by the `solid-gemc` orchestrator skill — it auto-loads on any SoLID-flavored request (Claude Code or Codex CLI). Tell it what you want:
+Ask your harness something like:
 
 ```text
-> Run the heavy-gas Cherenkov study on SIDIS He-3 at 11 GeV e-,
-  default solid_SIDIS_He3_hgc.gcard, 10000 events, then plot
-  photon yield per Cherenkov detector.
+Follow the examples at "solid_gemc/analysis/hgc_study/" and
+"solid_gemc/geometry/hgc_moved/" to run the heavy-gas Cherenkov study on
+SIDIS He-3 at 5 GeV π- with the moved configuration, 1000 events, then plot
+photoelectron yield in various illustrative ways and show me the result in
+an HTML file.
 ```
 
-The skill gap-checks against a seven-field spec (project name, physics goal, SoLID config, beam, GCard, output, analysis), asks about anything missing, shows a plan, runs it on approval.
+`init` runs once as a one-shot bootstrap (pull the `.sif`, clone `solid_gemc`, run both scons builds, scaffold a workspace) — automatically on first use, or when you ask to "init solid-gemc-claude". After it, two upstream worked examples live in your workspace, both self-contained:
 
-After init, two upstream worked examples live in your workspace as templates:
+| Example | What it teaches |
+|---|---|
+| `solid_gemc/analysis/hgc_study/` | the **config + run + analyze** pipeline — GCards, batch run scripts, ROOT analysis macros |
+| `solid_gemc/geometry/hgc_moved/` | **custom detector authoring** — Perl generators, the factory text files they emit, and the GCard wiring |
 
-- **`solid_gemc/analysis/hgc_study/`** — the config + run + analyze pipeline (GCards, batch scripts, ROOT analysis macros).
-- **`solid_gemc/geometry/hgc_moved/`** — custom detector authoring (Perl generators, factory text files, GCard wiring).
+`bin/solid-gemc-run analyze runs/<id>` produces uproot plots from the post-converted `out.root`. `bin/solid-gemc-run shell` drops you into a tcsh prompt with the env exported, to follow upstream's scripts directly.
 
 ## What it does
 
@@ -60,7 +64,7 @@ After init, two upstream worked examples live in your workspace as templates:
 - `wget`, `git` on the host. (No host-side `tcsh` needed — the wrapper invokes `tcsh` *inside* the container.)
 - Python 3.9+ with `uproot numpy matplotlib` (only for the `analyze` step).
 - ~1.7 GB of disk for the cached JLabCE 2.5 image, plus ~1 GB per workspace for the cloned + built `solid_gemc` tree.
-- Claude Code with plugin support.
+- Claude Code (plugin support) **or** OpenAI Codex CLI (Agent Skills).
 
 ## Links
 
