@@ -23,11 +23,16 @@ them once at the start of execution, then use `$SGC_RUN` / `$SGC_ROOT`
 everywhere — never hardcode a platform's plugin-path env var:
 
 ```bash
-# $SGC_RUN — the wrapper. Claude sets CLAUDE_PLUGIN_ROOT; otherwise
-# (Codex, standalone) the installed plugin puts solid-gemc-run on PATH.
+# $SGC_RUN — the wrapper, always invoked by ABSOLUTE path; PATH is never
+# required. Resolve in order: Claude's CLAUDE_PLUGIN_ROOT → the known Codex
+# install location ($CODEX_HOME/plugins/cache/<mkt>/<plugin>/<ver>/bin, newest
+# version) → PATH as a last convenience → error.
 SGC_RUN="${CLAUDE_PLUGIN_ROOT:+${CLAUDE_PLUGIN_ROOT}/bin/solid-gemc-run}"
-[ -x "$SGC_RUN" ] || SGC_RUN="$(command -v solid-gemc-run)" \
-  || { echo "[skill] solid-gemc-run not found on PATH"; exit 1; }
+if [ ! -x "$SGC_RUN" ]; then
+  SGC_RUN="$(ls -d "${CODEX_HOME:-$HOME/.codex}"/plugins/cache/solid-gemc-claude/solid-gemc-claude/*/bin/solid-gemc-run 2>/dev/null | sort -V | tail -1)"
+  [ -x "$SGC_RUN" ] || SGC_RUN="$(command -v solid-gemc-run)" \
+    || { echo "[skill] solid-gemc-run not found — invoke it by absolute path, or symlink it onto PATH"; exit 1; }
+fi
 
 # $SGC_ROOT — the plugin root (for templates/ and reference/).
 SGC_ROOT="$("$SGC_RUN" paths | awk '/^root:/{print $2}')"

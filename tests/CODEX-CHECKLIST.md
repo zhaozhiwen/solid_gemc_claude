@@ -23,9 +23,12 @@ gate. Run it on a host with apptainer + git + wget + python3.
       under `~/.codex/plugins/cache/…` and the bundled `solid-gemc` skill loads
       (ask "is the solid-gemc skill available?"). **No YAML load error** in the
       logs (frontmatter must be strict-YAML clean — CI lint guards this).
-- [ ] `solid-gemc-run` resolves: either `command -v solid-gemc-run` succeeds,
-      or symlink it (`ln -s <cache>/bin/solid-gemc-run ~/.local/bin/`). The skill
-      falls back to `command -v solid-gemc-run` when `CLAUDE_PLUGIN_ROOT` is unset.
+- [ ] `solid-gemc-run` resolves **without** being on `PATH`: with
+      `CLAUDE_PLUGIN_ROOT` unset, the skill discovers the wrapper by absolute
+      path under `${CODEX_HOME:-~/.codex}/plugins/cache/solid-gemc-claude/solid-gemc-claude/*/bin/`
+      (newest version), then falls back to `command -v`. PATH/symlink is optional
+      (only to type `solid-gemc-run` yourself). Confirm a run works with the
+      wrapper *not* on PATH.
 - [ ] `AGENTS.md` is present in the installed plugin as a **real file** (it is
       the canonical source; `CLAUDE.md` is a symlink → `AGENTS.md` that
       `codex plugin add` drops — harmless, Codex reads `AGENTS.md`).
