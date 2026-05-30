@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# Assert every AGENTS.md is byte-identical to its sibling CLAUDE.md.
+# Assert the CLAUDE.md / AGENTS.md single-source invariant.
 #
-# Why: AGENTS.md (Codex) must mirror CLAUDE.md (Claude) — same content, one
-# source of truth. We *can't* use symlinks: `codex plugin add` does not copy
-# symlinks, so a symlinked AGENTS.md silently vanishes from the installed
-# plugin (and the workspace scaffold). So they are real copies, and this lint
-# guards against drift. See BUILD_LOG Phase 19.
+# AGENTS.md is the canonical project-rules file (a real file); CLAUDE.md is a
+# symlink → AGENTS.md in the same directory. One source, zero drift by
+# construction. This direction is deliberate: `codex plugin add` copies files
+# and DROPS symlinks, so the Codex package keeps the real AGENTS.md (which
+# Codex reads) and drops the CLAUDE.md symlink (which Codex doesn't need).
+# Claude Code installs via git clone, which preserves the symlink, so it reads
+# CLAUDE.md through the link. See BUILD_LOG Phase 22.
 set -eu
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -13,21 +15,22 @@ cd "$ROOT"
 
 fail=0
 while IFS= read -r agents; do
-  claude="$(dirname "$agents")/CLAUDE.md"
+  dir="$(dirname "$agents")"
+  claude="$dir/CLAUDE.md"
   if [[ -L "$agents" ]]; then
-    echo "[FAIL] $agents is a symlink — must be a real file (codex plugin add drops symlinks)"
+    echo "[FAIL] $agents is a symlink — AGENTS.md must be the real (canonical) file"
     fail=1; continue
   fi
-  if [[ ! -f "$claude" ]]; then
-    echo "[FAIL] $agents has no sibling CLAUDE.md"
+  if [[ ! -L "$claude" ]]; then
+    echo "[FAIL] $claude must be a symlink → AGENTS.md (codex plugin add keeps the real AGENTS.md, drops the symlink)"
     fail=1; continue
   fi
-  if diff -q "$claude" "$agents" >/dev/null; then
-    echo "[ok]   $agents == $(dirname "$agents")/CLAUDE.md"
-  else
-    echo "[FAIL] $agents differs from its sibling CLAUDE.md — re-copy: cp '$claude' '$agents'"
-    fail=1
+  target="$(readlink "$claude")"
+  if [[ "$target" != "AGENTS.md" ]]; then
+    echo "[FAIL] $claude → '$target', expected 'AGENTS.md' (relative, same dir)"
+    fail=1; continue
   fi
+  echo "[ok]   $claude → AGENTS.md (real $(stat -c%s "$agents") b)"
 done < <(find . -path ./.git -prune -o -name AGENTS.md -print)
 
-[[ $fail -eq 0 ]] && echo "all AGENTS.md mirror their sibling CLAUDE.md" || exit 1
+[[ $fail -eq 0 ]] && echo "all CLAUDE.md symlink to their canonical AGENTS.md" || exit 1

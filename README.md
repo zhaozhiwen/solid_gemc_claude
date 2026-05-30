@@ -60,7 +60,9 @@ if needed, symlink it:
 ln -s <plugin-cache-dir>/bin/solid-gemc-run ~/.local/bin/solid-gemc-run
 ```
 
-Codex reads `AGENTS.md` (a copy of `CLAUDE.md`) for project rules.
+Codex reads `AGENTS.md` — the canonical project-rules file. (`CLAUDE.md` is a
+symlink to it; `codex plugin add` drops the symlink but keeps the real
+`AGENTS.md`, which is the one Codex reads.)
 
 ### Standalone (no harness)
 

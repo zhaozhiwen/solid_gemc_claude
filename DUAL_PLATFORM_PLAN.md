@@ -41,7 +41,7 @@ mappings were uncertain — now confirmed).
 | Manifest | `.claude-plugin/plugin.json` | `.codex-plugin/plugin.json` |
 | Install | marketplace `/plugin install` → `~/.claude/plugins/cache/` | Codex plugin install → `~/.codex/plugins/cache/` |
 | Skill discovery | bundled `skills/` in the installed plugin | bundled `skills/` in the installed plugin |
-| Project rules file | `CLAUDE.md` | `AGENTS.md` (real copy of `CLAUDE.md`) |
+| Project rules file | `CLAUDE.md` (symlink → `AGENTS.md`) | `AGENTS.md` (real, canonical) |
 | Activation | auto by description | auto by description; `/skills`; `$mention` |
 | Lifecycle hook | none — venv installs lazily on first `analyze` | none — same |
 | Runtime seam | `bin/solid-gemc-run` | identical |
@@ -126,20 +126,25 @@ simplicity — one install path, not two.)
 - (Future, not built) the superpowers `sync-to-codex-plugin.sh` marketplace-publish
   path, noted in docs as the scale option.
 
-### F. AGENTS.md — real copies of each CLAUDE.md, guarded by a CI lint
-Each `AGENTS.md` is a **real file, byte-identical to its sibling `CLAUDE.md`**
-(root, `templates/`, `templates/workspace/`). Codex reads AGENTS.md, Claude
-reads CLAUDE.md, same content.
+### F. AGENTS.md is canonical; CLAUDE.md is a symlink to it
+`AGENTS.md` is the **real, canonical** project-rules file (root, `templates/`,
+`templates/workspace/`); `CLAUDE.md` is a **symlink → `AGENTS.md`** in the same
+dir. One source, zero drift by construction.
 
-> **Not symlinks** (corrected during Codex testing): `codex plugin add` does
-> **not** copy symlinks, so a symlinked `AGENTS.md` silently vanishes from the
-> installed plugin and breaks `init`'s scaffold. Real copies survive packaging;
-> the "single source of truth" intent is enforced instead by
-> `tests/lint-agents-mirror.sh` (CI fails if any `AGENTS.md` drifts from — or is
-> a symlink to — its sibling `CLAUDE.md`).
+> **Why this direction** (settled during Codex testing): `codex plugin add`
+> copies files and **drops symlinks**. Putting the real bytes in `AGENTS.md`
+> (the file Codex reads) means the Codex package keeps it; the dropped
+> `CLAUDE.md` symlink is one Codex doesn't need. Claude Code installs via git
+> clone, which preserves the symlink, so it reads `CLAUDE.md` through it. (We
+> first tried the opposite — real `CLAUDE.md` + copied `AGENTS.md` — but a true
+> link is cleaner, and this direction survives both installers.)
+> `tests/lint-agents-mirror.sh` enforces it (CI fails if `CLAUDE.md` isn't a
+> symlink → `AGENTS.md`, or `AGENTS.md` isn't a real file).
 
-`bin/solid-gemc-run init` copies a real `AGENTS.md` next to `CLAUDE.md` into the
-user's workspace; each CLI reads only its own.
+`bin/solid-gemc-run init` copies the templates into the user's workspace with
+`cp -L` (dereferences): a Claude clone yields real `CLAUDE.md` + `AGENTS.md`; a
+Codex install (symlink already dropped) yields just `AGENTS.md`. Since a user
+works one harness per workspace, that asymmetry is fine.
 
 ### G. Documentation
 - `README.md`: platform-support matrix + "Install on Codex CLI" section (plugin
@@ -170,7 +175,7 @@ user's workspace; each CLI reads only its own.
 | `commands/` | **removed** (Phase 21) — no slash commands; skill + wrapper only |
 | `hooks/` | **removed** — no `SessionStart` hook; venv installs lazily |
 | `.codex-plugin/plugin.json` | **new** — Codex manifest mirroring the Claude one |
-| `AGENTS.md` (root), `templates/AGENTS.md`, `templates/workspace/AGENTS.md` | **new** real copies of the sibling `CLAUDE.md` (guarded by `tests/lint-agents-mirror.sh`) |
+| `AGENTS.md` ×3 (real, canonical); `CLAUDE.md` ×3 (symlink → `AGENTS.md`) | single-source rules files; guarded by `tests/lint-agents-mirror.sh` |
 | `README.md`, `CLAUDE.md`, `BUILD_LOG.md` | docs: matrix, Codex install, #7 exception, phase log |
 | `tests/clean-smoke.sh`, `tests/CODEX-CHECKLIST.md`, `tests/lint-*` | cover new subcommands; manual Codex checklist; CI lints |
 | `.claude-plugin/plugin.json`, `marketplace.json` | version → 0.0.4 |

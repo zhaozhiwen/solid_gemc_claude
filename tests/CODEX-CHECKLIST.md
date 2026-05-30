@@ -25,8 +25,9 @@ gate. Run it on a host with apptainer + git + wget + python3.
 - [ ] `solid-gemc-run` resolves: either `command -v solid-gemc-run` succeeds,
       or symlink it (`ln -s <cache>/bin/solid-gemc-run ~/.local/bin/`). The skill
       falls back to `command -v solid-gemc-run` when `CLAUDE_PLUGIN_ROOT` is unset.
-- [ ] `AGENTS.md` is present in the installed plugin and is a **real file**
-      (copy of `CLAUDE.md`), not a symlink — `codex plugin add` drops symlinks.
+- [ ] `AGENTS.md` is present in the installed plugin as a **real file** (it is
+      the canonical source; `CLAUDE.md` is a symlink → `AGENTS.md` that
+      `codex plugin add` drops — harmless, Codex reads `AGENTS.md`).
 - [ ] No hook-trust prompt at session start (the plugin ships no hooks; the
       venv installs lazily on first `analyze`).
 
