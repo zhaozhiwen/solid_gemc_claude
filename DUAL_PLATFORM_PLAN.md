@@ -67,11 +67,15 @@ platforms install the plugin and get the bundled skill automatically.
 ## Workstreams
 
 ### A. Generalize path resolution in `bin/solid-gemc-run`
-Off Claude, `CLAUDE_PLUGIN_DATA` is unset. Add an XDG/home tier **only when the
-Claude var is absent**:
+Off Claude, `CLAUDE_PLUGIN_DATA` is unset. Add a Codex-install tier and an
+XDG/home tier **only when the Claude var is absent**. Codex exposes no
+`CLAUDE_PLUGIN_DATA` equivalent, so detect a Codex install by `PLUGIN_ROOT`
+being under `~/.codex/plugins/` and co-locate the artifacts with it (the way
+`$CLAUDE_PLUGIN_DATA` does on Claude); a bare git clone falls through to XDG:
 - Cache: `$SOLID_GEMC_CLAUDE_CACHE` → `$CLAUDE_PLUGIN_DATA/cache` →
-  `${XDG_CACHE_HOME:-~/.cache}/solid-gemc-claude` → fatal.
-- Venv: `$CLAUDE_PLUGIN_DATA/venv` → `${XDG_DATA_HOME:-~/.local/share}/solid-gemc-claude/venv`.
+  `${PLUGIN_ROOT}/cache` (Codex) → `${XDG_CACHE_HOME:-~/.cache}/solid-gemc-claude`.
+- Venv: `$CLAUDE_PLUGIN_DATA/venv` → `${PLUGIN_ROOT}/venv` (Codex) →
+  `${XDG_DATA_HOME:-~/.local/share}/solid-gemc-claude/venv`.
 
 **Conflict surfaced:** CLAUDE.md non-negotiable #7 says "no `$HOME` fallback."
 This adds one for off-Claude use. Update #7 to record the exception (strict rule

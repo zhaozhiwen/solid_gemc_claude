@@ -52,13 +52,16 @@ gate. Run it on a host with apptainer + git + wget + python3.
 - [ ] The simulation produces `<project>/runs/<id>/{gcard.gcard, out.evio,
       out.root, log.txt, config.json}`.
 - [ ] `analyze` installs the venv lazily on first use (no `SessionStart` hook
-      on Codex), under `~/.local/share/solid-gemc-claude/venv` (or
-      `$XDG_DATA_HOME`), and writes PNGs into the run dir.
+      on Codex), under the Codex plugin install
+      (`~/.codex/plugins/cache/solid-gemc-claude/solid-gemc-claude/venv`), and
+      writes PNGs into the run dir.
 - [ ] `<project>/log.md` gets the four-section verbatim entry (user input →
       plan → decision → outcome).
 
 ## 5. Path hygiene
 
-- [ ] Cache landed under `~/.cache/solid-gemc-claude` (or `$XDG_CACHE_HOME`),
-      not in the repo or `$HOME` root.
+- [ ] Cache (the `.sif`) landed under the Codex plugin install
+      (`~/.codex/plugins/cache/solid-gemc-claude/solid-gemc-claude/cache/sif`),
+      not in `~/.cache` or `$HOME` root. Confirm with `solid-gemc-run info`
+      (cache line tagged `[Codex plugin install …]`).
 - [ ] Re-running `init` is idempotent (existing files skipped without `--force`).

@@ -73,13 +73,17 @@ Pattern improvements propagate by deliberate sync, not by linking.
    `bin/solid-gemc-run init` re-detects existing files and refuses to overwrite
    without `--force`.
 7. **Cache resolution, tiered.** `$SOLID_GEMC_CLAUDE_CACHE` →
-   `$CLAUDE_PLUGIN_DATA/cache` → `${XDG_CACHE_HOME:-~/.cache}/solid-gemc-claude`.
-   The XDG/home tier exists **only** for use outside Claude Code (Codex CLI,
-   bare shell), where `CLAUDE_PLUGIN_DATA` is unset — added for dual-platform
-   support (see `DUAL_PLATFORM_PLAN.md`). When `CLAUDE_PLUGIN_DATA` **is** set we
-   stay strictly inside it (no `$HOME` fallback), so the plugin's own `.sif` is
-   never shadowed by a phantom re-download. Venv resolution mirrors this:
-   `$CLAUDE_PLUGIN_DATA/venv` → `${XDG_DATA_HOME:-~/.local/share}/solid-gemc-claude/venv`.
+   `$CLAUDE_PLUGIN_DATA/cache` → `${PLUGIN_ROOT}/cache` (Codex plugin install) →
+   `${XDG_CACHE_HOME:-~/.cache}/solid-gemc-claude` (bare shell). Tiers 2 and 3
+   co-locate the `.sif` with the plugin install so each harness manages its own
+   copy. The Codex tier fires when the wrapper runs from a `~/.codex/plugins/`
+   install (detected via `PLUGIN_ROOT`, since Codex exposes no `CLAUDE_PLUGIN_DATA`
+   equivalent); the XDG tier is the last resort for a bare git clone — added for
+   dual-platform support (see `DUAL_PLATFORM_PLAN.md`). When `CLAUDE_PLUGIN_DATA`
+   **is** set we stay strictly inside it (no `$HOME` fallback), so the plugin's
+   own `.sif` is never shadowed by a phantom re-download. Venv resolution
+   mirrors this: `$CLAUDE_PLUGIN_DATA/venv` → `${PLUGIN_ROOT}/venv` (Codex) →
+   `${XDG_DATA_HOME:-~/.local/share}/solid-gemc-claude/venv`.
 
 ## Naming
 
