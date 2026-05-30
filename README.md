@@ -72,21 +72,6 @@ Codex reads `AGENTS.md` — the canonical project-rules file. (`CLAUDE.md` is a
 symlink to it; `codex plugin add` drops the symlink but keeps the real
 `AGENTS.md`, which is the one Codex reads.)
 
-### Standalone (no harness)
-
-Everything also works from a bare shell — the wrapper owns the workflow:
-
-```sh
-git clone https://github.com/zhaozhiwen/solid_gemc_claude && cd solid_gemc_claude
-bin/solid-gemc-run init                 # scaffold + pull + clone + build
-bin/solid-gemc-run analyze runs/<id>    # uproot plots (venv self-installs)
-```
-
-Off a managed plugin (standalone / bare clone) the `.sif` and venv live in
-`<clone>/cache` and `<clone>/venv`, next to the wrapper. Set
-`$SOLID_GEMC_CLAUDE_CACHE` to point the `.sif` somewhere else (e.g. a shared
-scratch location, or a pre-staged image).
-
 ## How you drive it
 
 There are **no slash commands**. The `solid-gemc` orchestrator skill
