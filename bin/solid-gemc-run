@@ -32,16 +32,24 @@ log()  { printf '[solid-gemc-run] %s\n' "$*" >&2; }
 die()  { printf '[solid-gemc-run] error: %s\n' "$*" >&2; exit 1; }
 
 # True when this script runs from a Codex CLI plugin install
-# (~/.codex/plugins/cache/<marketplace>/<plugin>/). Codex exposes no env var
-# like CLAUDE_PLUGIN_DATA, but it always installs the plugin under
-# .codex/plugins, so PLUGIN_ROOT itself is the ground-truth signal — a bare
-# git clone is not under that path and keeps the XDG fallback.
-is_codex_install() { [[ "${PLUGIN_ROOT}" == *"/.codex/plugins/"* ]]; }
+# ($CODEX_HOME/plugins/cache/<marketplace>/<plugin>/<version>/). Codex exposes no
+# env var like CLAUDE_PLUGIN_DATA, so PLUGIN_ROOT is the ground-truth signal.
+# CODEX_HOME defaults to ~/.codex but is configurable (e.g. a project-local
+# `codex_home/`), so the literal `.codex/plugins` is NOT reliable — key off the
+# stable structural marker every Codex install shares, a `/plugins/cache/` path
+# segment, and prefer an explicit CODEX_HOME match when the harness exports it.
+# A bare git clone is under neither and keeps the XDG fallback. (A Claude install
+# path also contains `/plugins/cache/`, but that's moot: the CLAUDE_PLUGIN_DATA
+# tier is resolved before this function is ever consulted.)
+is_codex_install() {
+  [[ -n "${CODEX_HOME:-}" && "${PLUGIN_ROOT}/" == "${CODEX_HOME%/}/"* ]] && return 0
+  [[ "${PLUGIN_ROOT}" == *"/plugins/cache/"* ]]
+}
 
 # Cache resolution (four tiers, in order):
 #   1. $SOLID_GEMC_CLAUDE_CACHE        explicit override (any platform)
 #   2. $CLAUDE_PLUGIN_DATA/cache       Claude Code plugin data dir
-#   3. ${PLUGIN_ROOT}/cache            Codex plugin install (~/.codex/plugins/cache)
+#   3. ${PLUGIN_ROOT}/cache            Codex plugin install ($CODEX_HOME/plugins/cache)
 #   4. ${XDG_CACHE_HOME:-~/.cache}/solid-gemc-claude   bare shell / standalone
 # Tiers 2 and 3 co-locate the .sif with the plugin install so each harness
 # manages its own copy and the big artifact is never orphaned in ~/.cache. The
@@ -69,7 +77,7 @@ resolve_cache_dir() {
 
 # Data dir (venv home) resolution, mirroring the cache tiers:
 #   1. $CLAUDE_PLUGIN_DATA              Claude Code plugin data dir
-#   2. ${PLUGIN_ROOT}                   Codex plugin install (~/.codex/plugins/cache)
+#   2. ${PLUGIN_ROOT}                   Codex plugin install ($CODEX_HOME/plugins/cache)
 #   3. ${XDG_DATA_HOME:-~/.local/share}/solid-gemc-claude   bare shell / standalone
 # The venv is installed lazily on first use (see ensure_venv_python below) on
 # every platform — no session hook. Run `setup-python` to pre-install it.
@@ -285,7 +293,7 @@ cmd_info() {
   elif [[ -n "${CLAUDE_PLUGIN_DATA:-}" ]]; then
     cache_src="CLAUDE_PLUGIN_DATA (Claude Code plugin)"
   elif is_codex_install; then
-    cache_src="Codex plugin install (~/.codex/plugins/cache)"
+    cache_src="Codex plugin install (\$CODEX_HOME/plugins/cache)"
   else
     cache_src="XDG/home fallback (bare shell / standalone)"
   fi

@@ -54,15 +54,19 @@ gate. Run it on a host with apptainer + git + wget + python3.
       out.root, log.txt, config.json}`.
 - [ ] `analyze` installs the venv lazily on first use (no `SessionStart` hook
       on Codex), under the Codex plugin install
-      (`~/.codex/plugins/cache/solid-gemc-claude/solid-gemc-claude/venv`), and
-      writes PNGs into the run dir.
+      (`$CODEX_HOME/plugins/cache/solid-gemc-claude/solid-gemc-claude/<ver>/venv`;
+      `CODEX_HOME` defaults to `~/.codex` but may be a custom dir), and writes
+      PNGs into the run dir.
 - [ ] `<project>/log.md` gets the four-section verbatim entry (user input →
       plan → decision → outcome).
 
 ## 5. Path hygiene
 
 - [ ] Cache (the `.sif`) landed under the Codex plugin install
-      (`~/.codex/plugins/cache/solid-gemc-claude/solid-gemc-claude/cache/sif`),
-      not in `~/.cache` or `$HOME` root. Confirm with `solid-gemc-run info`
-      (cache line tagged `[Codex plugin install …]`).
+      (`$CODEX_HOME/plugins/cache/solid-gemc-claude/solid-gemc-claude/<ver>/cache/sif`),
+      **not** in `~/.cache` or `$HOME` root. This is the regression from the
+      2026-05-30 field report: a custom `CODEX_HOME` (e.g. `…/codex_home`, no
+      leading dot) used to miss the Codex tier and fall to `~/.cache`. Confirm
+      with `solid-gemc-run info` — cache line tagged `[Codex plugin install …]`,
+      not `[XDG/home fallback …]`.
 - [ ] Re-running `init` is idempotent (existing files skipped without `--force`).

@@ -76,10 +76,13 @@ Pattern improvements propagate by deliberate sync, not by linking.
    `$CLAUDE_PLUGIN_DATA/cache` → `${PLUGIN_ROOT}/cache` (Codex plugin install) →
    `${XDG_CACHE_HOME:-~/.cache}/solid-gemc-claude` (bare shell). Tiers 2 and 3
    co-locate the `.sif` with the plugin install so each harness manages its own
-   copy. The Codex tier fires when the wrapper runs from a `~/.codex/plugins/`
-   install (detected via `PLUGIN_ROOT`, since Codex exposes no `CLAUDE_PLUGIN_DATA`
-   equivalent); the XDG tier is the last resort for a bare git clone — added for
-   dual-platform support (see `DUAL_PLATFORM_PLAN.md`). When `CLAUDE_PLUGIN_DATA`
+   copy. The Codex tier fires when the wrapper runs from a `$CODEX_HOME/plugins/cache/`
+   install — detected via `PLUGIN_ROOT` (Codex exposes no `CLAUDE_PLUGIN_DATA`
+   equivalent). `CODEX_HOME` defaults to `~/.codex` but is configurable, so the
+   match keys on the stable `/plugins/cache/` path segment (and an explicit
+   `$CODEX_HOME` prefix when exported), **not** a literal `.codex` — a custom
+   `codex_home/` install must still resolve to the Codex tier. The XDG tier is the
+   last resort for a bare git clone — added for dual-platform support. When `CLAUDE_PLUGIN_DATA`
    **is** set we stay strictly inside it (no `$HOME` fallback), so the plugin's
    own `.sif` is never shadowed by a phantom re-download. Venv resolution
    mirrors this: `$CLAUDE_PLUGIN_DATA/venv` → `${PLUGIN_ROOT}/venv` (Codex) →

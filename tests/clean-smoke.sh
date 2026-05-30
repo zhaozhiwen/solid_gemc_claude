@@ -104,6 +104,20 @@ OFF_CACHE=$(env -u CLAUDE_PLUGIN_DATA -u SOLID_GEMC_CLAUDE_CACHE \
   || fail "off-Claude cache resolved to '${OFF_CACHE}', expected '${OFF_XDG}/solid-gemc-claude'"
 pass "off-Claude tier: cache falls back to \$XDG_CACHE_HOME/solid-gemc-claude"
 
+# Codex tier: wrapper run from a $CODEX_HOME/plugins/cache/... install must
+# co-locate the cache with the install, NOT fall to XDG. Regression guard for
+# the 2026-05-30 field report (custom CODEX_HOME = .../codex_home, no leading
+# dot, missed the Codex tier). Copy the wrapper into a replica install path so
+# readlink -f resolves PLUGIN_ROOT into it.
+CDX_ROOT="${SCRATCH}/codex_home/plugins/cache/solid-gemc-claude/solid-gemc-claude/0.0.4"
+mkdir -p "${CDX_ROOT}/bin"
+cp "${PLUGIN_ROOT}/bin/solid-gemc-run" "${CDX_ROOT}/bin/solid-gemc-run"
+CDX_CACHE=$(env -u CLAUDE_PLUGIN_DATA -u SOLID_GEMC_CLAUDE_CACHE -u CODEX_HOME \
+  "${CDX_ROOT}/bin/solid-gemc-run" paths | awk '/^cache:/{print $2}')
+[[ "${CDX_CACHE}" == "${CDX_ROOT}/cache" ]] \
+  || fail "Codex-tier cache resolved to '${CDX_CACHE}', expected '${CDX_ROOT}/cache' (custom CODEX_HOME regression)"
+pass "Codex tier: cache co-locates with the \$CODEX_HOME/plugins/cache install"
+
 # --- phase 1: workspace template + image cache ------------------------------
 log "phase 1 — workspace skeleton + image cache"
 WS="${SCRATCH}/ws"
