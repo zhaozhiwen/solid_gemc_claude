@@ -15,8 +15,8 @@ analysis runs on the host with [`uproot`](https://github.com/scikit-hep/uproot5)
 
 > **Status: v0.0.4.** Dual-platform (Claude Code + Codex CLI). The
 > orchestrator skill drives the full simulation loop through the wrapper. See
-> [`docs/DESIGN.md`](docs/DESIGN.md) for design intent and `DUAL_PLATFORM_PLAN.md`
-> for the cross-platform architecture.
+> [`docs/DESIGN.md`](docs/DESIGN.md) for design intent and the cross-platform
+> architecture.
 
 ## Requirements
 
