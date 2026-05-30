@@ -42,8 +42,10 @@ disciplined copy-and-adapt, not invention. Key files to read before mirroring:
   `macros/` + `build/`).
 - `~/claude/geant4_claude/tests/{clean-smoke.sh,clean-install-test.sh,CLEAN-INSTALL-CHECKLIST.md}`
   — three-layer test rig.
-- `~/claude/geant4_claude/hooks/` + `requirements.txt` — SessionStart Python
-  deps; port verbatim, change only `requirements.txt` content.
+- `requirements.txt` — Python analysis deps. NOTE: unlike `geant4_claude`, this
+  plugin has **no `hooks/` SessionStart hook** (removed for dual-platform
+  simplicity). The venv installs lazily on first `analyze` via
+  `bin/solid-gemc-run setup-python`; don't re-add a session hook.
 
 Share **patterns**, not code. Each plugin owns its own copy of every file.
 Pattern improvements propagate by deliberate sync, not by linking.

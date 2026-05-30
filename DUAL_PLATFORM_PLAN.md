@@ -41,9 +41,9 @@ mappings were uncertain — now confirmed).
 | Manifest | `.claude-plugin/plugin.json` | `.codex-plugin/plugin.json` |
 | Install | marketplace `/plugin install` → `~/.claude/plugins/cache/` | Codex plugin install → `~/.codex/plugins/cache/` |
 | Skill discovery | bundled `skills/` in the installed plugin | bundled `skills/` in the installed plugin |
-| Project rules file | `CLAUDE.md` | `AGENTS.md` (symlink → `CLAUDE.md`) |
+| Project rules file | `CLAUDE.md` | `AGENTS.md` (real copy of `CLAUDE.md`) |
 | Activation | auto by description | auto by description; `/skills`; `$mention` |
-| Lifecycle hook | `SessionStart` (`hooks.json`) | none — venv ensured lazily |
+| Lifecycle hook | none — venv installs lazily on first `analyze` | none — same |
 | Runtime seam | `bin/solid-gemc-run` | identical |
 
 ## Architecture (the unifying move)
@@ -58,8 +58,8 @@ thin adapter that calls it.
         ┌───────────────┤            │              │
    Claude Code      orchestrator   Codex CLI
    commands/*.md    skill          .codex-plugin manifest
-   hooks/*.sh       SKILL.md        + AGENTS.md (bundled in plugin)
-   (thin callers)   (one canonical, platform-neutral phrasing)
+   (thin callers)   SKILL.md        + AGENTS.md (bundled in plugin)
+                    (one canonical, platform-neutral phrasing)
 ```
 
 One skill, one workflow implementation, two thin discovery layers. Both
@@ -89,10 +89,11 @@ Move the **non-interactive** logic out of the Claude command/hook files:
 The wrapper stays non-interactive and flag-driven; interactive bits (collision
 confirmation, approve/edit gate) stay in the adapter/skill layer.
 
-**Lazy venv (Codex has no SessionStart hook):** any python path (`analyze`)
-calls `setup-python` internally if the venv is missing. On Claude the hook
-pre-warms it; on Codex the first `analyze` self-ensures it. Same wrapper, no
-platform branch in behavior.
+**Lazy venv (no session hook on any platform):** any python path (`analyze`)
+calls `setup-python` internally if the venv is missing, so the first `analyze`
+self-ensures it on Claude and Codex alike. Same wrapper, no platform branch.
+(A Claude `SessionStart` pre-warm hook was tried and then removed for
+simplicity — one install path, not two.)
 
 ### C. Make the orchestrator skill platform-neutral
 `skills/solid-gemc/SKILL.md`:
@@ -107,7 +108,8 @@ platform branch in behavior.
 - `commands/init.md` → call `bin/solid-gemc-run init`; keep only the interactive
   collision/`--force` prompt + status report.
 - `commands/analyze.md` → call `bin/solid-gemc-run analyze`.
-- `hooks/install-deps.sh` → one line: `exec "$CLAUDE_PLUGIN_ROOT/bin/solid-gemc-run" setup-python`.
+- `hooks/` removed entirely — no `SessionStart` hook. The venv installs lazily
+  on first `analyze` (the same path Codex/standalone use).
 
 ### E. Codex manifest (superpowers-style)
 - Add `.codex-plugin/plugin.json` mirroring `.claude-plugin/plugin.json` (name,
@@ -164,18 +166,18 @@ user's workspace; each CLI reads only its own.
 | `bin/solid-gemc-analyze.py` | **new** — extracted uproot plotting helper |
 | `skills/solid-gemc/SKILL.md` | platform-neutral phrasing (wrapper calls, neutral "ask user") |
 | `commands/init.md`, `commands/analyze.md` | slim to thin callers of the wrapper |
-| `hooks/install-deps.sh` | one-liner → `bin/solid-gemc-run setup-python` |
+| `hooks/` | **removed** — no `SessionStart` hook; venv installs lazily |
 | `.codex-plugin/plugin.json` | **new** — Codex manifest mirroring the Claude one |
-| `AGENTS.md` (root), `templates/AGENTS.md`, `templates/workspace/AGENTS.md` | **new** symlinks → the sibling `CLAUDE.md` |
+| `AGENTS.md` (root), `templates/AGENTS.md`, `templates/workspace/AGENTS.md` | **new** real copies of the sibling `CLAUDE.md` (guarded by `tests/lint-agents-mirror.sh`) |
 | `README.md`, `CLAUDE.md`, `BUILD_LOG.md` | docs: matrix, Codex install, #7 exception, phase log |
-| `tests/clean-smoke.sh`, `tests/CODEX-CHECKLIST.md` | cover new subcommands; manual Codex checklist |
+| `tests/clean-smoke.sh`, `tests/CODEX-CHECKLIST.md`, `tests/lint-*` | cover new subcommands; manual Codex checklist; CI lints |
 | `.claude-plugin/plugin.json`, `marketplace.json` | version → 0.0.4 |
 
 ## Reuse (don't reinvent)
 - Wrapper subcommand dispatch, `--bind`/`--pwd` container invocation, env block:
   add cases to the existing `bin/solid-gemc-run`, don't restructure.
-- venv install logic: lift verbatim from `hooks/install-deps.sh` (uv-or-pip,
-  Python 3.9+ guard) into `setup-python`.
+- venv install logic: lives in the wrapper's `setup-python` (uv-or-pip,
+  Python 3.9+ guard) — the single install path, invoked lazily by `analyze`.
 - uproot plotting: lift the Python from `commands/analyze.md` into `bin/solid-gemc-analyze.py`.
 - `evio2root -R=flux` and `LIBRARY=shared` flags: keep — load-bearing.
 - Structural model: mirror superpowers' side-by-side manifest dirs + dual root

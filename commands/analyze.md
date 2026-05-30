@@ -24,8 +24,8 @@ Claude Code surface.
 
 ## Steps
 
-1. **Run the analysis.** The venv is ensured automatically (the SessionStart
-   hook pre-warms it; otherwise it installs on first use):
+1. **Run the analysis.** The analysis venv installs automatically on first use
+   (idempotent; run `bin/solid-gemc-run setup-python` to pre-install):
    ```bash
    "${CLAUDE_PLUGIN_ROOT}/bin/solid-gemc-run" analyze "<run-dir>"   # optional: trailing max-plots
    ```

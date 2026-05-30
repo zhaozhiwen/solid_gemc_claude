@@ -27,9 +27,8 @@ gate. Run it on a host with apptainer + git + wget + python3.
       falls back to `command -v solid-gemc-run` when `CLAUDE_PLUGIN_ROOT` is unset.
 - [ ] `AGENTS.md` is present in the installed plugin and is a **real file**
       (copy of `CLAUDE.md`), not a symlink — `codex plugin add` drops symlinks.
-- [ ] On session start Codex may prompt to trust the Claude `hooks/hooks.json`.
-      Decline ("Continue without trusting") — the hook is Claude-only; on Codex
-      the venv installs lazily.
+- [ ] No hook-trust prompt at session start (the plugin ships no hooks; the
+      venv installs lazily on first `analyze`).
 
 ## 2. Skill auto-activation
 

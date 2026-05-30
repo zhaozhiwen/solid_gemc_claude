@@ -2,8 +2,8 @@
 
 Pre-release smoke test that exercises the parts of the plugin
 `tests/clean-smoke.sh` *can't* reach: Claude Code's slash-command
-dispatch, the `SessionStart` hook, the orchestrator skill's
-NL-trigger + `AskUserQuestion` flow, and namespace lookup.
+dispatch, the orchestrator skill's NL-trigger + `AskUserQuestion`
+flow, and namespace lookup.
 
 **Run this before tagging any release.** ~15 minutes once the
 container is cached + `solid_gemc` is built (otherwise add the
@@ -54,16 +54,14 @@ Pass:
   exists; `grep version` matches the tag being released.
 - `installed_plugins.json` lists `solid-gemc-claude@solid-gemc-claude`.
 
-## Phase 2 — `SessionStart` side effects
+## Phase 2 — No hidden session side effects
 
 Open Claude Code in **any** directory.
 
 Pass:
-- The `SessionStart` hook reports
-  `[solid_gemc_claude] installing Python deps into …/venv (one-time, ~30s)…`
-  and then `Python deps ready.`
-- `~/.claude/plugins/data/solid-gemc-claude-solid-gemc-claude/venv/bin/python -c "import uproot, numpy, matplotlib, pdg"`
-  succeeds.
+- **No** Python-deps install fires at session start (the plugin ships no
+  `SessionStart` hook — the venv installs lazily on the first `analyze`;
+  verified in Phase 5).
 - No MCP approval prompt fires (the plugin ships no `.mcp.json`).
 
 ## Phase 3 — `/solid-gemc-claude:init`
@@ -154,6 +152,9 @@ Pass:
 ```
 
 Pass:
+- On the **first** analyze, the venv installs once
+  (`installing Python deps … one-time` → `Python deps ready.`), then the
+  command proceeds (this is the lazy install that replaced the old hook).
 - The command lists at least one TTree from `out.root` with its
   branches and entry count.
 - At least 1 PNG histogram lands in

@@ -60,9 +60,8 @@ resolve_cache_dir() {
 # Data dir (venv home) resolution, mirroring the cache tiers:
 #   1. $CLAUDE_PLUGIN_DATA              Claude Code plugin data dir
 #   2. ${XDG_DATA_HOME:-~/.local/share}/solid-gemc-claude   off-Claude
-# On Claude the SessionStart hook pre-warms the venv here; off Claude (Codex,
-# standalone) there is no such hook, so any python path lazily ensures it via
-# ensure_venv_python below.
+# The venv is installed lazily on first use (see ensure_venv_python below) on
+# every platform — no session hook. Run `setup-python` to pre-install it.
 DATA_DIR=""
 VENV_DIR=""
 resolve_data_dir() {
@@ -214,9 +213,9 @@ ${cmd}"
 
 # Idempotently install requirements.txt into the resolved venv. Diffs the
 # bundled requirements against a stored copy; no-op when in sync. Uses `uv`
-# when available (fast), else python3 -m venv + pip. This is the single
-# implementation behind both the Claude SessionStart hook and the off-Claude
-# lazy path. KEEP PY_MIN in sync with the "Python 3.9+" line in README/docs.
+# when available (fast), else python3 -m venv + pip. Invoked lazily by
+# ensure_venv_python, or run by hand to pre-install. KEEP PY_MIN in sync with
+# the "Python 3.9+" line in README/docs.
 PY_MIN=3.9
 cmd_setup_python() {
   resolve_data_dir
@@ -255,8 +254,8 @@ PY
   log "Python deps ready."
 }
 
-# Echo the venv python, installing the venv first if absent. Lets `analyze`
-# work on Codex/standalone where no SessionStart hook pre-warmed it.
+# Echo the venv python, installing the venv first if absent. This is the only
+# venv-install trigger (no session hook), so `analyze` always self-heals.
 ensure_venv_python() {
   resolve_data_dir
   [[ -x "${VENV_DIR}/bin/python" ]] || cmd_setup_python >&2

@@ -31,7 +31,7 @@ jobs:
       - name: bash -n the shell scripts
         run: |
           set -e
-          for f in bin/solid-gemc-run hooks/install-deps.sh tests/clean-smoke.sh; do
+          for f in bin/solid-gemc-run tests/clean-smoke.sh tests/lint-agents-mirror.sh; do
             bash -n "$f" && echo "ok: $f"
           done
       - uses: actions/setup-python@v5
