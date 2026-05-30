@@ -61,10 +61,10 @@ upstream organizes `solid_gemc/analysis/hgc_study/` and
    `<name>/report.html`.** Every simulation effort — orchestrator-
    driven or manual — leaves a record in the relevant project's
    `log.md`. Prepend a new dated section capturing four things: the
-   user's **original request** (verbatim), the **plan** Claude drew
-   up (six-field spec — physics goal, SoLID config, beam, GCard,
-   output, analysis), the user's **decision** (approved / edited /
-   plan-only), and the **outcome** (run id, status, one-line
+   user's **original request** (verbatim), the **plan** the agent drew
+   up (seven-field spec — project name, physics goal, SoLID config,
+   beam, GCard, output, analysis), the user's **decision** (approved /
+   edited / plan-only), and the **outcome** (run id, status, one-line
    summary). After an `analyze` run that produced a
    noteworthy result, add or update a section in `<name>/result.md`
    with key numbers + plot paths, and refresh `<name>/report.html`
@@ -75,10 +75,13 @@ upstream organizes `solid_gemc/analysis/hgc_study/` and
 
    When a `report.html` needs to leave the workspace tree (committed
    to a public `docs/` folder, emailed, attached to a ticket), first
-   run the plugin's portability script:
+   run the plugin's portability script. Find the plugin root with
+   `bin/solid-gemc-run paths` (the `root:` line) — works on Claude and
+   Codex (don't rely on `$CLAUDE_PLUGIN_ROOT`, which is Claude-only):
 
    ```sh
-   python3 "${CLAUDE_PLUGIN_ROOT}/templates/embed_html.py" <name>/report.html
+   ROOT=$(bin/solid-gemc-run paths | awk '/^root:/{print $2}')
+   python3 "$ROOT/templates/embed_html.py" <name>/report.html
    ```
 
    It rewrites each `<img src="runs/<id>/*.png">` as an inline
@@ -91,7 +94,7 @@ upstream organizes `solid_gemc/analysis/hgc_study/` and
 The plugin's `solid-gemc` skill auto-loads when you describe a
 SoLID-flavored simulation in plain language (PVDIS, SIDIS, J/psi,
 He-3, HGC, LGC, GEM, EC, ...). It gap-checks your request against
-the six-field spec, presents a plan, and on approval drives:
+the seven-field spec, presents a plan, and on approval drives:
 
 1. Copy a canonical GCard from `solid_gemc/script/` or
    `solid_gemc/analysis/*/` into `<name>/<preset>.gcard`,

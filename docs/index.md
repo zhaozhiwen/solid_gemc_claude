@@ -34,7 +34,7 @@ The full simulation loop is driven by the `solid-gemc` orchestrator skill — it
   photon yield per Cherenkov detector.
 ```
 
-The skill gap-checks against a six-field spec (physics goal, SoLID config, beam, GCard, output, analysis), asks about anything missing, shows a plan, runs it on approval.
+The skill gap-checks against a seven-field spec (project name, physics goal, SoLID config, beam, GCard, output, analysis), asks about anything missing, shows a plan, runs it on approval.
 
 After init, two upstream worked examples live in your workspace as templates:
 

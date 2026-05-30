@@ -54,10 +54,10 @@ generators producing factory text files** that gemc loads via
 - `config_<sub>.dat` — parameter file the generators consume.
 
 The plugin has **no** surface for this — follow
-upstream's `hgc_moved/readme.md` directly. See also
-`${CLAUDE_PLUGIN_ROOT}/reference/gemc_simulation_general_note.md`
-(mirror of the SoLID wiki) for field-by-field semantics of the
-text formats.
+upstream's `hgc_moved/readme.md` directly. See also the plugin's
+`reference/gemc_simulation_general_note.md` (mirror of the SoLID
+wiki) for field-by-field semantics of the text formats; find the
+plugin root with `bin/solid-gemc-run paths` (the `reference:` line).
 
 ## Config + run + analyze (the simulation loop)
 
@@ -124,5 +124,6 @@ container, so paths are the same in and out.
 - Upstream worked examples (cloned by init):
   `../solid_gemc/analysis/hgc_study/` (config + run + analyze) and
   `../solid_gemc/geometry/hgc_moved/` (custom detector authoring).
-- gemc / solid_gemc source digests and physics references:
-  `${CLAUDE_PLUGIN_ROOT}/reference/` inside the plugin install.
+- gemc / solid_gemc source digests and physics references: the plugin's
+  `reference/` dir — locate it with `bin/solid-gemc-run paths` (the
+  `reference:` line; works on Claude and Codex).

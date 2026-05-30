@@ -106,12 +106,13 @@ reference material — units, physics list choice, uproot recipes, etc. Don't
 add a second workflow skill without a reason comparable to the
 auto-load-on-natural-language one.
 
-## Six-field spec (orchestrator contract)
+## Seven-field spec (orchestrator contract)
 
 The `skills/solid-gemc/SKILL.md` orchestrator gap-checks user requests against:
 
 | Field | Example |
 |---|---|
+| Project name | `pvdis_ld2_aPV` (the `<name>/` subdir under the workspace root) |
 | Physics goal | "PVDIS A_PV asymmetry as a function of Q²" |
 | SoLID config | "PVDIS, LD2 target, full magnet config" |
 | Beam | "11 GeV e- on LD2, 10000 events" |
@@ -137,15 +138,15 @@ with stop-on-failure post-condition checks.
   `solid-gemc-run` post-converts the EVIO to ROOT via `evio2root`
   inside the same container, so the analysis path is still uproot.
   Both `out.evio` and `out.root` end up in `runs/<id>/`. HIPO
-  deferred past v0.0.3.
+  deferred past v0.0.4.
 - **solid_gemc pin.** Clone HEAD of master; record commit SHA per run
-  in `runs/<id>/config.json`. No upstream pin at v0.0.3.
+  in `runs/<id>/config.json`. No upstream pin at v0.0.4.
 - **GCard surface.** The orchestrator skill copies a canonical GCard
   from `$SoLID_GEMC/script/` (or `…/analysis/*/`) into `gcards/` and
   injects `USE_GUI=0` / `OUTPUT=evio,out.evio` / `N=<n>` on the live
-  `<gcard>` block. NL→GCard deferred past v0.0.3.
+  `<gcard>` block. NL→GCard deferred past v0.0.4.
 
-## v0.0.3 known limitations
+## v0.0.4 known limitations
 
 - **.sif hosted at Duke webhome.** Personal hosting (no SLA), flagged
   in `README.md` "Known limitations". Revisit before paper citation.
@@ -189,7 +190,7 @@ study on He-3"), or follow upstream's `run.sh` via
 
 ## Pre-publish checks
 
-Before the v0.0.3 tag, every item must be clean:
+Before the v0.0.4 tag, every item must be clean:
 
 - `grep -RIn "/home/$USER\|jefflab" .` returns nothing in tracked files (with
   `$USER` expanded). `jlab.org` is allowed only as the `gemc.jlab.org`

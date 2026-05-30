@@ -2,7 +2,7 @@
 
 ## Context
 
-`solid-gemc-claude` is today a Claude Code plugin. The goal is to make the
+`solid-gemc-claude` began as a Claude Code plugin. The goal is to make the
 **same single repo** drive the identical solid_gemc workflow on two agentic
 CLIs: **Claude Code** and **OpenAI Codex CLI**. (Antigravity deferred — not in
 scope.)

@@ -20,8 +20,9 @@ quoting their contents.
 > <verbatim user request, in their own words; quote it so future-you
 >  can tell what was asked vs. what Claude inferred>
 
-### Plan (six-field spec)
+### Plan (seven-field spec)
 
+- Project name:    <the `<name>/` subdir under the workspace root>
 - Physics goal:    <…>
 - SoLID config:    <PVDIS_LD2 / PVDIS_LH2 / SIDIS_He3 / J_psi / …>
 - Beam:            <particle, energy, n_events>
