@@ -36,7 +36,9 @@ on first use; URL is pinned in [`bin/solid-gemc-run`](bin/solid-gemc-run).
 
 The repo is one source of truth for both harnesses — shared
 `bin/solid-gemc-run` + `skills/solid-gemc/`, with `.claude-plugin/` and
-`.codex-plugin/` manifests side by side and `CLAUDE.md` / `AGENTS.md` (same
+`.codex-plugin/` manifests side by side (plus the per-harness marketplace
+descriptors `.claude-plugin/marketplace.json` and
+`.agents/plugins/marketplace.json`) and `CLAUDE.md` / `AGENTS.md` (same
 content) at the root. The analysis venv installs lazily on the first `analyze`
 on every platform (idempotent; run `bin/solid-gemc-run setup-python` to
 pre-install).
@@ -50,9 +52,11 @@ pre-install).
 
 ### Codex CLI
 
-Install as a Codex plugin (cached under `~/.codex/plugins/cache/`); the bundled
-`solid-gemc` skill auto-activates on SoLID-flavored requests, the same as on
-Claude Code. Ensure `solid-gemc-run` is on `PATH` (the skill resolves the
+Install as a Codex plugin (cached under `~/.codex/plugins/cache/`); the repo
+ships a local-source marketplace descriptor at
+`.agents/plugins/marketplace.json` so Codex can discover the plugin from a
+clone. The bundled `solid-gemc` skill auto-activates on SoLID-flavored
+requests, the same as on Claude Code. Ensure `solid-gemc-run` is on `PATH` (the skill resolves the
 wrapper via `CLAUDE_PLUGIN_ROOT` on Claude, else `command -v solid-gemc-run`);
 if needed, symlink it:
 

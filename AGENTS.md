@@ -92,6 +92,8 @@ Pattern improvements propagate by deliberate sync, not by linking.
 | Plugin name (Claude Code + Codex spec) | `solid-gemc-claude` — kebab-case, mandatory |
 | Claude manifest | `.claude-plugin/plugin.json` |
 | Codex manifest | `.codex-plugin/plugin.json` (mirror; same `name`/`version`) |
+| Claude marketplace | `.claude-plugin/marketplace.json` |
+| Codex marketplace | `.agents/plugins/marketplace.json` (local-source descriptor; **coexists** with the `.codex-plugin/` manifest — Codex uses this for marketplace discovery and still reads `.codex-plugin/plugin.json` as the manifest) |
 | GitHub repo | `solid_gemc_claude` — underscore, mirrors `geant4_claude` |
 | Run IDs | `YYYYMMDD-HHMMSS-<6char>` (UTC) |
 | Skill dirs | `skills/solid-gemc-<topic>/` (plus the one orchestrator `skills/solid-gemc/`) |
