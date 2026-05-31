@@ -23,7 +23,7 @@
   "repository": "https://github.com/zhaozhiwen/solid_gemc_claude.git",
   "skills": "./skills/",
   "interface": {
-    "displayName": "solid_gemc",
+    "displayName": "solid-gemc-claude",
     "shortDescription": "Run SoLID experiment (solid_gemc) simulations from natural language: container-based gemc + host-side uproot analysis.",
     "developerName": "Zhiwen Zhao",
     "category": "Developer Tools",
