@@ -69,8 +69,10 @@ You can ask your agent harness to
 
 ```text
 Learn the examples at solid_gemc repo "solid_gemc/analysis/hgc_study/" and "solid_gemc/geometry/hgc_moved/",
-Do the heavy gas Cherenkov study on SIDIS He3 moved configuration with 1000 events of 5 GeV pi- at 10 degree theta angle and full phi angle,
-then plot number of photoelectron yield in various illustrative ways and show me results in a html file
+Do the heavy gas Cherenkov simulation on SIDIS He3 moved configuration with 1000 events of 5 GeV pi- at 10 degree theta angle and full phi angle,
+then plot number of photoelectron yield in various illustrative ways,
+verify the sim result with physics analytic calculation,
+finally show me the results in an html file
 ```
 
 ## How you drive it
