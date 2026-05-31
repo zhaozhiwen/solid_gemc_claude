@@ -36,11 +36,12 @@ There are no slash commands. The `solid-gemc` orchestrator skill auto-loads on a
 Ask your harness something like:
 
 ```text
-Follow the examples at "solid_gemc/analysis/hgc_study/" and
-"solid_gemc/geometry/hgc_moved/" to run the heavy-gas Cherenkov study on
-SIDIS He-3 at 5 GeV π- with the moved configuration, 1000 events, then plot
-photoelectron yield in various illustrative ways and show me the result in
-an HTML file.
+Learn the examples at solid_gemc repo "solid_gemc/analysis/hgc_study/" and
+"solid_gemc/geometry/hgc_moved/",
+Do the heavy-gas Cherenkov study on SIDIS He-3 moved configuration with 1000
+events of 5 GeV π- at 10 degree theta angle,
+then plot number of photoelectron yield in various illustrative ways and show
+me results in an HTML file.
 ```
 
 `init` runs once as a one-shot bootstrap (pull the `.sif`, clone `solid_gemc`, run both scons builds, scaffold a workspace) — automatically on first use, or when you ask to "init solid-gemc-claude". After it, two upstream worked examples live in your workspace, both self-contained:

@@ -66,7 +66,9 @@ Codex reads `AGENTS.md` — the canonical project-rules file.
 You can ask your agent harness to
 
 ```text
-Follow the examples at solid_gemc repo "solid_gemc/analysis/hgc_study/" and "solid_gemc/geometry/hgc_moved/" to run the heavy gas Cherenkov study on SIDIS He3 at 5 GeV pi- with the moved configuration, 1000 events, then plot number of photoelectron yield in various illustrative ways and show me the result in the html file
+Learn the examples at solid_gemc repo "solid_gemc/analysis/hgc_study/" and "solid_gemc/geometry/hgc_moved/",
+Do the heavy gas Cherenkov study on SIDIS He3 moved configuration with 1000 events of 5 GeV pi- at 10 degree theta angle,
+then plot number of photoelectron yield in various illustrative ways and show me results in a html file
 ```
 
 ## How you drive it
