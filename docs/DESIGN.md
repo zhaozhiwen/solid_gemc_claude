@@ -129,7 +129,7 @@ SoLID build environment.
 JLabCE 2.5 supports only EVIO and TXT output (`-help-output` confirms).
 We post-convert EVIO → ROOT inside the container with `evio2root`, so
 both `out.evio` and `out.root` end up in `runs/<id>/`. Analysis stays
-Python via uproot. HIPO output deferred past v0.0.5.
+Python via uproot. HIPO output deferred past v0.0.6.
 
 **Why `wget` to pull the `.sif`, not `apptainer pull docker://`?** The
 `.sif` is hosted at a webhome URL, not a container registry. Direct
@@ -141,7 +141,7 @@ passes: `mod/gemc/2.9` produces `libgemc.so` (requires
 `LIBRARY=shared`), then `source/2.9` links against it. Skipping or
 reordering produces an unlinked binary that segfaults on first run.
 
-## Known limitations (v0.0.5)
+## Known limitations (v0.0.6)
 
 - The `.sif` is at a personal Duke webhome
   (`webhome.phy.duke.edu`). No SLA. Mirror locally if you need

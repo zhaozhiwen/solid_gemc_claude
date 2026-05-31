@@ -39,7 +39,7 @@ Ask your harness something like:
 Learn the examples at solid_gemc repo "solid_gemc/analysis/hgc_study/" and
 "solid_gemc/geometry/hgc_moved/",
 Do the heavy-gas Cherenkov study on SIDIS He-3 moved configuration with 1000
-events of 5 GeV π- at 10 degree theta angle,
+events of 5 GeV π- at 10 degree theta angle and full phi angle,
 then plot number of photoelectron yield in various illustrative ways and show
 me results in an HTML file.
 ```
