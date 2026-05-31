@@ -78,6 +78,48 @@ resolve_data_dir() {
   VENV_DIR="${DATA_DIR}/venv"
 }
 
+# Human-readable label for which cache tier resolve_cache_dir picked. Shared by
+# `info` and `init` so both report the rule the same way.
+cache_source_label() {
+  if [[ -n "${SOLID_GEMC_CLAUDE_CACHE:-}" ]]; then
+    echo "SOLID_GEMC_CLAUDE_CACHE override"
+  elif [[ -n "${CLAUDE_PLUGIN_DATA:-}" ]]; then
+    echo "CLAUDE_PLUGIN_DATA (Claude Code plugin)"
+  else
+    echo "PLUGIN_ROOT/cache (Codex / standalone / bare clone)"
+  fi
+}
+
+# Workspace root resolution. `init` drops WORKSPACE_MARKER in the dir it runs
+# in (the workspace root). Every later subcommand walks up from $PWD to find
+# that marker, so the same solid_gemc tree resolves whether the wrapper is
+# invoked from the workspace root or a deep project/run subdir. Without this a
+# bare `exec`/`shell` from a subdir defaulted SoLID_GEMC to ${PWD}/solid_gemc
+# and silently missed the build tree (it relied on the skill exporting the var).
+WORKSPACE_MARKER=".solid-gemc-workspace"
+
+# Echo the nearest ancestor dir (inclusive of $PWD) containing the marker, or
+# nothing and return 1 if none is found. No filesystem writes.
+find_workspace_root() {
+  local d; d="$(pwd -P)"
+  while [[ "${d}" != "/" ]]; do
+    [[ -f "${d}/${WORKSPACE_MARKER}" ]] && { printf '%s' "${d}"; return 0; }
+    d="$(dirname "${d}")"
+  done
+  [[ -f "/${WORKSPACE_MARKER}" ]] && { printf '/'; return 0; }
+  return 1
+}
+
+# Default $SoLID_GEMC to <workspace-root>/solid_gemc when the caller has not
+# set it. An explicit caller-set value always wins (the skill's symlink/reuse
+# path). With no marker found we leave it unset, so env_block's ${PWD}/solid_gemc
+# fallback preserves the pre-marker behavior for a bare clone at its root.
+resolve_solid_gemc() {
+  [[ -n "${SoLID_GEMC:-}" ]] && return 0
+  local root; root="$(find_workspace_root)" || return 0
+  export SoLID_GEMC="${root}/solid_gemc"
+}
+
 require_apptainer() {
   command -v apptainer >/dev/null 2>&1 \
     || die "apptainer not found on PATH. Install apptainer first (https://apptainer.org)."
@@ -121,11 +163,13 @@ container_workdir()   { pwd -P; }
 container_cache_dir() { readlink -f "${CACHE_DIR}"; }
 
 # Tcsh env block for solid_gemc/GEMC inside the container. Honors any
-# externally-set `$SoLID_GEMC` (lets slash commands cd into a subdir like
+# externally-set `$SoLID_GEMC` (lets the skill cd into a subdir like
 # `solid_gemc/analysis/hgc_study/` to pick up cwd-relative detector loading
-# while keeping `SoLID_GEMC` pinned to the workspace root). Falls back to
-# `${PWD}/solid_gemc` for the workspace-root-cwd case. The heredoc is
-# single-quoted so `${VAR}` stays literal — tcsh interpolates at run time.
+# while keeping `SoLID_GEMC` pinned to the workspace root). resolve_solid_gemc
+# (run before every container invocation) exports it from the marker-located
+# workspace root when unset; only a markerless bare clone falls through to the
+# `${PWD}/solid_gemc` default here. The heredoc is single-quoted so `${VAR}`
+# stays literal — tcsh interpolates at run time.
 env_block() {
   cat <<'TCSH'
 if ( ! $?SoLID_GEMC ) setenv SoLID_GEMC ${PWD}/solid_gemc
@@ -187,6 +231,7 @@ container_binds() {
 in_container() {
   local cmd="$1"
   local wd cache_real env
+  resolve_solid_gemc
   wd="$(container_workdir)"
   # SOLID_GEMC_RUN_DRYRUN=1: print the resolved apptainer bind/pwd argv and
   # return without touching the .sif. A container-free seam for the bind
@@ -270,17 +315,9 @@ ensure_venv_python() {
 
 cmd_info() {
   resolve_cache_dir
-  local cache_src
-  if [[ -n "${SOLID_GEMC_CLAUDE_CACHE:-}" ]]; then
-    cache_src="SOLID_GEMC_CLAUDE_CACHE override"
-  elif [[ -n "${CLAUDE_PLUGIN_DATA:-}" ]]; then
-    cache_src="CLAUDE_PLUGIN_DATA (Claude Code plugin)"
-  else
-    cache_src="PLUGIN_ROOT/cache (Codex / standalone / bare clone)"
-  fi
   echo "sif url:        ${SIF_URL}"
   echo "sif file:       ${SIF_PATH} $([[ -f ${SIF_PATH} ]] && echo '[present]' || echo '[not pulled]')"
-  echo "cache:          ${CACHE_DIR}  [${cache_src}]"
+  echo "cache:          ${CACHE_DIR}  [$(cache_source_label)]"
   echo "plugin:         ${PLUGIN_ROOT}"
   echo "solid_gemc:     ${SOLID_GEMC_REPO} (HEAD of master)"
   echo "GEMC_VERSION:   ${GEMC_VERSION}"
@@ -350,6 +387,7 @@ cmd_exec() {
 
 cmd_shell() {
   ensure_sif
+  resolve_solid_gemc
   local wd cache_real env
   wd="$(container_workdir)"
   cache_real="$(container_cache_dir)"
@@ -388,6 +426,16 @@ cmd_init() {
   [[ "${1:-}" == "--force" ]] && force=1
   require_apptainer; require_git; require_wget
 
+  # Report where everything will resolve before doing any work. The wrapper's
+  # install dir and its cache can legitimately live on different filesystems
+  # (e.g. a Codex install under ~/.codex with the cache co-located on /work),
+  # which surprises people — so make it explicit up front.
+  resolve_cache_dir
+  log "plugin root:   ${PLUGIN_ROOT}"
+  log "cache:         ${CACHE_DIR}  [$(cache_source_label)]"
+  log "sif:           ${SIF_PATH}"
+  log "workspace:     $(pwd -P)/solid_gemc"
+
   local tdir="${PLUGIN_ROOT}/templates" f src dst
   for f in CLAUDE.md AGENTS.md .gitignore log.md result.md report.html; do
     src="${tdir}/${f}"; dst="./${f}"
@@ -400,9 +448,24 @@ cmd_init() {
     log "wrote ${dst}"
   done
 
+  # Mark this dir as the workspace root so the wrapper self-locates solid_gemc
+  # from any subdir later (see find_workspace_root). Always (re)written — it
+  # carries no state, just marks the root.
+  printf 'solid-gemc-claude workspace root\n' > "./${WORKSPACE_MARKER}"
+
   cmd_pull
   cmd_clone
   cmd_build
+
+  # Post-build smoke: confirm the freshly built binary actually resolves on the
+  # in-container PATH. Catches a broken build or a broken env block immediately,
+  # while the user is watching init, instead of at the first real run.
+  log "verifying solid_gemc resolves inside the container..."
+  if in_container "which solid_gemc" >/dev/null 2>&1; then
+    log "smoke ok: solid_gemc on PATH in-container"
+  else
+    die "post-build smoke failed: 'solid_gemc' not found on PATH inside the container (build or env block is broken)"
+  fi
 }
 
 # Host-side uproot plots from a run's out.root. Accepts a run dir, a bare run

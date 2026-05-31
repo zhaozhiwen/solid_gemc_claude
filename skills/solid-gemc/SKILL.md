@@ -145,6 +145,18 @@ re-doing work because a default was wrong.
   you proceed — the requirement (an explicit per-turn pick before
   any write) is identical; only the mechanism differs. The user
   must pick an option.
+- **One round, not two (esp. on Codex).** The gate is satisfied by
+  the user's reply to *that* numbered question — when they name or
+  number one of the three options in the message right after the
+  plan, that pick **is** the approval. Proceed (or loop / hold)
+  accordingly; do **not** re-ask, re-render the plan, or demand a
+  second tool-shaped confirmation. On a harness without
+  `AskUserQuestion`, a plain-language "Approve and run" / "1" /
+  "looks good, go" answering the presented options counts — the
+  structured-choice rule is about *what the plan offered*, not about
+  forcing the user through an extra hoop they already cleared. (This
+  changes nothing above: a "go" from *before* the plan, or carried
+  from an earlier turn or a different plan, still does not count.)
 - The gate fires **after** the plan is on screen as text in the
   same turn. The order is: present the plan as text →
   `AskUserQuestion` with three options → wait for the explicit
