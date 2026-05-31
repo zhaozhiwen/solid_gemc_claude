@@ -56,21 +56,18 @@ gate. Run it on a host with apptainer + git + wget + python3.
 - [ ] The simulation produces `<project>/runs/<id>/{gcard.gcard, out.evio,
       out.root, log.txt, config.json}`.
 - [ ] `analyze` installs the venv lazily on first use (no `SessionStart` hook
-      on Codex), under the plugin install at `${PLUGIN_ROOT}/venv` (i.e.
-      `$CODEX_HOME/plugins/cache/solid-gemc-claude/solid-gemc-claude/<ver>/venv`),
-      and writes PNGs into the run dir.
+      on Codex), at `<workspace-root>/venv`, and writes PNGs into the run dir.
 - [ ] `<project>/log.md` gets the four-section verbatim entry (user input →
       plan → decision → outcome).
 
 ## 5. Path hygiene
 
-- [ ] Cache (the `.sif`) landed at `${PLUGIN_ROOT}/cache/sif` — i.e.
-      `$CODEX_HOME/plugins/cache/solid-gemc-claude/solid-gemc-claude/<ver>/cache/sif`,
-      next to the wrapper — **not** in `~/.cache` or `$HOME` root. (Tier 3 is
-      unconditional and co-locates with the install; there is no `~/.cache`
-      tier anymore — the 2026-05-30 field report where a custom `CODEX_HOME`
-      orphaned the `.sif` in `~/.cache` can no longer happen.) Confirm with
-      `solid-gemc-run info` — cache line tagged `[PLUGIN_ROOT/cache …]`.
+- [ ] Cache (the `.sif`) landed at `<workspace-root>/cache/sif` — i.e. inside
+      the workspace `init` ran in, **not** under the plugin install
+      (`$CODEX_HOME/plugins/cache/.../<ver>/`) and not in `~/.cache` or `$HOME`.
+      Anchoring to the workspace is what lets the `.sif` survive a plugin update
+      (the version-pinned install dir changes; the workspace doesn't). Confirm
+      with `solid-gemc-run info` — cache line tagged `[workspace (<root>/cache)]`.
 - [ ] Optional: `$SOLID_GEMC_CLAUDE_CACHE` overrides the location (e.g. point
       it at a shared/pre-staged `.sif`); `info` then tags the cache line
       `[SOLID_GEMC_CLAUDE_CACHE override]`.

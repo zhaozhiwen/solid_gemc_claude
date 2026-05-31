@@ -55,7 +55,8 @@ upstream organizes `solid_gemc/analysis/hgc_study/` and
    that needs the actual ROOT executable runs inside the container
    via `bin/solid-gemc-run root <macro>`.
 5. **Don't commit `solid_gemc/`.** It's an upstream-managed working
-   tree that init rebuilds. Same for `<name>/runs/`,
+   tree that init rebuilds. Same for the workspace-rooted `cache/`
+   (the ~1.7 GB `.sif`) and `venv/`, plus `<name>/runs/`,
    `*.root`, `*.hipo`, `__pycache__/`.
 6. **Maintain `<name>/log.md`, `<name>/result.md`, and
    `<name>/report.html`.** Every simulation effort — orchestrator-

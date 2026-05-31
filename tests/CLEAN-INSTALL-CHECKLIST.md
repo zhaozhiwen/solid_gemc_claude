@@ -84,8 +84,9 @@ Pass:
   `log.md`, `result.md`, `report.html` (no `gcards/`, `runs/`,
   `analysis/` at the workspace root — those live inside each project
   subdir).
-- `.sif` lands at
-  `~/.claude/plugins/data/solid-gemc-claude-solid-gemc-claude/cache/sif/jeffersonlab_jlabce_tag2.5_digest:sha256:9b9a9...sif`.
+- `.sif` lands at `<workspace-root>/cache/sif/jeffersonlab_jlabce_tag2.5_digest:sha256:9b9a9...sif`
+  (anchored to the workspace, so it survives plugin updates; confirm via the
+  `cache:` line of `bin/solid-gemc-run info`).
 - `solid_gemc/` is cloned into the workspace; `git rev-parse HEAD`
   there is reported in the command's final summary.
 - Two scons builds complete (first run: several minutes); the binary
