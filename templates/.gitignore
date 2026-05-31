@@ -6,6 +6,11 @@
 # Built upstream tree
 solid_gemc/
 
+# Plugin-managed heavy artifacts, anchored to this workspace so they survive
+# plugin updates (the 1.7 GB .sif and the analysis venv)
+cache/
+venv/
+
 # File-type-level catches
 *.root
 *.hipo

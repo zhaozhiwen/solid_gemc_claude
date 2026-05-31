@@ -24,8 +24,10 @@ analysis runs on the host with [`uproot`](https://github.com/scikit-hep/uproot5)
 - `wget`, `git` on the host. (No host-side `tcsh` needed — the
   wrapper invokes `tcsh` *inside* the container.)
 - Python 3.9+ with `uproot numpy matplotlib` (only for the analyze step).
-- ~1.7 GB of disk for the cached JLabCE 2.5 image, plus ~1 GB for
-  the cloned + built solid_gemc tree per workspace.
+- ~1.7 GB of disk for the cached JLabCE 2.5 image plus ~1 GB for the
+  cloned + built solid_gemc tree, both per workspace (the cache lives
+  in the workspace so it survives plugin updates; set
+  `$SOLID_GEMC_CLAUDE_CACHE` to share one `.sif` across workspaces).
 - Claude Code (plugin support) **or** OpenAI Codex CLI (Agent Skills).
 
 The plugin downloads
@@ -67,7 +69,7 @@ You can ask your agent harness to
 
 ```text
 Learn the examples at solid_gemc repo "solid_gemc/analysis/hgc_study/" and "solid_gemc/geometry/hgc_moved/",
-Do the heavy gas Cherenkov study on SIDIS He3 moved configuration with 1000 events of 5 GeV pi- at 10 degree theta angle,
+Do the heavy gas Cherenkov study on SIDIS He3 moved configuration with 1000 events of 5 GeV pi- at 10 degree theta angle and full phi angle,
 then plot number of photoelectron yield in various illustrative ways and show me results in a html file
 ```
 

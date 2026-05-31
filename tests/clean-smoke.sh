@@ -2,13 +2,14 @@
 # tests/clean-smoke.sh — plumbing smoke test for solid-gemc-claude.
 #
 # Exercises bin/solid-gemc-run (including the init/analyze/setup-python/paths
-# subcommands and the off-Claude PLUGIN_ROOT/cache fallback) + the workspace
-# template + the simulation loop the orchestrator skill drives (gcard prep +
-# solid_gemc + evio2root) + the analyze step, against a sandboxed
-# CLAUDE_PLUGIN_DATA. Does NOT go through Claude Code or Codex, so it does not
-# test skill dispatch, MCP approval, the approval gate, or NL-trigger
-# auto-load — see tests/CLEAN-INSTALL-CHECKLIST.md
-# (Claude) and tests/CODEX-CHECKLIST.md (Codex) for the manual flows.
+# subcommands and the two-tier override → workspace-rooted cache/venv
+# resolution) + the workspace template + the simulation loop the orchestrator
+# skill drives (gcard prep + solid_gemc + evio2root) + the analyze step. The
+# run phases pin the cache via the SOLID_GEMC_CLAUDE_CACHE override (tier 1).
+# Does NOT go through Claude Code or Codex, so it does not test skill dispatch,
+# MCP approval, the approval gate, or NL-trigger auto-load — see
+# tests/CLEAN-INSTALL-CHECKLIST.md (Claude) and tests/CODEX-CHECKLIST.md
+# (Codex) for the manual flows.
 #
 # Usage:
 #   tests/clean-smoke.sh
@@ -24,9 +25,9 @@
 #
 # Requires: apptainer, bash >= 4, git, wget, python3.
 # (tcsh runs inside the container, not on the host.)
-# Optional: python3 with uproot+numpy+matplotlib (the plugin's venv at
-#           ${CLAUDE_PLUGIN_DATA}/venv will be used if present). Without
-#           them, the analyze step is skipped (the rest still runs).
+# Optional: python3 with uproot+numpy+matplotlib (the analysis venv installs
+#           lazily at <workspace>/venv on first analyze). Without them, the
+#           analyze step is skipped (the rest still runs).
 
 set -euo pipefail
 
@@ -80,9 +81,9 @@ sgrun() {
     "${PLUGIN_ROOT}/bin/solid-gemc-run" "$@"
 }
 
-# --- phase 0: wrapper subcommands + off-Claude path resolution --------------
-# Container-free, no network. Verifies the new subcommands exist and that the
-# three-tier cache/venv resolution does the right thing on and off Claude.
+# --- phase 0: wrapper subcommands + cache/venv resolution -------------------
+# Container-free, no network. Verifies the subcommands exist and that the
+# two-tier (override → workspace-rooted) cache/venv resolution is correct.
 log "phase 0 — wrapper subcommands + path resolution (no container)"
 for sub in init analyze setup-python paths; do
   "${PLUGIN_ROOT}/bin/solid-gemc-run" help | grep -qE "^  ${sub} " \
@@ -90,41 +91,40 @@ for sub in init analyze setup-python paths; do
 done
 pass "init/analyze/setup-python/paths present in help"
 
-# Under Claude (CLAUDE_PLUGIN_DATA set) cache stays strictly inside it.
-sgrun paths | grep -qx "cache:      ${CLAUDE_PLUGIN_DATA}/cache" \
-  || fail "Claude-tier cache did not resolve to \$CLAUDE_PLUGIN_DATA/cache"
-pass "Claude tier: cache inside \$CLAUDE_PLUGIN_DATA"
+# Run `paths` from a given cwd with the override + CLAUDE_PLUGIN_DATA cleared,
+# so only the workspace-rooted tier (or its $PWD fallback) is exercised.
+run_paths() { ( cd "$1" && env -u SOLID_GEMC_CLAUDE_CACHE -u CLAUDE_PLUGIN_DATA \
+  "${PLUGIN_ROOT}/bin/solid-gemc-run" paths ); }
 
-# Off Claude (no CLAUDE_PLUGIN_DATA, no override): cache co-locates with the
-# wrapper at PLUGIN_ROOT/cache (here PLUGIN_ROOT is this repo clone).
-OFF_CACHE=$(env -u CLAUDE_PLUGIN_DATA -u SOLID_GEMC_CLAUDE_CACHE \
-  "${PLUGIN_ROOT}/bin/solid-gemc-run" paths | awk '/^cache:/{print $2}')
-[[ "${OFF_CACHE}" == "${PLUGIN_ROOT}/cache" ]] \
-  || fail "off-Claude cache resolved to '${OFF_CACHE}', expected '${PLUGIN_ROOT}/cache'"
-pass "non-Claude tier: cache co-locates at \$PLUGIN_ROOT/cache"
-
-# The override (tier 1) wins over everything — the escape hatch for a pre-staged
-# .sif or a shared cache across version-pinned installs.
+# Override (tier 1) wins over everything — the shared/pre-staged .sif escape
+# hatch (and how sgrun pins the cache for the rest of this run).
 OVR="${SCRATCH}/shared-sif"
-OVR_CACHE=$(env -u CLAUDE_PLUGIN_DATA SOLID_GEMC_CLAUDE_CACHE="${OVR}" \
+OVR_CACHE=$(SOLID_GEMC_CLAUDE_CACHE="${OVR}" \
   "${PLUGIN_ROOT}/bin/solid-gemc-run" paths | awk '/^cache:/{print $2}')
 [[ "${OVR_CACHE}" == "${OVR}" ]] \
   || fail "override cache resolved to '${OVR_CACHE}', expected '${OVR}'"
 pass "override tier: \$SOLID_GEMC_CLAUDE_CACHE wins"
 
-# Realistic Codex install path (deep, version-pinned, custom CODEX_HOME with no
-# leading dot) must still co-locate at PLUGIN_ROOT/cache — regression guard for
-# the 2026-05-30 field report. Copy the wrapper in so readlink -f resolves
-# PLUGIN_ROOT into the replica. (No platform detection now — tier 3 is
-# unconditional — so this just confirms a deep install path resolves cleanly.)
-CDX_ROOT="${SCRATCH}/codex_home/plugins/cache/solid-gemc-claude/solid-gemc-claude/0.0.5"
-mkdir -p "${CDX_ROOT}/bin"
-cp "${PLUGIN_ROOT}/bin/solid-gemc-run" "${CDX_ROOT}/bin/solid-gemc-run"
-CDX_CACHE=$(env -u CLAUDE_PLUGIN_DATA -u SOLID_GEMC_CLAUDE_CACHE -u CODEX_HOME \
-  "${CDX_ROOT}/bin/solid-gemc-run" paths | awk '/^cache:/{print $2}')
-[[ "${CDX_CACHE}" == "${CDX_ROOT}/cache" ]] \
-  || fail "Codex install cache resolved to '${CDX_CACHE}', expected '${CDX_ROOT}/cache'"
-pass "Codex install: deep version-pinned path co-locates at \$PLUGIN_ROOT/cache"
+# Workspace tier (default): with a .solid-gemc-workspace marker, cache + venv
+# anchor at the marker dir — resolved identically from the root and a deep subdir.
+WST="${SCRATCH}/wstier"; WST_P=$(mkdir -p "${WST}/proj/runs/x" && cd "${WST}" && pwd -P)
+: > "${WST}/.solid-gemc-workspace"
+for from in "${WST}" "${WST}/proj/runs/x"; do
+  WC=$(run_paths "${from}" | awk '/^cache:/{print $2}')
+  WV=$(run_paths "${from}" | awk '/^venv:/{print $2}')
+  [[ "${WC}" == "${WST_P}/cache" ]] \
+    || fail "workspace cache from ${from} = '${WC}', expected '${WST_P}/cache'"
+  [[ "${WV}" == "${WST_P}/venv" ]] \
+    || fail "workspace venv from ${from} = '${WV}', expected '${WST_P}/venv'"
+done
+pass "workspace tier: cache/venv anchor at the marker root from any subdir"
+
+# No marker (bare/standalone): falls back to \$PWD/cache.
+BARE="${SCRATCH}/bare"; BARE_P=$(mkdir -p "${BARE}" && cd "${BARE}" && pwd -P)
+BC=$(run_paths "${BARE}" | awk '/^cache:/{print $2}')
+[[ "${BC}" == "${BARE_P}/cache" ]] \
+  || fail "no-marker cache = '${BC}', expected '${BARE_P}/cache'"
+pass "no-marker fallback: cache at \$PWD/cache"
 
 # --- phase 1: workspace template + image cache ------------------------------
 log "phase 1 — workspace skeleton + image cache"

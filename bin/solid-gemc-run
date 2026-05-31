@@ -31,19 +31,18 @@ PLUGIN_ROOT="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
 log()  { printf '[solid-gemc-run] %s\n' "$*" >&2; }
 die()  { printf '[solid-gemc-run] error: %s\n' "$*" >&2; exit 1; }
 
-# Cache resolution (three tiers, in order):
+# Cache resolution (two tiers, in order):
 #   1. $SOLID_GEMC_CLAUDE_CACHE        explicit override (any platform)
-#   2. $CLAUDE_PLUGIN_DATA/cache       Claude Code plugin data dir
-#   3. ${PLUGIN_ROOT}/cache            everyone else (Codex, standalone, bare clone)
-# Tier 3 is the unconditional non-Claude fallback: it co-locates the .sif with
-# the wrapper, whatever installed it. No platform detection — under Codex
-# PLUGIN_ROOT is the (version-pinned) plugin install dir; from a bare clone it is
-# the clone dir. This deliberately has no $HOME/XDG tier: the .sif lives next to
-# the code that uses it, so it is never orphaned and never needs a platform guess
-# (an earlier `is_codex_install` heuristic mis-fired on custom CODEX_HOME dirs).
-# Tier 1 is the escape hatch — point it at a stable shared location to reuse a
-# pre-staged .sif or to avoid re-downloading on every version-pinned bump. When
-# CLAUDE_PLUGIN_DATA *is* set we stay strictly inside it. See non-negotiable #7.
+#   2. <workspace-root>/cache          the workspace the wrapper is run from
+# Tier 2 anchors the .sif to the *workspace* (the dir `init` ran in, located via
+# the .solid-gemc-workspace marker — see workspace_root), NOT to the plugin
+# install dir. The plugin install is ephemeral — under Codex its path is
+# version-pinned, so a co-located cache was re-downloaded (~1.7 GB, no-SLA host)
+# on every plugin bump. The workspace is stable across updates and already holds
+# the multi-GB solid_gemc/ build tree, so co-locating the .sif there makes one
+# workspace a self-contained, update-proof unit. With no marker (bare/standalone)
+# workspace_root falls back to $PWD. Tier 1 is the escape hatch — point several
+# workspaces at one shared/pre-staged .sif to avoid per-workspace duplication.
 # Resolution is lazy so `solid-gemc-run help` works without any env vars set.
 CACHE_DIR=""
 SIF_DIR=""
@@ -52,29 +51,22 @@ resolve_cache_dir() {
   [[ -n "${CACHE_DIR}" ]] && return 0
   if [[ -n "${SOLID_GEMC_CLAUDE_CACHE:-}" ]]; then
     CACHE_DIR="${SOLID_GEMC_CLAUDE_CACHE}"
-  elif [[ -n "${CLAUDE_PLUGIN_DATA:-}" ]]; then
-    CACHE_DIR="${CLAUDE_PLUGIN_DATA}/cache"
   else
-    CACHE_DIR="${PLUGIN_ROOT}/cache"
+    CACHE_DIR="$(workspace_root)/cache"
   fi
   SIF_DIR="${CACHE_DIR}/sif"
   SIF_PATH="${SIF_DIR}/${SIF_NAME}"
 }
 
-# Data dir (venv home) resolution, mirroring the cache tiers:
-#   1. $CLAUDE_PLUGIN_DATA              Claude Code plugin data dir
-#   2. ${PLUGIN_ROOT}                   everyone else (Codex, standalone, bare clone)
-# The venv is installed lazily on first use (see ensure_venv_python below) on
-# every platform — no session hook. Run `setup-python` to pre-install it.
+# Data dir (venv home) resolution: <workspace-root>/venv, same anchor as the
+# cache (no override tier). The venv installs lazily on first use (see
+# ensure_venv_python) on every platform — no session hook. Run `setup-python`
+# to pre-install it.
 DATA_DIR=""
 VENV_DIR=""
 resolve_data_dir() {
   [[ -n "${DATA_DIR}" ]] && return 0
-  if [[ -n "${CLAUDE_PLUGIN_DATA:-}" ]]; then
-    DATA_DIR="${CLAUDE_PLUGIN_DATA}"
-  else
-    DATA_DIR="${PLUGIN_ROOT}"
-  fi
+  DATA_DIR="$(workspace_root)"
   VENV_DIR="${DATA_DIR}/venv"
 }
 
@@ -83,10 +75,8 @@ resolve_data_dir() {
 cache_source_label() {
   if [[ -n "${SOLID_GEMC_CLAUDE_CACHE:-}" ]]; then
     echo "SOLID_GEMC_CLAUDE_CACHE override"
-  elif [[ -n "${CLAUDE_PLUGIN_DATA:-}" ]]; then
-    echo "CLAUDE_PLUGIN_DATA (Claude Code plugin)"
   else
-    echo "PLUGIN_ROOT/cache (Codex / standalone / bare clone)"
+    echo "workspace (<root>/cache)"
   fi
 }
 
@@ -108,6 +98,14 @@ find_workspace_root() {
   done
   [[ -f "/${WORKSPACE_MARKER}" ]] && { printf '/'; return 0; }
   return 1
+}
+
+# The workspace root that anchors the cache, venv, and solid_gemc tree: the
+# marker dir if one is found up-tree, else $PWD. The $PWD fallback mirrors
+# env_block's ${PWD}/solid_gemc default and keeps a bare clone working before
+# its first `init` (which writes the marker).
+workspace_root() {
+  find_workspace_root || pwd -P
 }
 
 # Default $SoLID_GEMC to <workspace-root>/solid_gemc when the caller has not
@@ -137,8 +135,27 @@ ensure_sif() {
   resolve_cache_dir
   require_apptainer
   if [[ -f "${SIF_PATH}" ]]; then return 0; fi
-  require_wget
   mkdir -p "${SIF_DIR}"
+  # Reuse a .sif already pulled to a legacy location before re-downloading from
+  # the no-SLA host. These are NOT resolution tiers (the cache is workspace-
+  # rooted now) — just one-time migration sources for users who pulled under an
+  # older layout. Hard-link when on the same filesystem (no extra space,
+  # survives deletion of the source), else copy.
+  local -a legacy=()
+  [[ -n "${CLAUDE_PLUGIN_DATA:-}" ]] && legacy+=("${CLAUDE_PLUGIN_DATA}/cache/sif/${SIF_NAME}")
+  legacy+=("${PLUGIN_ROOT}/cache/sif/${SIF_NAME}")
+  local src
+  for src in "${legacy[@]}"; do
+    [[ "${src}" == "${SIF_PATH}" || ! -f "${src}" ]] && continue
+    if ln "${src}" "${SIF_PATH}" 2>/dev/null; then
+      log "reused existing .sif (hard-linked from ${src})"
+    else
+      log "reusing existing .sif (copying from ${src}; ~1.7 GB, one-time)"
+      cp "${src}" "${SIF_PATH}.part" && mv "${SIF_PATH}.part" "${SIF_PATH}"
+    fi
+    [[ -f "${SIF_PATH}" ]] && return 0
+  done
+  require_wget
   log "downloading ${SIF_URL}"
   log "  -> ${SIF_PATH}"
   log "  (~1.7 GB .sif; first pull can take several minutes)"
@@ -269,7 +286,9 @@ PY_MIN=3.9
 cmd_setup_python() {
   resolve_data_dir
   local req="${PLUGIN_ROOT}/requirements.txt"
-  local stored="${DATA_DIR}/requirements.txt"
+  # Sync marker lives inside the venv (not DATA_DIR, which is now the workspace
+  # root — a bare requirements.txt there would look like the user's own deps).
+  local stored="${VENV_DIR}/requirements.snapshot"
   [[ -f "${req}" ]] || die "requirements.txt not found at ${req}"
   diff -q "${req}" "${stored}" >/dev/null 2>&1 && return 0
 
@@ -426,15 +445,20 @@ cmd_init() {
   [[ "${1:-}" == "--force" ]] && force=1
   require_apptainer; require_git; require_wget
 
-  # Report where everything will resolve before doing any work. The wrapper's
-  # install dir and its cache can legitimately live on different filesystems
-  # (e.g. a Codex install under ~/.codex with the cache co-located on /work),
-  # which surprises people — so make it explicit up front.
-  resolve_cache_dir
+  # Mark this dir as the workspace root FIRST — the cache/venv/solid_gemc
+  # resolution all anchor on it (workspace_root), so the marker must exist
+  # before resolve_cache_dir runs below or the cache would resolve to a stale
+  # $PWD fallback. Always (re)written — it carries no state, just marks the root.
+  printf 'solid-gemc-claude workspace root\n' > "./${WORKSPACE_MARKER}"
+
+  # Report where everything will resolve before doing any work — the workspace
+  # now owns the cache (survives plugin updates), so show the resolved paths.
+  resolve_cache_dir; resolve_data_dir
+  log "workspace:     $(workspace_root)"
   log "plugin root:   ${PLUGIN_ROOT}"
   log "cache:         ${CACHE_DIR}  [$(cache_source_label)]"
   log "sif:           ${SIF_PATH}"
-  log "workspace:     $(pwd -P)/solid_gemc"
+  log "venv:          ${VENV_DIR}"
 
   local tdir="${PLUGIN_ROOT}/templates" f src dst
   for f in CLAUDE.md AGENTS.md .gitignore log.md result.md report.html; do
@@ -447,11 +471,6 @@ cmd_init() {
     cp -L "${src}" "${dst}"   # -L derefs the AGENTS.md->CLAUDE.md symlink
     log "wrote ${dst}"
   done
-
-  # Mark this dir as the workspace root so the wrapper self-locates solid_gemc
-  # from any subdir later (see find_workspace_root). Always (re)written — it
-  # carries no state, just marks the root.
-  printf 'solid-gemc-claude workspace root\n' > "./${WORKSPACE_MARKER}"
 
   cmd_pull
   cmd_clone
@@ -529,10 +548,10 @@ solid_gemc: ${SOLID_GEMC_REPO} (HEAD of master)
 GEMC_VERSION: ${GEMC_VERSION}
 
 Cache resolution order:
-  1. \$SOLID_GEMC_CLAUDE_CACHE     (explicit override; any platform)
-  2. \$CLAUDE_PLUGIN_DATA/cache     (auto-set under Claude Code)
-  3. \${PLUGIN_ROOT}/cache          (everyone else: Codex, standalone, bare clone)
-Run \`solid-gemc-run info\` to see the resolved cache path.
+  1. \$SOLID_GEMC_CLAUDE_CACHE     (explicit override; shared/pre-staged .sif)
+  2. <workspace-root>/cache       (default: the workspace 'init' ran in)
+The workspace-rooted cache + venv survive plugin updates (the install dir does
+not). Run \`solid-gemc-run info\` / \`paths\` to see the resolved paths.
 EOF
 }
 

@@ -108,13 +108,15 @@ or personal email in committed files. The one allowed exception is
 state. `bin/solid-gemc-run init` re-detects existing files and refuses
 to overwrite without `--force`.
 
-**Cache resolution, no `$HOME` fallback.** Cache location resolves
-`$SOLID_GEMC_CLAUDE_CACHE` → `$CLAUDE_PLUGIN_DATA/cache` →
-`${PLUGIN_ROOT}/cache`. The last tier is unconditional and co-locates
-the `.sif` with the wrapper (Codex, standalone, bare clone) — no
-platform detection, no silent `$HOME`/XDG fallback that would orphan
-the image or hide state divergence between dev machines. Tier 1 is the
-escape hatch for a pre-staged or shared `.sif`.
+**Cache resolution, workspace-rooted.** Cache (and venv) location
+resolves `$SOLID_GEMC_CLAUDE_CACHE` → `<workspace-root>/cache`. Tier 2
+anchors the `.sif` to the workspace (located via the
+`.solid-gemc-workspace` marker; `$PWD` when none), not to the plugin
+install dir — so it survives plugin updates, which under Codex carry a
+version-pinned install path that would otherwise orphan a co-located
+`.sif` and force a ~1.7 GB re-download. No `$HOME`/XDG tier and no
+platform detection. Tier 1 is the escape hatch to share one `.sif`
+across several workspaces.
 
 ## Resolved decisions
 

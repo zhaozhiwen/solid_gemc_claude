@@ -72,20 +72,24 @@ Pattern improvements propagate by deliberate sync, not by linking.
 6. **Idempotent operations.** Running anything twice must not corrupt state.
    `bin/solid-gemc-run init` re-detects existing files and refuses to overwrite
    without `--force`.
-7. **Cache resolution, three tiers.** `$SOLID_GEMC_CLAUDE_CACHE` →
-   `$CLAUDE_PLUGIN_DATA/cache` → `${PLUGIN_ROOT}/cache`. Tier 3 is the
-   **unconditional** non-Claude fallback — it co-locates the `.sif` with the
-   wrapper whatever installed it (Codex, standalone, bare clone), with **no**
-   platform detection and **no** `$HOME`/XDG tier. This is deliberate: an
-   earlier `is_codex_install` heuristic keyed on a `.codex` path segment and
-   mis-fired on custom `CODEX_HOME` dirs, silently orphaning the `.sif` in
-   `~/.cache`; dropping detection entirely removes that whole bug class. Tier 1
-   is the escape hatch — point it at a stable shared location to reuse a
-   pre-staged `.sif` or to avoid re-downloading on every version-pinned install
-   bump (Codex install paths carry the version, so co-located caches don't
-   survive a bump; the override does). When `CLAUDE_PLUGIN_DATA` **is** set we
-   stay strictly inside it. Venv resolution mirrors this:
-   `$CLAUDE_PLUGIN_DATA/venv` → `${PLUGIN_ROOT}/venv`.
+7. **Cache resolution, two tiers — workspace-rooted.**
+   `$SOLID_GEMC_CLAUDE_CACHE` → `<workspace-root>/cache`. Tier 2 anchors the
+   `.sif` to the **workspace** (the dir `init` ran in, located by walking up to
+   the `.solid-gemc-workspace` marker via `workspace_root`; `$PWD` when no
+   marker), **not** to the plugin install dir. Rationale: the install dir is
+   ephemeral — under Codex its path is version-pinned, so a co-located cache was
+   re-downloaded (~1.7 GB, no-SLA host) on every plugin bump. The workspace is
+   stable across updates and already holds the multi-GB `solid_gemc/` build
+   tree, so co-locating the `.sif` (and venv) there makes one workspace a
+   self-contained, update-proof unit. There is **no** `$CLAUDE_PLUGIN_DATA`,
+   `$PLUGIN_ROOT`, or `$HOME`/XDG tier and **no** platform detection (an earlier
+   `is_codex_install` heuristic mis-fired on custom `CODEX_HOME` dirs — dropping
+   it removed that bug class). Tier 1 is the escape hatch — point several
+   workspaces at one shared/pre-staged `.sif` to avoid per-workspace
+   duplication. Venv resolution mirrors this (no override tier):
+   `<workspace-root>/venv`. On a cache miss `ensure_sif` hard-links/copies a
+   `.sif` found at a legacy `$PLUGIN_ROOT`/`$CLAUDE_PLUGIN_DATA` location before
+   re-downloading (one-time migration, not a resolution tier).
 
 ## Naming
 
