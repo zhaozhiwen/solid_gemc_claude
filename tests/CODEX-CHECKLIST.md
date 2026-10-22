@@ -62,13 +62,13 @@ gate. Run it on a host with apptainer + git + wget + python3.
 
 ## 5. Path hygiene
 
-- [ ] Cache (the `.sif`) landed at `<workspace-root>/cache/sif` — i.e. inside
-      the workspace `init` ran in, **not** under the plugin install
-      (`$CODEX_HOME/plugins/cache/.../<ver>/`) and not in `~/.cache` or `$HOME`.
-      Anchoring to the workspace is what lets the `.sif` survive a plugin update
-      (the version-pinned install dir changes; the workspace doesn't). Confirm
-      with `solid-gemc-run info` — cache line tagged `[workspace (<root>/cache)]`.
-- [ ] Optional: `$SOLID_GEMC_CLAUDE_CACHE` overrides the location (e.g. point
-      it at a shared/pre-staged `.sif`); `info` then tags the cache line
-      `[SOLID_GEMC_CLAUDE_CACHE override]`.
+- [ ] Cache (the `.sif`) landed at
+      `${CODEX_HOME:-~/.codex}/plugins/data/solid-gemc-claude-solid-gemc-claude/cache/sif`
+      — Codex's persistent per-plugin data dir, **not** the version-pinned
+      install (`$CODEX_HOME/plugins/cache/.../<ver>/`) and not the workspace.
+      Confirm with `solid-gemc-run info` — cache line tagged
+      `[Codex plugin data]`. Writing there and the `wget` pull are outside the
+      workspace-write sandbox, so they need escalation (same as apptainer).
+- [ ] Bump the plugin version and reinstall: `info` still shows the `.sif`
+      `[present]` (no re-download).
 - [ ] Re-running `init` is idempotent (existing files skipped without `--force`).

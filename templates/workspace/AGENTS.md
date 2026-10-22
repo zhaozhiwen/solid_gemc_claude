@@ -1,9 +1,12 @@
 # CLAUDE.md — project rules
 
-Rules for Claude when working **inside one project** under the
+Rules for the agent (Claude Code or Codex) working **inside one project** under the
 solid_gemc workspace. The workspace-wide rules (non-negotiables,
 wrapper-only seam, run-dir immutability, default analysis stack)
 live at `../CLAUDE.md` — read both.
+
+Commands below run from this project dir, so the workspace launcher
+is `../bin/solid-gemc-run`.
 
 This template is what each new project starts from. Rename the
 parent directory of this file to your study name (e.g.
@@ -53,11 +56,18 @@ generators producing factory text files** that gemc loads via
   generated text files (what gemc actually reads).
 - `config_<sub>.dat` — parameter file the generators consume.
 
-The plugin has **no** surface for this — follow
+Regenerate the text files with
+`../bin/solid-gemc-run exec "./<sub>.pl config_<sub>.dat"`, and run
+gemc with **this project dir as cwd** — detector `name=` paths are
+relative to the run folder, so from the skill's default (upstream)
+run folder your files aren't found. Details: `../CLAUDE.md`,
+"Reference example for custom detectors".
+
+The plugin has **no** further surface for this — follow
 upstream's `hgc_moved/readme.md` directly. See also the plugin's
 `reference/gemc_simulation_general_note.md` (mirror of the SoLID
-wiki) for field-by-field semantics of the text formats; find the
-plugin root with `bin/solid-gemc-run paths` (the `reference:` line).
+wiki) for field-by-field semantics of the text formats; find it
+with `../bin/solid-gemc-run paths` (the `reference:` line).
 
 ## Config + run + analyze (the simulation loop)
 
@@ -69,14 +79,14 @@ project dir. Convention from `solid_gemc/analysis/hgc_study/`:
 - Run scripts (`run.sh`, `getplot`, `run_all`) when batching over
   parameter scans.
 - ROOT analysis (`analysis.C`, `compare_*.C`, …). Host-side ROOT
-  optional — use `bin/solid-gemc-run root <macro.C>` to execute
+  optional — use `../bin/solid-gemc-run root <macro.C>` to execute
   inside the container without installing ROOT on the host.
 - Per-run outputs in `runs/<id>/` subdirs (gitignored). The
   orchestrator skill writes `gcard.gcard`, `out.evio`,
   `out.root`, `log.txt`, `config.json` per run.
 
 For host-side default plots from `runs/<id>/out.root`, run
-`bin/solid-gemc-run analyze <run>` — it bypasses container ROOT via
+`../bin/solid-gemc-run analyze runs/<id>` — it bypasses container ROOT via
 uproot.
 
 ## Project handoff documents
@@ -110,9 +120,8 @@ outputs under `runs/<id>/`.
 For a manual flow, drop into the container shell directly:
 
 ```bash
-bin/solid-gemc-run shell
-# then inside the container:
-cd <project>            # for any project work
+../bin/solid-gemc-run shell
+# inside the container you start in this project dir
 ```
 
 The wrapper binds your workspace at its host path inside the
@@ -125,5 +134,5 @@ container, so paths are the same in and out.
   `../solid_gemc/analysis/hgc_study/` (config + run + analyze) and
   `../solid_gemc/geometry/hgc_moved/` (custom detector authoring).
 - gemc / solid_gemc source digests and physics references: the plugin's
-  `reference/` dir — locate it with `bin/solid-gemc-run paths` (the
-  `reference:` line; works on Claude and Codex).
+  `reference/` dir — locate it with `../bin/solid-gemc-run paths` (the
+  `reference:` line).

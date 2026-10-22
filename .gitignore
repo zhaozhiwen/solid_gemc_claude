@@ -18,7 +18,6 @@ __pycache__/
 BUILD_LOG.md
 PLAN.md
 CODEX_PORT_PLAN.md
-DUAL_PLATFORM_PLAN.md
 
 # Apptainer cache (normally outside the repo; defensive)
 *.sif

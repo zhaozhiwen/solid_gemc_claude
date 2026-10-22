@@ -72,24 +72,26 @@ Pattern improvements propagate by deliberate sync, not by linking.
 6. **Idempotent operations.** Running anything twice must not corrupt state.
    `bin/solid-gemc-run init` re-detects existing files and refuses to overwrite
    without `--force`.
-7. **Cache resolution, two tiers — workspace-rooted.**
-   `$SOLID_GEMC_CLAUDE_CACHE` → `<workspace-root>/cache`. Tier 2 anchors the
-   `.sif` to the **workspace** (the dir `init` ran in, located by walking up to
-   the `.solid-gemc-workspace` marker via `workspace_root`; `$PWD` when no
-   marker), **not** to the plugin install dir. Rationale: the install dir is
-   ephemeral — under Codex its path is version-pinned, so a co-located cache was
-   re-downloaded (~1.7 GB, no-SLA host) on every plugin bump. The workspace is
-   stable across updates and already holds the multi-GB `solid_gemc/` build
-   tree, so co-locating the `.sif` (and venv) there makes one workspace a
-   self-contained, update-proof unit. There is **no** `$CLAUDE_PLUGIN_DATA`,
-   `$PLUGIN_ROOT`, or `$HOME`/XDG tier and **no** platform detection (an earlier
-   `is_codex_install` heuristic mis-fired on custom `CODEX_HOME` dirs — dropping
-   it removed that bug class). Tier 1 is the escape hatch — point several
-   workspaces at one shared/pre-staged `.sif` to avoid per-workspace
-   duplication. Venv resolution mirrors this (no override tier):
-   `<workspace-root>/venv`. On a cache miss `ensure_sif` hard-links/copies a
-   `.sif` found at a legacy `$PLUGIN_ROOT`/`$CLAUDE_PLUGIN_DATA` location before
-   re-downloading (one-time migration, not a resolution tier).
+7. **Image cache = the agent tool's persistent plugin data dir.** The `.sif`
+   is downloaded to and found only at
+   `<tool-home>/plugins/data/solid-gemc-claude-solid-gemc-claude/cache/sif/`,
+   where `<tool-home>` is `${CLAUDE_CONFIG_DIR:-~/.claude}` when `CLAUDECODE` is
+   set (Claude Code) or `${CODEX_HOME:-~/.codex}` when `CODEX_THREAD_ID`/
+   `CODEX_CI` is set (Codex). Both tools name that dir
+   `<plugin>-<marketplace>` (no version), so the ~1.7 GB image (no-SLA host)
+   survives plugin updates and is shared by every workspace. No override, no
+   workspace tier, no legacy reuse. Neither tool detected (plain terminal) or
+   both (nested session) → an `.sif` already in either data dir is used
+   read-only; nothing is ever downloaded, and with none present
+   `pull`/`init`/`exec` fail and `info`/`paths` report `unresolved`.
+   `$CLAUDE_PLUGIN_DATA`/`$PLUGIN_DATA` are **not** read — both tools set them
+   only for hooks/MCP (this plugin has none) and other plugins' hooks can leak
+   their own value into the shell env. The venv stays workspace-rooted:
+   `<workspace-root>/venv` (the `.solid-gemc-workspace` marker dir; `$PWD` when
+   none). `init` also writes `<workspace>/bin/solid-gemc-run` (from
+   `templates/workspace-launcher.sh`), a launcher that runs the newest installed wrapper on
+   each call — so `bin/solid-gemc-run` in the workspace docs is literally
+   true. The skill keeps its own lookup (`${CLAUDE_PLUGIN_ROOT}` is exact).
 
 ## Naming
 
@@ -109,7 +111,7 @@ points are the orchestrator skill (natural language) and `bin/solid-gemc-run`.
 
 The name keeps its `-claude` suffix even though the plugin now also targets
 Codex CLI — renaming the published repo / marketplace / docs site was judged
-not worth the churn (see `DUAL_PLATFORM_PLAN.md`). Treat "claude" in the name as
+not worth the churn (see `BUILD_LOG.md`). Treat "claude" in the name as
 historical, not a platform restriction.
 
 The orchestrator-vs-reference skill split: only `skills/solid-gemc/SKILL.md` is a

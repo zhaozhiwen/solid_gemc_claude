@@ -24,10 +24,13 @@ analysis runs on the host with [`uproot`](https://github.com/scikit-hep/uproot5)
 - `wget`, `git` on the host. (No host-side `tcsh` needed — the
   wrapper invokes `tcsh` *inside* the container.)
 - Python 3.9+ with `uproot numpy matplotlib` (only for the analyze step).
-- ~1.7 GB of disk for the cached JLabCE 2.5 image plus ~1 GB for the
-  cloned + built solid_gemc tree, both per workspace (the cache lives
-  in the workspace so it survives plugin updates; set
-  `$SOLID_GEMC_CLAUDE_CACHE` to share one `.sif` across workspaces).
+- ~1.7 GB in your home dir for the cached JLabCE 2.5 image, plus ~1 GB
+  per workspace for the cloned + built solid_gemc tree. The image lives
+  in the agent tool's persistent plugin data dir
+  (`~/.claude/plugins/data/solid-gemc-claude-solid-gemc-claude/` or
+  `~/.codex/plugins/data/solid-gemc-claude-solid-gemc-claude/`), so it
+  survives plugin updates and is shared across workspaces; uninstalling
+  the plugin may delete it.
 - Claude Code (plugin support) **or** OpenAI Codex CLI (Agent Skills).
 
 The plugin downloads
@@ -92,6 +95,8 @@ Two upstream worked examples live in your workspace after init, both fully self-
 |---|---|
 | `solid_gemc/analysis/hgc_study/` | the **config + run + analyze** pipeline — GCards (`cherenkov.gcard`, `solid_SIDIS_He3_hgc.gcard`, …), batch run scripts (`load.sh` / `run.sh`), ROOT analysis (`analysis.C` and the `compare_*.C` scripts) |
 | `solid_gemc/geometry/hgc_moved/` | **custom detector authoring** — Perl generators (`solid_SIDIS_hgc_*.pl`), the resulting factory text files (`*__geometry_Original.txt` etc.) referenced by `<detector name="..." factory="TEXT" ...>`, plus a `readme.md` |
+
+Init also writes `bin/solid-gemc-run` into your workspace: a small launcher that runs the newest installed plugin wrapper, so the commands below work from the workspace root (`../bin/solid-gemc-run` from a project subdir), in the agent or a plain terminal. A plain terminal uses an image an agent session already downloaded; it never downloads one itself.
 
 `bin/solid-gemc-run analyze runs/<id>` would produce uproot-based default plots from out.root (the post-converted file).
 

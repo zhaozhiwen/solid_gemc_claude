@@ -81,12 +81,15 @@ isolation, ask Claude to run it:
 Pass:
 - Tool checks succeed for `apptainer`, `git`, `wget`.
 - Workspace-common files appear: `CLAUDE.md`, `AGENTS.md`, `.gitignore`,
-  `log.md`, `result.md`, `report.html` (no `gcards/`, `runs/`,
+  `log.md`, `result.md`, `report.html`, plus the launcher
+  `bin/solid-gemc-run`; from a plain terminal at the workspace root,
+  `bin/solid-gemc-run info` works and tags the cache `read-only` (no `gcards/`, `runs/`,
   `analysis/` at the workspace root — those live inside each project
   subdir).
-- `.sif` lands at `<workspace-root>/cache/sif/jeffersonlab_jlabce_tag2.5_digest:sha256:9b9a9...sif`
-  (anchored to the workspace, so it survives plugin updates; confirm via the
-  `cache:` line of `bin/solid-gemc-run info`).
+- `.sif` lands at `~/.claude/plugins/data/solid-gemc-claude-solid-gemc-claude/cache/sif/jeffersonlab_jlabce_tag2.5_digest:sha256:9b9a9...sif`
+  (`${CLAUDE_CONFIG_DIR}` replaces `~/.claude` if set; version-independent, so
+  it survives plugin updates). Confirm via the `cache:` line of
+  `bin/solid-gemc-run info`, tagged `[Claude Code plugin data]`.
 - `solid_gemc/` is cloned into the workspace; `git rev-parse HEAD`
   there is reported in the command's final summary.
 - Two scons builds complete (first run: several minutes); the binary

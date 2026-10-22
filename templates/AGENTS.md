@@ -1,7 +1,7 @@
 # CLAUDE.md — solid_gemc workspace
 
-Rules for Claude when working in this solid_gemc simulation workspace.
-The `solid-gemc-claude` plugin scaffolded these directories.
+Rules for the agent (Claude Code or Codex) working in this solid_gemc
+simulation workspace. The `solid-gemc-claude` plugin scaffolded it.
 
 `bin/solid-gemc-run init` (which created this workspace) also
 cloned and built solid_gemc into `./solid_gemc/` — that's where SoLID
@@ -15,6 +15,14 @@ driven by the **`solid-gemc` orchestrator skill** which auto-loads on
 SoLID-flavored natural-language requests (Claude Code or Codex CLI). You
 can also call `bin/solid-gemc-run` directly (e.g. following upstream's
 `hgc_study/run.sh` pattern).
+
+**The wrapper.** `bin/solid-gemc-run` in this workspace is a small
+launcher that `init` wrote; on every call it runs the newest installed
+plugin wrapper, so it keeps working across plugin updates. Paths in this
+file are relative to the workspace root — from inside a project subdir,
+use `../bin/solid-gemc-run`. It also works from a plain terminal, but
+only after an agent session has downloaded the container image (a
+terminal never downloads it).
 
 ## Workspace layout
 
@@ -31,7 +39,8 @@ upstream organizes `solid_gemc/analysis/hgc_study/` and
 | `<name>/result.md`  | Per-run findings, with paths to `<name>/runs/<id>/`. |
 | `<name>/report.html` | Browser-readable summary (rich text + plots referenced relatively from `runs/<id>/`). Opens via `file://` inside the workspace tree; for off-host sharing run the embed script (see non-negotiable #6). |
 | `<name>/runs/<id>/` | Per-run output dirs. The orchestrator skill writes `gcard.gcard`, `out.evio`, `out.root`, `log.txt`, `config.json` per run. **Gitignored.** |
-| `solid_gemc/`       | Cloned + built upstream tree (init artifact). **Gitignored.** Refresh via re-running init. |
+| `solid_gemc/`       | Cloned + built upstream tree (init artifact). **Gitignored.** Re-running init rebuilds it but keeps the existing clone; to update to upstream HEAD, `rm -rf solid_gemc` then re-run init. |
+| `bin/solid-gemc-run` | Launcher for the plugin wrapper (init artifact, rewritten by each init). |
 
 ## Non-negotiables
 
@@ -55,9 +64,10 @@ upstream organizes `solid_gemc/analysis/hgc_study/` and
    that needs the actual ROOT executable runs inside the container
    via `bin/solid-gemc-run root <macro>`.
 5. **Don't commit `solid_gemc/`.** It's an upstream-managed working
-   tree that init rebuilds. Same for the workspace-rooted `cache/`
-   (the ~1.7 GB `.sif`) and `venv/`, plus `<name>/runs/`,
-   `*.root`, `*.hipo`, `__pycache__/`.
+   tree that init rebuilds. Same for `venv/` (the analysis venv),
+   `<name>/runs/`, `*.root`, `*.hipo`, `__pycache__/`. (The ~1.7 GB
+   `.sif` lives outside the workspace, in the agent tool's plugin
+   data dir.)
 6. **Maintain `<name>/log.md`, `<name>/result.md`, and
    `<name>/report.html`.** Every simulation effort — orchestrator-
    driven or manual — leaves a record in the relevant project's
@@ -77,8 +87,7 @@ upstream organizes `solid_gemc/analysis/hgc_study/` and
    When a `report.html` needs to leave the workspace tree (committed
    to a public `docs/` folder, emailed, attached to a ticket), first
    run the plugin's portability script. Find the plugin root with
-   `bin/solid-gemc-run paths` (the `root:` line) — works on Claude and
-   Codex (don't rely on `$CLAUDE_PLUGIN_ROOT`, which is Claude-only):
+   `bin/solid-gemc-run paths` (the `root:` line):
 
    ```sh
    ROOT=$(bin/solid-gemc-run paths | awk '/^root:/{print $2}')
@@ -113,7 +122,8 @@ the seven-field spec, presents a plan, and on approval drives:
 For variations: edit `<name>/<preset>.gcard` between steps
 1 and 2 (beam energy, physics list, target). GCard option
 reference: `https://gemc.jlab.org` (mirror in
-`reference/gemc_simulation_general_note.md` inside the plugin).
+`gemc_simulation_general_note.md` under the plugin's `reference/` dir —
+`bin/solid-gemc-run paths` prints its location on the `reference:` line).
 
 ## First run after init — try the upstream HGC study
 
@@ -155,11 +165,23 @@ the rest of the project, no `geometry/` subdir):
   generated text files (what gemc actually reads at runtime).
 - `config_<sub>.dat` — parameter file the Perl generators consume.
 
-The plugin has no custom-detector authoring surface — for that work,
-follow upstream conventions
-in `solid_gemc/geometry/hgc_moved/` directly (edit the `.pl`,
-regenerate the `.txt`, reference from your GCard with
-`<detector name="..." factory="TEXT" ...>`).
+Regenerate the `.txt` files from `<name>/`:
+`../bin/solid-gemc-run exec "./<sub>.pl config_<sub>.dat"`.
+
+**Run gemc from `<name>/`.** A detector `name=` in a GCard is a path
+relative to the folder gemc runs in, not to the GCard. The skill's
+default run folder is the upstream folder the canonical GCard came
+from, and from there your `<name>/` files are not found ("Failed to
+open geometry file … Exiting."). So for a custom detector:
+
+- put the GCard in `<name>/` and run it with cwd = `<name>/`;
+- point upstream detectors at the clone, e.g.
+  `name="../solid_gemc/geometry/hgc_moved/solid_SIDIS_hgc"`;
+- give your detector a new name — a copy that keeps an upstream name
+  would silently load the upstream files if run from the upstream folder.
+
+The plugin has no custom-detector authoring surface beyond this; follow
+upstream conventions in `solid_gemc/geometry/hgc_moved/`.
 
 ## When something fails
 
@@ -168,5 +190,6 @@ regenerate the `.txt`, reference from your GCard with
   usually the failing volume, material, or magnet field config.
 - Missing binary at `solid_gemc/source/2.9/solid_gemc` → re-run
   `bin/solid-gemc-run init` or `bin/solid-gemc-run build`.
-- Image missing → `bin/solid-gemc-run info` shows `[not pulled]`; run
-  `bin/solid-gemc-run pull`.
+- Image missing → `bin/solid-gemc-run info` shows `[not pulled]` or an
+  unresolved cache; run `bin/solid-gemc-run pull` from a Claude Code or
+  Codex session (a plain terminal never downloads it).

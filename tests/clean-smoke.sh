@@ -2,10 +2,11 @@
 # tests/clean-smoke.sh — plumbing smoke test for solid-gemc-claude.
 #
 # Exercises bin/solid-gemc-run (including the init/analyze/setup-python/paths
-# subcommands and the two-tier override → workspace-rooted cache/venv
-# resolution) + the workspace template + the simulation loop the orchestrator
+# subcommands, the agent-tool-detected .sif cache, and the workspace-rooted
+# venv) + the workspace template + the simulation loop the orchestrator
 # skill drives (gcard prep + solid_gemc + evio2root) + the analyze step. The
-# run phases pin the cache via the SOLID_GEMC_CLAUDE_CACHE override (tier 1).
+# run phases simulate a Claude Code shell (CLAUDECODE=1) with
+# CLAUDE_CONFIG_DIR pointed into the sandbox, so the .sif lands there.
 # Does NOT go through Claude Code or Codex, so it does not test skill dispatch,
 # MCP approval, the approval gate, or NL-trigger auto-load — see
 # tests/CLEAN-INSTALL-CHECKLIST.md (Claude) and tests/CODEX-CHECKLIST.md
@@ -62,12 +63,17 @@ cleanup() {
 }
 trap cleanup EXIT
 
-export CLAUDE_PLUGIN_ROOT="${PLUGIN_ROOT}"
-export CLAUDE_PLUGIN_DATA="${SCRATCH}/data"
-mkdir -p "${CLAUDE_PLUGIN_DATA}/cache/sif"
+# Simulate a Claude Code shell with its config dir in the sandbox. Clear the
+# Codex detection vars so a smoke launched from a Codex shell isn't ambiguous.
+unset CODEX_THREAD_ID CODEX_CI CODEX_HOME
+export CLAUDECODE=1
+export CLAUDE_CONFIG_DIR="${SCRATCH}/claude-home"
+DATA_NAME=$(grep '^PLUGIN_DATA_NAME=' "${PLUGIN_ROOT}/bin/solid-gemc-run" | head -1 | cut -d'"' -f2)
+CACHE="${CLAUDE_CONFIG_DIR}/plugins/data/${DATA_NAME}/cache"
+mkdir -p "${CACHE}/sif"
 
 SIF_NAME=$(grep '^SIF_NAME=' "${PLUGIN_ROOT}/bin/solid-gemc-run" | head -1 | cut -d'"' -f2)
-SIF_PATH="${CLAUDE_PLUGIN_DATA}/cache/sif/${SIF_NAME}"
+SIF_PATH="${CACHE}/sif/${SIF_NAME}"
 
 if [[ -n "${SGC_REUSE_SIF:-}" ]]; then
   [[ -f "${SGC_REUSE_SIF}" ]] || fail "SGC_REUSE_SIF=${SGC_REUSE_SIF} not a file"
@@ -76,14 +82,11 @@ if [[ -n "${SGC_REUSE_SIF:-}" ]]; then
   pass "linked ${SGC_REUSE_SIF}"
 fi
 
-sgrun() {
-  SOLID_GEMC_CLAUDE_CACHE="${CLAUDE_PLUGIN_DATA}/cache" \
-    "${PLUGIN_ROOT}/bin/solid-gemc-run" "$@"
-}
+sgrun() { "${PLUGIN_ROOT}/bin/solid-gemc-run" "$@"; }
 
 # --- phase 0: wrapper subcommands + cache/venv resolution -------------------
-# Container-free, no network. Verifies the subcommands exist and that the
-# two-tier (override → workspace-rooted) cache/venv resolution is correct.
+# Container-free, no network. Verifies the subcommands exist, that the .sif
+# cache follows the detected agent tool, and that the venv is workspace-rooted.
 log "phase 0 — wrapper subcommands + path resolution (no container)"
 for sub in init analyze setup-python paths; do
   "${PLUGIN_ROOT}/bin/solid-gemc-run" help | grep -qE "^  ${sub} " \
@@ -91,40 +94,124 @@ for sub in init analyze setup-python paths; do
 done
 pass "init/analyze/setup-python/paths present in help"
 
-# Run `paths` from a given cwd with the override + CLAUDE_PLUGIN_DATA cleared,
-# so only the workspace-rooted tier (or its $PWD fallback) is exercised.
-run_paths() { ( cd "$1" && env -u SOLID_GEMC_CLAUDE_CACHE -u CLAUDE_PLUGIN_DATA \
-  "${PLUGIN_ROOT}/bin/solid-gemc-run" paths ); }
+# Run the wrapper with every detection/home var cleared, then the given
+# VAR=value pairs applied: sgclean [VAR=value...] -- <subcommand...>
+sgclean() {
+  local -a kv=()
+  while [[ "$1" != "--" ]]; do kv+=("$1"); shift; done; shift
+  env -u CLAUDECODE -u CODEX_THREAD_ID -u CODEX_CI -u CLAUDE_CONFIG_DIR -u CODEX_HOME \
+    "${kv[@]}" "${PLUGIN_ROOT}/bin/solid-gemc-run" "$@"
+}
+cache_of() { sgclean "$@" -- paths | awk '/^cache:/{print $2}'; }
 
-# Override (tier 1) wins over everything — the shared/pre-staged .sif escape
-# hatch (and how sgrun pins the cache for the rest of this run).
-OVR="${SCRATCH}/shared-sif"
-OVR_CACHE=$(SOLID_GEMC_CLAUDE_CACHE="${OVR}" \
-  "${PLUGIN_ROOT}/bin/solid-gemc-run" paths | awk '/^cache:/{print $2}')
-[[ "${OVR_CACHE}" == "${OVR}" ]] \
-  || fail "override cache resolved to '${OVR_CACHE}', expected '${OVR}'"
-pass "override tier: \$SOLID_GEMC_CLAUDE_CACHE wins"
+C=$(cache_of CLAUDECODE=1 CLAUDE_CONFIG_DIR=/x/claude)
+[[ "${C}" == "/x/claude/plugins/data/${DATA_NAME}/cache" ]] \
+  || fail "Claude Code cache = '${C}'"
+C=$(cache_of CLAUDECODE=1)
+[[ "${C}" == "${HOME}/.claude/plugins/data/${DATA_NAME}/cache" ]] \
+  || fail "Claude Code default-home cache = '${C}'"
+pass "Claude Code: cache at \${CLAUDE_CONFIG_DIR:-~/.claude}/plugins/data/${DATA_NAME}/cache"
 
-# Workspace tier (default): with a .solid-gemc-workspace marker, cache + venv
-# anchor at the marker dir — resolved identically from the root and a deep subdir.
+for v in CODEX_THREAD_ID=t CODEX_CI=1; do
+  C=$(cache_of "${v}" CODEX_HOME=/x/codex)
+  [[ "${C}" == "/x/codex/plugins/data/${DATA_NAME}/cache" ]] \
+    || fail "Codex cache (${v}) = '${C}'"
+done
+C=$(cache_of CODEX_CI=1)
+[[ "${C}" == "${HOME}/.codex/plugins/data/${DATA_NAME}/cache" ]] \
+  || fail "Codex default-home cache = '${C}'"
+pass "Codex: cache at \${CODEX_HOME:-~/.codex}/plugins/data/${DATA_NAME}/cache"
+
+# No single tool (none or both): an existing .sif in either data dir is used
+# read-only; with none present, paths reports unresolved and pull refuses
+# without downloading. Fake homes keep the real ~/.claude, ~/.codex out of it.
+EH="${SCRATCH}/empty-homes"; FH="${SCRATCH}/fake-homes"
+NOHOME=(CLAUDE_CONFIG_DIR="${EH}/claude" CODEX_HOME="${EH}/codex")
+PATHS=$(sgclean "${NOHOME[@]}" -- paths)
+grep -q '^cache: *(unresolved: no agent tool detected' <<<"${PATHS}" \
+  || fail "no-tool paths did not report unresolved cache"
+sgclean "${NOHOME[@]}" -- pull 2>/dev/null && fail "pull succeeded with no agent tool and no .sif"
+BOTH=$(sgclean "${NOHOME[@]}" CLAUDECODE=1 CODEX_CI=1 -- pull 2>&1) \
+  && fail "pull succeeded with both agent tools detected and no .sif"
+grep -q 'both Claude Code and Codex detected' <<<"${BOTH}" \
+  || fail "pull did not refuse an ambiguous (both tools) environment: ${BOTH}"
+FCX="${FH}/codex/plugins/data/${DATA_NAME}/cache"
+mkdir -p "${FCX}/sif" && : > "${FCX}/sif/${SIF_NAME}"
+C=$(cache_of CLAUDE_CONFIG_DIR="${FH}/claude" CODEX_HOME="${FH}/codex")
+[[ "${C}" == "${FCX}" ]] || fail "no-tool fallback cache = '${C}', expected '${FCX}'"
+INFO=$(sgclean CLAUDE_CONFIG_DIR="${FH}/claude" CODEX_HOME="${FH}/codex" -- info)
+grep -q 'no single agent tool detected, read-only' <<<"${INFO}" \
+  || fail "no-tool fallback not labelled read-only in info"
+pass "no single tool: existing .sif used read-only; none present → unresolved, pull refuses"
+
+# Workspace launcher (templates/workspace-launcher.sh, as rendered by init): picks
+# the newest installed wrapper by version, prefers the detected tool, falls
+# back to the init-time wrapper, else errors.
+LH="${SCRATCH}/launcher"; mkdir -p "${LH}/ws/bin"
+stub() { mkdir -p "$(dirname "$1")"; printf '#!/bin/sh\necho "%s $*"\n' "$2" > "$1"; chmod +x "$1"; }
+for v in 0.0.5 0.0.10; do
+  stub "${LH}/claude/plugins/cache/mkt/solid-gemc-claude/${v}/bin/solid-gemc-run" "claude-${v}"
+done
+stub "${LH}/codex/plugins/cache/other/solid-gemc-claude/0.0.7/bin/solid-gemc-run" "codex-0.0.7"
+stub "${LH}/init-wrapper" "init"
+TPL="$(<"${PLUGIN_ROOT}/templates/workspace-launcher.sh")"
+printf '%s\n' "${TPL//@SGC_INIT_WRAPPER@/"${LH}/init-wrapper"}" > "${LH}/ws/bin/solid-gemc-run"
+chmod +x "${LH}/ws/bin/solid-gemc-run"
+launch() {
+  local -a kv=()
+  while [[ "$1" != "--" ]]; do kv+=("$1"); shift; done; shift
+  env -u CLAUDECODE -u CODEX_THREAD_ID -u CODEX_CI "${kv[@]}" "${LH}/ws/bin/solid-gemc-run" "$@"
+}
+L=(CLAUDE_CONFIG_DIR="${LH}/claude" CODEX_HOME="${LH}/codex")
+[[ "$(launch "${L[@]}" -- info)" == "claude-0.0.10 info" ]] \
+  || fail "launcher (no tool) did not pick newest Claude install: $(launch "${L[@]}" -- info)"
+[[ "$(launch "${L[@]}" CODEX_CI=1 -- info)" == "codex-0.0.7 info" ]] \
+  || fail "launcher (Codex) did not prefer the Codex install"
+[[ "$(launch CLAUDE_CONFIG_DIR="${EH}/claude" CODEX_HOME="${EH}/codex" -- info)" == "init info" ]] \
+  || fail "launcher with no install did not fall back to the init-time wrapper"
+mv "${LH}/init-wrapper" "${LH}/init-wrapper.gone"
+launch CLAUDE_CONFIG_DIR="${EH}/claude" CODEX_HOME="${EH}/codex" -- info 2>/dev/null \
+  && fail "launcher succeeded with no install and no init-time wrapper"
+pass "workspace launcher: newest version, detected tool first, init-time fallback, else error"
+
+# init's launcher write, through the real cmd_init. A non-git solid_gemc/ makes
+# init stop at clone (no network, no container); the fake read-only .sif above
+# lets it get past pull. (a) in a fresh dir init writes the rendered launcher;
+# (b) run inside a plugin checkout it must not overwrite the wrapper itself.
+INIT_ENV=(CLAUDE_CONFIG_DIR="${FH}/claude" CODEX_HOME="${FH}/codex")
+IW="${SCRATCH}/init-ws"; mkdir -p "${IW}/solid_gemc"
+( cd "${IW}" && sgclean "${INIT_ENV[@]}" -- init >/dev/null 2>&1 ) \
+  && fail "init unexpectedly passed the clone step in ${IW}"
+[[ -x "${IW}/bin/solid-gemc-run" ]] || fail "init did not write an executable bin/solid-gemc-run"
+grep -qF "\"${PLUGIN_ROOT}/bin/solid-gemc-run\"" "${IW}/bin/solid-gemc-run" \
+  || fail "init's launcher lacks the init-time wrapper fallback"
+grep -q '@SGC_INIT_WRAPPER@' "${IW}/bin/solid-gemc-run" && fail "launcher placeholder left unsubstituted"
+RC="${SCRATCH}/plugin-checkout"; mkdir -p "${RC}/solid_gemc"
+cp -r "${PLUGIN_ROOT}/bin" "${PLUGIN_ROOT}/templates" "${PLUGIN_ROOT}/requirements.txt" "${RC}/"
+OUT=$( cd "${RC}" && env -u CLAUDECODE -u CODEX_THREAD_ID -u CODEX_CI "${INIT_ENV[@]}" \
+  "${RC}/bin/solid-gemc-run" init 2>&1 ) && fail "init unexpectedly passed the clone step in ${RC}"
+cmp -s "${RC}/bin/solid-gemc-run" "${PLUGIN_ROOT}/bin/solid-gemc-run" \
+  || fail "init inside a plugin checkout overwrote bin/solid-gemc-run"
+grep -q 'skipping workspace launcher' <<<"${OUT}" || fail "init did not log the launcher skip: ${OUT}"
+pass "init: writes the launcher in a workspace, never overwrites the wrapper in a plugin checkout"
+
+# Venv: with a .solid-gemc-workspace marker it anchors at the marker dir —
+# resolved identically from the root and a deep subdir.
 WST="${SCRATCH}/wstier"; WST_P=$(mkdir -p "${WST}/proj/runs/x" && cd "${WST}" && pwd -P)
 : > "${WST}/.solid-gemc-workspace"
 for from in "${WST}" "${WST}/proj/runs/x"; do
-  WC=$(run_paths "${from}" | awk '/^cache:/{print $2}')
-  WV=$(run_paths "${from}" | awk '/^venv:/{print $2}')
-  [[ "${WC}" == "${WST_P}/cache" ]] \
-    || fail "workspace cache from ${from} = '${WC}', expected '${WST_P}/cache'"
+  WV=$( cd "${from}" && sgclean -- paths | awk '/^venv:/{print $2}')
   [[ "${WV}" == "${WST_P}/venv" ]] \
     || fail "workspace venv from ${from} = '${WV}', expected '${WST_P}/venv'"
 done
-pass "workspace tier: cache/venv anchor at the marker root from any subdir"
+pass "venv anchors at the workspace marker root from any subdir"
 
-# No marker (bare/standalone): falls back to \$PWD/cache.
+# No marker (bare/standalone): venv falls back to \$PWD/venv.
 BARE="${SCRATCH}/bare"; BARE_P=$(mkdir -p "${BARE}" && cd "${BARE}" && pwd -P)
-BC=$(run_paths "${BARE}" | awk '/^cache:/{print $2}')
-[[ "${BC}" == "${BARE_P}/cache" ]] \
-  || fail "no-marker cache = '${BC}', expected '${BARE_P}/cache'"
-pass "no-marker fallback: cache at \$PWD/cache"
+BV=$( cd "${BARE}" && sgclean -- paths | awk '/^venv:/{print $2}')
+[[ "${BV}" == "${BARE_P}/venv" ]] \
+  || fail "no-marker venv = '${BV}', expected '${BARE_P}/venv'"
+pass "no-marker fallback: venv at \$PWD/venv"
 
 # --- phase 1: workspace template + image cache ------------------------------
 log "phase 1 — workspace skeleton + image cache"

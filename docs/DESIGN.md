@@ -108,15 +108,16 @@ or personal email in committed files. The one allowed exception is
 state. `bin/solid-gemc-run init` re-detects existing files and refuses
 to overwrite without `--force`.
 
-**Cache resolution, workspace-rooted.** Cache (and venv) location
-resolves `$SOLID_GEMC_CLAUDE_CACHE` → `<workspace-root>/cache`. Tier 2
-anchors the `.sif` to the workspace (located via the
-`.solid-gemc-workspace` marker; `$PWD` when none), not to the plugin
-install dir — so it survives plugin updates, which under Codex carry a
-version-pinned install path that would otherwise orphan a co-located
-`.sif` and force a ~1.7 GB re-download. No `$HOME`/XDG tier and no
-platform detection. Tier 1 is the escape hatch to share one `.sif`
-across several workspaces.
+**Image cache in the agent tool's plugin data dir.** The wrapper
+detects the running tool from its shell env (`CLAUDECODE` → Claude
+Code; `CODEX_THREAD_ID`/`CODEX_CI` → Codex) and keeps the `.sif` only
+in that tool's persistent per-plugin data dir,
+`<tool-home>/plugins/data/solid-gemc-claude-solid-gemc-claude/cache`.
+Both tools key that dir on plugin + marketplace, not version, so the
+~1.7 GB image survives plugin updates and is shared by all workspaces.
+No override and no workspace fallback; outside an agent tool the
+wrapper refuses to pull or run. The venv stays at
+`<workspace-root>/venv`.
 
 ## Resolved decisions
 

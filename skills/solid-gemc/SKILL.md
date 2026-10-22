@@ -38,10 +38,9 @@ fi
 SGC_ROOT="$("$SGC_RUN" paths | awk '/^root:/{print $2}')"
 ```
 
-The wrapper resolves its own cache and venv (off Claude they sit at
-`${PLUGIN_ROOT}/cache` and `${PLUGIN_ROOT}/venv`, next to the wrapper),
-so this skill no longer prefixes `SOLID_GEMC_CLAUDE_CACHE=…` on every
-call.
+The wrapper resolves its own image cache (the running tool's plugin
+data dir, detected from the shell env) and venv (`<workspace-root>/venv`),
+so this skill passes no cache/venv paths.
 
 ## Workspace layout
 

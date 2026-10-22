@@ -50,7 +50,7 @@ finally show me the results in an html file
 | `solid_gemc/analysis/hgc_study/` | the **config + run + analyze** pipeline — GCards, batch run scripts, ROOT analysis macros |
 | `solid_gemc/geometry/hgc_moved/` | **custom detector authoring** — Perl generators, the factory text files they emit, and the GCard wiring |
 
-`bin/solid-gemc-run analyze runs/<id>` produces uproot plots from the post-converted `out.root`. `bin/solid-gemc-run shell` drops you into a tcsh prompt with the env exported, to follow upstream's scripts directly.
+Init writes `bin/solid-gemc-run` into your workspace — a launcher that runs the newest installed plugin wrapper, from the agent or a plain terminal (a terminal uses an already-downloaded image; it never downloads one). `bin/solid-gemc-run analyze runs/<id>` produces uproot plots from the post-converted `out.root`. `bin/solid-gemc-run shell` drops you into a tcsh prompt with the env exported, to follow upstream's scripts directly.
 
 ## What it does
 
@@ -63,7 +63,7 @@ finally show me the results in an html file
 - [Apptainer](https://apptainer.org) ≥ 1.4 on Linux.
 - `wget`, `git` on the host. (No host-side `tcsh` needed — the wrapper invokes `tcsh` *inside* the container.)
 - Python 3.9+ with `uproot numpy matplotlib` (only for the `analyze` step).
-- ~1.7 GB of disk for the cached JLabCE 2.5 image plus ~1 GB for the cloned + built `solid_gemc` tree, both per workspace (the cache lives in the workspace so it survives plugin updates; set `$SOLID_GEMC_CLAUDE_CACHE` to share one `.sif` across workspaces).
+- ~1.7 GB in your home dir for the cached JLabCE 2.5 image, plus ~1 GB per workspace for the cloned + built `solid_gemc` tree. The image lives in the agent tool's persistent plugin data dir (`~/.claude/plugins/data/solid-gemc-claude-solid-gemc-claude/` or `~/.codex/plugins/data/solid-gemc-claude-solid-gemc-claude/`), so it survives plugin updates and is shared across workspaces; uninstalling the plugin may delete it.
 - Claude Code (plugin support) **or** OpenAI Codex CLI (Agent Skills).
 
 ## Links
