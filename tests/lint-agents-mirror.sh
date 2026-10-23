@@ -31,6 +31,6 @@ while IFS= read -r agents; do
     fail=1; continue
   fi
   echo "[ok]   $claude → AGENTS.md (real $(stat -c%s "$agents") b)"
-done < <(find . -path ./.git -prune -o -name AGENTS.md -print)
+done < <(git ls-files -co --exclude-standard -- 'AGENTS.md' '*/AGENTS.md')  # shipped files only (not the gitignored templates/solid_gemc clone)
 
 [[ $fail -eq 0 ]] && echo "all CLAUDE.md symlink to their canonical AGENTS.md" || exit 1

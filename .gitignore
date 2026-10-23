@@ -30,6 +30,12 @@ CODEX_PORT_PLAN.md
 /runs/
 /solid_gemc/
 
+# Built solid_gemc clone used by tests/quick-test.sh (~1 GB). Don't install the
+# plugin straight from this dir: a local marketplace install would copy it.
+/templates/solid_gemc
+# Persistent uv download cache for tests/quick-test.sh.
+/.test-cache/
+
 # Logs
 *.log
 
