@@ -31,8 +31,8 @@ Code and Codex CLI.
   bin/solid-gemc-run         │   init/analyze/    exec ───►│ evio2root,  │
   init / analyze / …        ─┤   exec/…                    │ solid_gemc  │
                              │                            └──────┬──────┘
-  Python (uproot, numpy)     │                                   │
-  for analysis  ◄────────────┴── runs/<id>/out.root ──────────── ┘
+  optional Python (uproot)   │      (ROOT analysis in here)      │
+  analyze --python ◄─────────┴── runs/<id>/out.root ──────────── ┘
 ```
 
 Two components live on the host (no slash commands):
@@ -91,13 +91,14 @@ change.
 subcommand, README) reads from that script. Eliminates docs/runtime
 drift.
 
-**No host-side ROOT requirement.** Default analysis is Python
-(uproot + numpy + matplotlib). Anything that needs ROOT runs inside the
-container via `bin/solid-gemc-run root`. Users don't have to install
-ROOT to use the plugin.
+**No host-side ROOT requirement.** Default analysis runs ROOT inside the
+container (`analyze`, `.C` macros via `bin/solid-gemc-run root`). Users
+install neither ROOT nor Python packages; host uproot is an option
+(`analyze --python`). The image's ROOT has no PNG writer, so plots are
+SVG/PDF.
 
 **Fresh-clone reproducibility.** Every command works after `git clone`
-on a machine with apptainer + Python. No reliance on cached state in
+on a machine with apptainer + Python 3. No reliance on cached state in
 the maintainer's `$HOME` or absolute `/home/$USER` paths.
 
 **No leakage.** No internal hostnames, absolute home paths, API tokens,
@@ -129,8 +130,8 @@ SoLID build environment.
 **Why EVIO + post-convert, not direct ROOT output?** gemc 2.9 in
 JLabCE 2.5 supports only EVIO and TXT output (`-help-output` confirms).
 We post-convert EVIO → ROOT inside the container with `evio2root`, so
-both `out.evio` and `out.root` end up in `runs/<id>/`. Analysis stays
-Python via uproot. HIPO output deferred past v0.0.6.
+both `out.evio` and `out.root` end up in `runs/<id>/`. Analysis runs on
+the container's ROOT (host uproot optional). HIPO output deferred past v0.0.6.
 
 **Why `wget` to pull the `.sif`, not `apptainer pull docker://`?** The
 `.sif` is hosted at a webhome URL, not a container registry. Direct

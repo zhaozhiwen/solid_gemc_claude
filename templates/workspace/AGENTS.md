@@ -26,7 +26,7 @@ Files live directly under the project root — no subdir split.
 | `report.html`  | rich-text + plots summary, openable directly in a browser (`file://…/<project>/report.html`). Updated alongside `result.md` when a noteworthy run lands. |
 | `<preset>.gcard` | workspace-edited GCard(s). The orchestrator skill copies from `solid_gemc/script/` or `solid_gemc/analysis/*/` and applies batch overrides (`USE_GUI=0`, `OUTPUT=evio,out.evio`, `N=<n>`) on the live `<gcard>` block. |
 | `runs/<id>/`   | per-run output. The skill writes `gcard.gcard` (frozen), `out.evio`, `out.root`, `log.txt`, `config.json`. **Gitignored** at the workspace level. |
-| `*.py`, `*.C`, `*.pl`, … | your analysis scripts (uproot Python, ROOT macros) or custom detector authoring (Perl generators + factory text files), mixed at the project root |
+| `*.py`, `*.C`, `*.pl`, … | your analysis scripts (ROOT macros; uproot Python if you opted in) or custom detector authoring (Perl generators + factory text files), mixed at the project root |
 
 The flat layout is by design — a single SoLID study typically
 weaves geometry tweaks, GCard edits, run outputs, and analysis
@@ -85,9 +85,10 @@ project dir. Convention from `solid_gemc/analysis/hgc_study/`:
   orchestrator skill writes `gcard.gcard`, `out.evio`,
   `out.root`, `log.txt`, `config.json` per run.
 
-For host-side default plots from `runs/<id>/out.root`, run
-`../bin/solid-gemc-run analyze runs/<id>` — it bypasses container ROOT via
-uproot.
+For default plots from `runs/<id>/out.root`, run
+`../bin/solid-gemc-run analyze runs/<id>` — ROOT in the container writes
+`hist_*.svg` + `plots.pdf` and prints per-branch stats. Add `--python`
+for host-side uproot PNGs instead.
 
 ## Project handoff documents
 

@@ -16,6 +16,7 @@ __pycache__/
 .claude.local.md
 .env
 BUILD_LOG.md
+HANDOFF.md
 PLAN.md
 CODEX_PORT_PLAN.md
 

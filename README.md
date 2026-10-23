@@ -4,7 +4,8 @@ A plugin for running [solid_gemc](https://github.com/JeffersonLab/solid_gemc)
 (the SoLID experiment's GEMC-based simulation) from **Claude Code** or
 **OpenAI Codex CLI**. solid_gemc, GEMC, Geant4, and ROOT all live in a pinned
 [JLabCE 2.5](https://github.com/JeffersonLab/solid_release) apptainer image;
-analysis runs on the host with [`uproot`](https://github.com/scikit-hep/uproot5).
+analysis runs on that ROOT inside the container (host-side
+[`uproot`](https://github.com/scikit-hep/uproot5) is an option).
 
 > The name keeps its `-claude` suffix for historical/repo-stability reasons;
 > the plugin is not Claude-specific. The whole workflow runs through one
@@ -23,7 +24,8 @@ analysis runs on the host with [`uproot`](https://github.com/scikit-hep/uproot5)
 - [apptainer](https://apptainer.org) ≥ 1.4 on Linux.
 - `wget`, `git` on the host. (No host-side `tcsh` needed — the
   wrapper invokes `tcsh` *inside* the container.)
-- Python 3.9+ with `uproot numpy matplotlib` (only for the analyze step).
+- Python 3 on the host. Python 3.9+ with `uproot numpy matplotlib` only for the
+  optional `analyze --python`.
 - ~1.7 GB in your home dir for the cached JLabCE 2.5 image, plus ~1 GB
   per workspace for the cloned + built solid_gemc tree. The image lives
   in the agent tool's persistent plugin data dir
@@ -44,9 +46,9 @@ The repo is one source of truth for both harnesses — shared
 `.codex-plugin/` manifests side by side (plus the per-harness marketplace
 descriptors `.claude-plugin/marketplace.json` and
 `.agents/plugins/marketplace.json`) and `CLAUDE.md` / `AGENTS.md` (same
-content) at the root. The analysis venv installs lazily on the first `analyze`
-on every platform (idempotent; run `bin/solid-gemc-run setup-python` to
-pre-install).
+content) at the root. Analysis needs no host install: `analyze` runs ROOT in
+the container. The optional Python venv installs lazily on the first
+`analyze --python` (idempotent; `bin/solid-gemc-run setup-python` pre-installs it).
 
 ### Claude Code
 
@@ -98,7 +100,7 @@ Two upstream worked examples live in your workspace after init, both fully self-
 
 Init also writes `bin/solid-gemc-run` into your workspace: a small launcher that runs the newest installed plugin wrapper, so the commands below work from the workspace root (`../bin/solid-gemc-run` from a project subdir), in the agent or a plain terminal. A plain terminal uses an image an agent session already downloaded; it never downloads one itself.
 
-`bin/solid-gemc-run analyze runs/<id>` would produce uproot-based default plots from out.root (the post-converted file).
+`bin/solid-gemc-run analyze runs/<id>` would produce default plots from out.root (the post-converted file) with ROOT in the container: `hist_*.svg`, `plots.pdf` and a stats line per branch. `analyze --python` makes uproot PNGs instead.
 
 `bin/solid-gemc-run shell` drops you into a tcsh prompt with the env
 exported (`SoLID_GEMC`, `GEMC`, `PATH`, `LD_LIBRARY_PATH`) so you can

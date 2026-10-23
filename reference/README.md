@@ -52,8 +52,8 @@ checking simulation output against analytic expectations.
 
 ### Runtime particle data
 
-Not a file in this dir — but worth knowing: the plugin venv installed
-by `solid-gemc-run setup-python` (`requirements.txt`) includes the
+Not a file in this dir — but worth knowing: the optional Python venv
+installed by `solid-gemc-run setup-python` (`requirements.txt`) includes the
 [`pdg`](https://pypi.org/project/pdg/) Python package. Runtime access
 to the PDG particle database for masses, lifetimes, widths, branching
 ratios, and PDG Monte Carlo IDs.
@@ -69,8 +69,8 @@ pi_plus = api.get_particle_by_name("pi+")
 print(pi_plus.mass, pi_plus.lifetime)           # 139.57 MeV, ~2.6e-8 s
 ```
 
-Available via the same venv `solid-gemc-analyze` uses:
-`${CLAUDE_PLUGIN_DATA}/venv/bin/python`. Pin: `pdg>=0.2.2`.
+Available via the same venv `analyze --python` uses:
+`<workspace-root>/venv/bin/python`. Pin: `pdg>=0.2.2`.
 
 When to consult: when reasoning about kinematic thresholds (Cherenkov
 threshold momentum per particle, target-frame decay kinematics),

@@ -45,10 +45,10 @@ disciplined copy-and-adapt, not invention. Key files to read before mirroring:
   — its test rig, a **pattern reference only**. This repo's own rig is
   `tests/quick-test.sh` + `tests/full-test.sh` (see "Tests" below); never call or
   source `geant4_claude` code from it (copy-and-modify is OK — note it in BUILD_LOG).
-- `requirements.txt` — Python analysis deps. NOTE: unlike `geant4_claude`, this
-  plugin has **no `hooks/` SessionStart hook** (removed for dual-platform
-  simplicity). The venv installs lazily on first `analyze` via
-  `bin/solid-gemc-run setup-python`; don't re-add a session hook.
+- `requirements.txt` — deps for the optional Python analysis (`analyze --python`).
+  NOTE: unlike `geant4_claude`, this plugin has **no `hooks/` SessionStart hook**
+  (removed for dual-platform simplicity). The venv installs lazily on the first
+  `analyze --python` (or `bin/solid-gemc-run setup-python`); don't re-add a session hook.
 
 Share **patterns**, not code. Each plugin owns its own copy of every file.
 Pattern improvements propagate by deliberate sync, not by linking.
@@ -61,11 +61,14 @@ Pattern improvements propagate by deliberate sync, not by linking.
 2. **Pinned image, one source of truth.** The container tag lives only in
    `bin/solid-gemc-run`. Anywhere else that displays it reads from that script. Do
    not hardcode the tag in commands, skills, README, or CI.
-3. **No host-side ROOT requirement.** Default analysis path is Python
-   (`uproot` + `numpy` + `matplotlib`). Anything needing ROOT runs inside the
-   container via `bin/solid-gemc-run root`.
+3. **No host-side ROOT requirement.** Default analysis runs ROOT inside the
+   container (`analyze`, and `.C` macros via `bin/solid-gemc-run root`). The
+   image's ROOT is batch-only with no PNG writer: plots are SVG/PDF. Host
+   Python (`uproot` + `numpy` + `matplotlib`) is an option (`analyze --python`),
+   never required.
 4. **Fresh-clone reproducibility.** Every command must work after `git clone`
-   on a machine with apptainer + Python. No reliance on cached state in the
+   on a machine with apptainer + Python 3 (stdlib; packages only for
+   `analyze --python`). No reliance on cached state in the
    maintainer's `$HOME` or absolute `/home/$USER` paths.
 5. **No leakage.** No JLab-internal hostnames, no absolute home paths, no API
    tokens, no personal email in committed files. The one allowed exception is
@@ -155,7 +158,8 @@ gate; execute with stop-on-failure post-condition checks.
 - **Output format.** gemc 2.9 in JLabCE 2.5 writes **EVIO natively
   only** (`-help-output` reports `Supported output: evio, txt`).
   `solid-gemc-run` post-converts the EVIO to ROOT via `evio2root`
-  inside the same container, so the analysis path is still uproot.
+  inside the same container; analysis reads `out.root` (container ROOT by
+  default, host uproot optional).
   Both `out.evio` and `out.root` end up in `runs/<id>/`. HIPO
   deferred past v0.0.6.
 - **solid_gemc pin.** Clone HEAD of master; record commit SHA per run
@@ -185,8 +189,9 @@ gate; execute with stop-on-failure post-condition checks.
 # through bin/solid-gemc-run. The wrapper is the one seam for everything:
 
 bin/solid-gemc-run init [--force]             # workspace skeleton + pull .sif + clone + 2× scons build
-bin/solid-gemc-run analyze <run|id|root> [N]  # host-side uproot plots from out.root (post-converted via evio2root)
-bin/solid-gemc-run setup-python               # idempotently install the analysis venv (else lazy on first analyze)
+bin/solid-gemc-run analyze <run|id|root> [N]  # default plots from out.root: container ROOT → SVG + plots.pdf + stats
+bin/solid-gemc-run analyze --python <run> [N] # same with host uproot → PNGs (installs the venv lazily)
+bin/solid-gemc-run setup-python               # idempotently install the venv for analyze --python
 bin/solid-gemc-run pull                       # wget the .sif into cache
 bin/solid-gemc-run clone [dest]               # git clone solid_gemc (default: ./solid_gemc)
 bin/solid-gemc-run build [dest]               # two scons builds inside container: mod/gemc/2.9 → source/2.9
@@ -219,7 +224,7 @@ each ends by checking that.
 | | `tests/quick-test.sh` | `tests/basic-test.sh setup/verify/cleanup` | `tests/full-test.sh setup/verify/cleanup` |
 |---|---|---|---|
 | Purpose | fast check of the working tree, every change | the skill in real sessions, after skill/flow changes | release check: a real user's first session |
-| Plugin source | working-tree copy | working-tree copy | published GitHub marketplace (`SGC_SOURCE=local` = fresh clone of HEAD) |
+| Plugin source | working-tree copy | working-tree copy | published GitHub marketplace (run after a push) |
 | Image / solid_gemc | `.sif` + prebuilt `templates/solid_gemc` linked; `init` skips scons | linked; `init` skips scons | real download; `init` really clones + builds |
 | Tiers | 0 unit checks · A installed plugin, no model | B: real sessions in tmux, one fresh subagent per tool playing the user (`tests/full-test-agent.md`), in parallel; `init` skips scons (`SOLID_GEMC_SKIP_BUILD=1`) | 0 · A · B |
 | Cost | ~1 min, no model calls | ~10–15 min, model calls | ~45–60 min, model calls, ~3.4 GB download |
@@ -252,8 +257,8 @@ Before the v0.0.6 tag, every item must be clean:
 - `grep -RIn "TODO\|FIXME\|XXX" .` reviewed; nothing critical left.
 - `bin/solid-gemc-run info` reports the same .sif URL the README claims.
 - `tests/quick-test.sh` passes (needs a built clone at `templates/solid_gemc`).
-- `tests/full-test.sh` passes on the commit being tagged (`SGC_SOURCE=local`; both
-  subagent verdicts `OVERALL: PASS`, `verify` → `RESULT: PASS`).
+- `tests/full-test.sh` passes after the push, before tagging (both subagent
+  verdicts `OVERALL: PASS`, `verify` → `RESULT: PASS`).
 - `LICENSE` (MIT) present; `README.md` shows the working flow with real
   output.
 - Version in `.claude-plugin/plugin.json` bumped per semver.

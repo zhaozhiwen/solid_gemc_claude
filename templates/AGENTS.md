@@ -56,15 +56,18 @@ upstream organizes `solid_gemc/analysis/hgc_study/` and
    GEMC_VERSION, n_events, the gemc + evio2root exit codes, wall
    time, and which source dir was used as cwd for the gemc step.
    Read it to know what produced the data. Never hand-edit it.
-4. **Default analysis stack: `uproot` + `numpy` + `matplotlib`** on
-   the host (out of the container), against
-   `<name>/runs/<id>/out.root`. The ROOT file is
-   post-converted from gemc's native `out.evio` by `evio2root`
-   inside the container — both files live in the run dir. Anything
-   that needs the actual ROOT executable runs inside the container
-   via `bin/solid-gemc-run root <macro>`.
+4. **Default analysis stack: ROOT inside the container**, against
+   `<name>/runs/<id>/out.root`. The ROOT file is post-converted from
+   gemc's native `out.evio` by `evio2root` inside the container —
+   both files live in the run dir. `bin/solid-gemc-run analyze`
+   gives default plots; custom analysis is a `.C` macro in `<name>/`
+   run with `bin/solid-gemc-run root <macro.C>`. The container's ROOT
+   is batch-only and cannot write PNGs: save plots as `.svg` / `.pdf`.
+   Host Python (`uproot` + `numpy` + `matplotlib`) is optional:
+   `bin/solid-gemc-run analyze --python` (PNGs) or a script run with
+   `venv/bin/python` after `bin/solid-gemc-run setup-python`.
 5. **Don't commit `solid_gemc/`.** It's an upstream-managed working
-   tree that init rebuilds. Same for `venv/` (the analysis venv),
+   tree that init rebuilds. Same for `venv/` (the optional Python venv),
    `<name>/runs/`, `*.root`, `*.hipo`, `__pycache__/`. (The ~1.7 GB
    `.sif` lives outside the workspace, in the agent tool's plugin
    data dir.)
@@ -94,7 +97,7 @@ upstream organizes `solid_gemc/analysis/hgc_study/` and
    python3 "$ROOT/templates/embed_html.py" <name>/report.html
    ```
 
-   It rewrites each `<img src="runs/<id>/*.png">` as an inline
+   It rewrites each `<img src="runs/<id>/*.svg">` (or `.png`) as an inline
    base64 data URI and writes a sibling `<name>/report_portable.html`.
    Ship the `_portable.html`; the plain `report.html` keeps relative
    paths and only renders correctly from inside the workspace tree.

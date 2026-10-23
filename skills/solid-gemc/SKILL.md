@@ -1,6 +1,6 @@
 ---
 name: solid-gemc
-description: Orchestrate the full solid_gemc (SoLID experiment) simulation flow from a single natural-language user request. Load whenever the user asks to "simulate", "run", "do a SoLID / solid_gemc / PVDIS / SIDIS / J/psi / He-3 / heavy-gas Cherenkov" study — including one-shot setups like "PVDIS A_PV asymmetry on LD2 at 11 GeV" or "SIDIS heavy-gas Cherenkov yield on He-3". Forces a gated `bin/solid-gemc-run init` (one-time workspace bootstrap) first when the workspace isn't initialized — before any plan — then captures the physics spec across seven fields (including project name), asks targeted clarifying questions when something required is missing, presents a brief plan for approval, and drives the run end-to-end — seed a project subdir from the per-project template if it doesn't exist, then the simulation (the skill writes the GCard edits, runs `solid_gemc` + `evio2root` inside the container, records provenance), then `analyze` for host-side uproot plots. Works on Claude Code and Codex CLI.
+description: Orchestrate the full solid_gemc (SoLID experiment) simulation flow from a single natural-language user request. Load whenever the user asks to "simulate", "run", "do a SoLID / solid_gemc / PVDIS / SIDIS / J/psi / He-3 / heavy-gas Cherenkov" study — including one-shot setups like "PVDIS A_PV asymmetry on LD2 at 11 GeV" or "SIDIS heavy-gas Cherenkov yield on He-3". Forces a gated `bin/solid-gemc-run init` (one-time workspace bootstrap) first when the workspace isn't initialized — before any plan — then captures the physics spec across seven fields (including project name), asks targeted clarifying questions when something required is missing, presents a brief plan for approval, and drives the run end-to-end — seed a project subdir from the per-project template if it doesn't exist, then the simulation (the skill writes the GCard edits, runs `solid_gemc` + `evio2root` inside the container, records provenance), then `analyze` for default plots with ROOT inside the container. Works on Claude Code and Codex CLI.
 ---
 
 # solid-gemc — full-flow orchestrator
@@ -9,7 +9,7 @@ Use this skill the moment the user asks for a SoLID-flavored
 simulation. It is the front door for everything this plugin does —
 there are no slash commands. The whole workflow runs through one
 wrapper, `bin/solid-gemc-run`: `init` (workspace bootstrap), the
-simulation loop in between, and `analyze` (host-side uproot plots).
+simulation loop in between, and `analyze` (default plots, ROOT in the container).
 This skill calls those subcommands directly, the same way on Claude
 Code and Codex CLI — the wrapper is the single seam. This keeps the
 plugin a thin layer over upstream `solid_gemc` (which already ships
@@ -68,7 +68,7 @@ init                                          (Step 0 — gated once, before pla
   → bin/solid-gemc-run exec "solid_gemc <gcard>"     (run gemc; emits out.evio)
   → bin/solid-gemc-run exec "evio2root -INPUTF=out.evio -R=flux"  (post-convert; -R=flux publishes the raw integrated bank — see step 3d)
   → write <project>/runs/<id>/{gcard.gcard, out.evio, out.root, log.txt, config.json}
-  → solid-gemc-run analyze <project>/runs/<id>        (host-side uproot)
+  → solid-gemc-run analyze <project>/runs/<id>        (ROOT in the container)
 ```
 
 `init` is one-shot per workspace and idempotent. **Step 0 force-
@@ -398,7 +398,7 @@ it, whether a default is safe, or whether you must ask.
 | **SoLID config** | Magnet + spectrometer configuration that fixes the geometry | "PVDIS, LD2 target, full magnet config", "SIDIS He-3, heavy-gas Cherenkov in", "J/psi LH2 simple" |
 | **Beam** | Particle, energy, event count | "11 GeV e-, 10000 events" |
 | **GCard** | Preset from `solid_gemc/script/` or `solid_gemc/analysis/*/`, with any parameter overrides | `solid_PVDIS_LD2_moved_full.gcard` (canonical), `N=10000`, `OUTPUT=evio,out.evio` |
-| **Output** | gemc 2.9 writes **EVIO natively** (the build has no ROOT writer); the skill post-converts to ROOT via `evio2root` so uproot analysis works the same. | `<project>/runs/<id>/out.evio` (raw) + `out.root` (converted) |
+| **Output** | gemc 2.9 writes **EVIO natively** (the build has no ROOT writer); the skill post-converts to ROOT via `evio2root` for analysis. | `<project>/runs/<id>/out.evio` (raw) + `out.root` (converted) |
 | **Analysis** | Plots / numbers to produce | "auto-histogram all numeric branches", "asymmetry binned in Q²", "PE yield vs radius via custom script in `<project>/`" |
 
 ### What must be asked, never guessed
@@ -491,7 +491,7 @@ ready-made workflow with its own `load.sh` / `run.sh` /
 - **Skill-driven** — create a project subdir (e.g.
   `hgc_study_<variant>/`), copy one of the hgc GCards into it,
   run through this skill. The `analyze` step gives
-  host-side uproot plots from the EVIO → ROOT conversion.
+  default ROOT plots from the EVIO → ROOT conversion.
 - **Upstream-driven** — `bin/solid-gemc-run shell` drops the user
   into a tcsh prompt with the env set; they
   `cd solid_gemc/analysis/hgc_study` and run `./run.sh`. Their
@@ -527,7 +527,7 @@ Steps  (workspace already initialized in Step 0)
    then bin/solid-gemc-run exec "evio2root -INPUTF=out.evio -R=flux"   (from <project>/runs/<id>/; -R=flux requests the raw bank for the flux detector)
    write <project>/runs/<id>/{gcard.gcard, out.evio, out.root, log.txt, config.json}
 5. solid-gemc-run analyze <project>/runs/<id>
-     <one line: auto-plots | custom <project>/<id>.py | container-side ROOT macro>
+     <one line: auto-plots | custom ROOT macro <project>/<id>.C | Python <project>/<id>.py (only if asked)>
 
 Defaults applied
 - <only list defaults you actually filled in; skip section if none>
@@ -754,10 +754,16 @@ record**. Treat the run dir as immutable from this point on.
 
 ### 3f. Analyze
 
-Run `"$SGC_RUN" analyze <project>/runs/<id>` — host-side uproot,
-auto-plots numeric branches into PNGs alongside `out.root`. For
-asymmetries / fits / multi-run comparisons, write a script under
-`<project>/`.
+Run `"$SGC_RUN" analyze <project>/runs/<id>` — ROOT inside the
+container plots each numeric branch into `hist_<tree>_<branch>.svg`
+plus one multi-page `plots.pdf` alongside `out.root`, and prints a
+stats line per branch (entries, mean, RMS, under/overflow). Check
+those numbers; the container's ROOT cannot write PNGs. For
+asymmetries / fits / multi-run comparisons, write a ROOT macro
+`<project>/<name>.C` and run it with `"$SGC_RUN" root <macro.C>`.
+Use Python (`"$SGC_RUN" analyze --python <run>` for uproot PNGs, or
+a uproot script run with `<workspace-root>/venv/bin/python` after
+`"$SGC_RUN" setup-python`) only when the user asks for it.
 
 ### Failure handling
 
@@ -798,11 +804,11 @@ Done.
 - Project: <project>
 - Run id:  <id>
 - Output:  <project>/runs/<id>/out.root
-- Plots:   <project>/runs/<id>/<plot1>.png, …  (or "(histogram-only output; no auto-plots)")
+- Plots:   <project>/runs/<id>/plots.pdf + hist_*.svg  (or "(histogram-only output; no auto-plots)")
 - Updated: <project>/log.md, <project>/result.md, <project>/report.html, log.md, report.html
 
 Next: <one concrete suggestion — vary the beam energy, scale up n_events,
-       try a different canonical config, run a custom <project>/<id>.py>
+       try a different canonical config, run a custom <project>/<id>.C>
 ```
 
 No "let me know if you have more questions". No emoji. No recap
@@ -812,7 +818,8 @@ of the plan — the plots and numbers are the recap.
 
 - `bin/solid-gemc-run` — the single seam this skill drives. `init`
   bootstraps the workspace (image + clone + build); `analyze` does
-  uproot inspect + auto-plot; `exec` / `validate-gcard` / `shell` /
+  the default inspect + auto-plot (ROOT in the container; `--python`
+  for host uproot); `exec` / `validate-gcard` / `shell` /
   `root` cover everything that needs the JLabCE 2.5 container. There
   are no slash commands — this wrapper is the only command surface.
 - `templates/CLAUDE.md` — workspace-wide rules loaded into

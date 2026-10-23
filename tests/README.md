@@ -13,7 +13,7 @@ the start. The basic and full tests share one script (`full-test.sh`), its
 |---|---|---|---|
 | Run it | on every change | when `skills/` or the orchestrator flow changes | before a release |
 | Command | `tests/quick-test.sh` | `tests/basic-test.sh setup` → subagents → `verify` → `cleanup` | `tests/full-test.sh setup` → subagents → `verify` → `cleanup` |
-| Plugin source | a copy of the working tree | a copy of the working tree | the published GitHub marketplace (`SGC_SOURCE=local`: a fresh clone of HEAD) |
+| Plugin source | a copy of the working tree | a copy of the working tree | the published GitHub marketplace |
 | Image | symlinked into each fake data dir | symlinked | really downloaded by the plugin |
 | solid_gemc | workspaces link `templates/solid_gemc` | linked | `init` really clones and builds |
 | Tiers | 0 + A | B only | 0 + A + B |
@@ -42,7 +42,8 @@ the start. The basic and full tests share one script (`full-test.sh`), its
   `info` through the launcher reports that tool's install and data dir (a plain
   terminal is read-only) → the workspace and solid_gemc tree are bind-mounted from a
   deep folder → a 2-event `cherenkov.gcard` run (gemc + `evio2root -R=flux`) →
-  `analyze` writes plots and the venv sits at the workspace root.
+  `analyze` (container ROOT) writes SVGs, `plots.pdf` and stats lines without a venv →
+  `analyze --python` writes PNGs and the venv sits at the workspace root.
 - **Leak scan**: no `/home/$USER` in shipped files.
 
 **How to run**
@@ -111,8 +112,8 @@ tests/full-test.sh setup                 # background; prints SANDBOX=<dir>
 tests/full-test.sh verify <dir>          # → <dir>/logs/summary.md, RESULT: PASS|FAIL
 tests/full-test.sh cleanup <dir>         # stops sessions + sandbox processes; SGC_KEEP=1 keeps <dir>
 ```
-- The default source is the published `main`, so unpushed work isn't tested — use
-  `SGC_SOURCE=local` after committing.
+- The source is the published `main`, so run it after a push (before tagging);
+  unpushed work isn't tested. The basic test covers the skill flow on the working tree.
 - If the image host (personal Duke webhome, no SLA) is down, the test fails at the
   download — what a real user would hit. There is no fallback.
 - Read only `summary.md`; triage a FAIL with a fresh subagent on `<dir>/logs/`.

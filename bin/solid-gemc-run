@@ -247,9 +247,13 @@ extra_binds_for() {
 # prebuilt tree) the build tree lives under the resolved target while the
 # run dir is a sibling of the symlink — the parent of the *unresolved* path.
 # extra_binds_for dedupes whatever is already under cwd/cache.
+# EXTRA_BIND_PATHS: per-command additions (analyze: the plugin's macro dir and
+# a run dir outside cwd).
+EXTRA_BIND_PATHS=()
 container_binds() {
   local wd="$1" cache_real="$2"
   printf -- '--bind\n%s\n--bind\n%s\n' "${wd}" "${cache_real}"
+  extra_binds_for "${wd}" "${cache_real}" ${EXTRA_BIND_PATHS[@]+"${EXTRA_BIND_PATHS[@]}"}
   [[ -n "${SoLID_GEMC:-}" && -d "${SoLID_GEMC}" ]] || return 0
   local solid_real parent_real
   solid_real="$(readlink -f "${SoLID_GEMC}")"
@@ -448,8 +452,10 @@ cmd_shell() {
 exec tcsh -i"
 }
 
+# $ROOTSYS/bin/root, not `root`: the image aliases root to `root -l --web=off`,
+# which this ROOT build rejects with spurious errors on every call.
 cmd_root() {
-  in_container "root -l -b -q $*"
+  in_container "\$ROOTSYS/bin/root -l -b -q $*"
 }
 
 cmd_validate_gcard() {
@@ -536,13 +542,15 @@ cmd_init() {
   fi
 }
 
-# Host-side uproot plots from a run's out.root. Accepts a run dir, a bare run
-# id (looked up under runs/), or a direct path to a .root file. Ensures the
-# venv lazily, then delegates the schema inspection + plotting to the Python
-# helper (shared by every platform).
+# Default plots from a run's out.root. Accepts a run dir, a bare run id (looked
+# up under runs/), or a direct path to a .root file. Default: ROOT inside the
+# container (SVG per branch + plots.pdf; the image's ROOT has no PNG writer).
+# --python: host-side uproot PNGs, installing the venv lazily.
 cmd_analyze() {
+  local python=0
+  [[ "${1:-}" == "--python" ]] && { python=1; shift; }
   local arg="${1:-}"
-  [[ -n "${arg}" ]] || die "usage: solid-gemc-run analyze <run-dir|id|out.root> [max-plots]"
+  [[ -n "${arg}" ]] || die "usage: solid-gemc-run analyze [--python] <run-dir|id|out.root> [max-plots]"
   local max_plots="${2:-12}"
   local root run_dir
   if   [[ -f "${arg}" ]];      then root="${arg}";               run_dir="$(dirname "${arg}")"
@@ -553,9 +561,17 @@ cmd_analyze() {
   [[ -f "${root}" ]] \
     || die "no ROOT file at ${root} (did the run succeed? see ${run_dir}/log.txt)"
 
-  local py; py="$(ensure_venv_python)"
-  "${py}" "${PLUGIN_ROOT}/bin/solid-gemc-analyze.py" "${root}" "${run_dir}" "${max_plots}"
-  ls -1 "${run_dir}"/*.png 2>/dev/null || true
+  if (( python )); then
+    local py; py="$(ensure_venv_python)"
+    "${py}" "${PLUGIN_ROOT}/bin/solid-gemc-analyze.py" "${root}" "${run_dir}" "${max_plots}"
+    ls -1 "${run_dir}"/*.png 2>/dev/null || true
+    return 0
+  fi
+  [[ "${max_plots}" =~ ^[0-9]+$ ]] || die "max-plots must be a number: ${max_plots}"
+  root="$(readlink -f "${root}")"; run_dir="$(readlink -f "${run_dir}")"
+  EXTRA_BIND_PATHS=("${PLUGIN_ROOT}/bin" "${run_dir}")
+  cmd_root "'${PLUGIN_ROOT}/bin/solid_gemc_analyze.C(\"${root}\",\"${run_dir}\",${max_plots})'"
+  ls -1 "${run_dir}"/*.svg "${run_dir}"/plots.pdf 2>/dev/null || true
 }
 
 # Print resolved paths so a platform-neutral skill can locate the plugin's
@@ -583,8 +599,10 @@ Usage: solid-gemc-run <subcommand> [args]
 
 Subcommands:
   init [--force]                Bootstrap workspace: scaffold files + pull + clone + build.
-  analyze <run|id|root> [N]     Host-side uproot plots from a run's out.root (max N plots).
-  setup-python                  Idempotently install the analysis venv (uproot/numpy/...).
+  analyze [--python] <run|id|root> [N]
+                                Default plots from a run's out.root (max N): ROOT in the
+                                container (SVG + plots.pdf); --python: host uproot PNGs.
+  setup-python                  Install the venv for analyze --python (uproot/numpy/...).
   pull                          Download the pinned .sif from upstream (wget).
   clone [dest]                  git clone solid_gemc into dest (default: ./solid_gemc).
   build [dest]                  Two scons builds inside container: mod/gemc/<v>, then source/<v>.

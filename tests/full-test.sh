@@ -22,9 +22,9 @@
 #   <script> verify <dir>       # on-disk checks + verdicts → <dir>/logs/summary.md
 #   <script> cleanup <dir>      # stop sessions + sandbox daemons, remove <dir>
 #
-# Full mode: SGC_SOURCE=local installs from a fresh git clone of this repo
-# (committed HEAD) instead of the published GitHub marketplace; an image-host
-# outage fails the test. SGC_KEEP=1 makes cleanup keep the sandbox.
+# Full mode installs from the published GitHub marketplace, so run it after a
+# push; an image-host outage fails the test. SGC_KEEP=1 makes cleanup keep the
+# sandbox.
 
 set -euo pipefail
 
@@ -60,12 +60,10 @@ cmd_setup() {
 
   if [[ "${MODE}" == basic ]]; then
     SGC_UV_CACHE="${PLUGIN_ROOT}/.test-cache/uv"; mkdir -p "${SGC_UV_CACHE}"
-    # Test cache for the venv; no scons in the sessions' init (prebuilt linked tree),
+    # Test cache for an optional venv; no scons in the sessions' init (prebuilt linked tree),
     # so the two sessions share nothing they write and can run in parallel.
     testenv="UV_CACHE_DIR='${SGC_UV_CACHE}' UV_LINK_MODE=copy SOLID_GEMC_SKIP_BUILD=1"
     plugin_copy "${PLUGIN_ROOT}"; src="${PLUGIN_COPY}"
-  elif [[ "${SGC_SOURCE:-github}" == local ]]; then
-    git clone -q "${PLUGIN_ROOT}" "${SCRATCH}/src"; src="${SCRATCH}/src"
   else
     src="${GITHUB_SOURCE}"
   fi
@@ -138,7 +136,7 @@ cmd_verify() {
       fi
       check "run dir with gcard.gcard, out.evio, out.root, log.txt, config.json" \
             "[[ -n '${run}' ]] && for f in gcard.gcard out.evio out.root log.txt config.json; do [[ -s '${run}'\$f ]] || exit 1; done"
-      check "analyze plots in the run dir" "[[ -n '${run}' ]] && ls '${run}'*.png >/dev/null 2>&1"
+      check "analyze plots in the run dir" "[[ -n '${run}' ]] && [[ -s '${run}'plots.pdf ]] && ls '${run}'*.svg >/dev/null 2>&1"
       check "request logged verbatim in ${PROJECT}/log.md" "grep -qF '${REQUEST}' '${ws}/${PROJECT}/log.md' 2>/dev/null"
       check "subagent verdict OVERALL: PASS (${v##*/})" "grep -q '^OVERALL: PASS' '${v}' 2>/dev/null"
       echo

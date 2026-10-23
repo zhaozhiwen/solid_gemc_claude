@@ -342,7 +342,14 @@ PY
   pass "${t}: gemc + evio2root (out.root $(stat -c %s "${RUN_DIR}/out.root") bytes)"
   ( cd "${ws}" && iso "${v}" "${L}" analyze "${RUN_DIR}" 4 ) > "${SCRATCH}/logs/A-${t}-analyze.log" 2>&1 \
     || fail "${t}: analyze failed; see logs/A-${t}-analyze.log"
-  (( $(ls "${RUN_DIR}"/*.png 2>/dev/null | wc -l) >= 1 )) || fail "${t}: analyze wrote no PNGs"
+  (( $(ls "${RUN_DIR}"/*.svg 2>/dev/null | wc -l) >= 1 )) || fail "${t}: analyze wrote no SVGs"
+  [[ -s "${RUN_DIR}/plots.pdf" ]] || fail "${t}: analyze wrote no plots.pdf"
+  grep -q "entries=.*mean=" "${SCRATCH}/logs/A-${t}-analyze.log" || fail "${t}: analyze printed no stats lines"
+  [[ -e "${ws}/venv" ]] && fail "${t}: default analyze created a venv"
+  pass "${t}: analyze (container ROOT) → SVGs + plots.pdf + stats, no venv"
+  ( cd "${ws}" && iso "${v}" "${L}" analyze --python "${RUN_DIR}" 4 ) > "${SCRATCH}/logs/A-${t}-analyze-python.log" 2>&1 \
+    || fail "${t}: analyze --python failed; see logs/A-${t}-analyze-python.log"
+  (( $(ls "${RUN_DIR}"/*.png 2>/dev/null | wc -l) >= 1 )) || fail "${t}: analyze --python wrote no PNGs"
   [[ -d "${ws}/venv" ]] || fail "${t}: venv not at the workspace root"
-  pass "${t}: analyze → PNGs, venv at ${ws##*/}/venv"
+  pass "${t}: analyze --python → PNGs, venv at ${ws##*/}/venv"
 }

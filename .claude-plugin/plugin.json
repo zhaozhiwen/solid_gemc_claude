@@ -1,6 +1,6 @@
 {
   "name": "solid-gemc-claude",
-  "description": "Build, run, and analyze solid_gemc (SoLID experiment) simulations from natural language via an orchestrator skill that drives bin/solid-gemc-run (works on Claude Code and Codex CLI). JLabCE 2.5 container pulled via wget; tcsh runtime inside container; analysis on the host with uproot.",
+  "description": "Build, run, and analyze solid_gemc (SoLID experiment) simulations from natural language via an orchestrator skill that drives bin/solid-gemc-run (works on Claude Code and Codex CLI). JLabCE 2.5 container pulled via wget; tcsh runtime inside container; analysis with the container's ROOT (host uproot optional).",
   "version": "0.0.6",
   "author": {
     "name": "Zhiwen Zhao"
@@ -16,6 +16,7 @@
     "jlab",
     "jefferson-lab",
     "apptainer",
+    "root",
     "uproot",
     "claude-code-plugin"
   ],
