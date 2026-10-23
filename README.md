@@ -107,6 +107,23 @@ then `./run.sh`. For detector authoring: edit the `.pl` in
 `solid_gemc/geometry/hgc_moved/`, regenerate, run gemc against your new
 detector.
 
+## Testing (maintainers)
+
+Three automated tests, all against a **clean Claude Code and Codex** set up in a
+throwaway sandbox, so your own sessions and `~/.claude`, `~/.codex` are never touched:
+
+- `tests/quick-test.sh` — ~1 min, no model calls. Installs the working tree into both
+  tools and runs the installed plugin end to end (init → gemc → evio2root → analyze),
+  with the image and a prebuilt `templates/solid_gemc` linked in.
+- `tests/basic-test.sh setup` / `verify` / `cleanup` — ~10–15 min. Real Claude Code
+  and Codex sessions driven by a subagent playing the user, with the quick test's
+  shortcuts. Run after changes to the skill.
+- `tests/full-test.sh setup` / `verify` / `cleanup` — a real first session in each tool:
+  installed from the published marketplace, real image download and build, default
+  permissions, and a subagent playing the user. Run before a release.
+
+Design and details: [`tests/README.md`](tests/README.md).
+
 ## Known limitations (v0.0.6)
 
 - The .sif is hosted at a personal Duke webhome

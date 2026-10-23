@@ -66,6 +66,15 @@ Init writes `bin/solid-gemc-run` into your workspace — a launcher that runs th
 - ~1.7 GB in your home dir for the cached JLabCE 2.5 image, plus ~1 GB per workspace for the cloned + built `solid_gemc` tree. The image lives in the agent tool's persistent plugin data dir (`~/.claude/plugins/data/solid-gemc-claude-solid-gemc-claude/` or `~/.codex/plugins/data/solid-gemc-claude-solid-gemc-claude/`), so it survives plugin updates and is shared across workspaces; uninstalling the plugin may delete it.
 - Claude Code (plugin support) **or** OpenAI Codex CLI (Agent Skills).
 
+## Testing
+
+Three automated tests run the plugin in a **clean Claude Code and Codex** inside a
+throwaway sandbox: a quick test (~1 min, no model calls, installed plugin run end to
+end), a basic test (~15 min, real sessions with an agent playing the user, image and
+build linked in) and a full test (a real first session in each tool — published
+install, real image download and build, an agent playing the user). See
+[`tests/README.md`](https://github.com/zhaozhiwen/solid_gemc_claude/blob/main/tests/README.md).
+
 ## Links
 
 - [License (MIT)](https://github.com/zhaozhiwen/solid_gemc_claude/blob/main/LICENSE)

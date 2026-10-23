@@ -142,6 +142,25 @@ passes: `mod/gemc/2.9` produces `libgemc.so` (requires
 `LIBRARY=shared`), then `source/2.9` links against it. Skipping or
 reordering produces an unlinked binary that segfaults on first run.
 
+## Testing
+
+**Test what a user gets, not the repo.** Both tests install the plugin with the
+tools' own `plugin` commands into a clean Claude Code and Codex — a fake `HOME` and a
+whitelisted environment, so nothing from the maintainer's sessions leaks in and nothing
+leaks out (checked by hashing the real plugin state before and after). Running the
+wrapper from the checkout would miss the version-pinned install dir, the per-tool data
+dir, the workspace launcher, and how each tool loads the skill.
+
+**Three speeds.** The quick test (`tests/quick-test.sh`, ~1 min, no model) links the
+image and a prebuilt solid_gemc and runs the installed plugin end to end. The full test
+(`tests/full-test.sh`, ~1 h) removes every shortcut — published install, real download
+and build, default permission/sandbox modes — and a fresh subagent per tool plays the
+user, answering prompts only as a sensible new user would and writing a verdict. A
+script answering by regex can't tell a confusing prompt from a good one; an agent with
+a user's brief can. The basic test (`tests/basic-test.sh`, ~15 min) runs those agent
+sessions with the quick test's links, to check skill changes without an hour-long
+run. Details: `tests/README.md`.
+
 ## Known limitations (v0.0.6)
 
 - The `.sif` is at a personal Duke webhome

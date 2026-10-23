@@ -42,7 +42,9 @@ disciplined copy-and-adapt, not invention. Key files to read before mirroring:
   GEMC layout (`detectors/` + `gcards/` instead of `src/` + `geometries/` +
   `macros/` + `build/`).
 - `~/claude/geant4_claude/tests/{clean-smoke.sh,clean-install-test.sh,CLEAN-INSTALL-CHECKLIST.md}`
-  — three-layer test rig.
+  — its test rig, a **pattern reference only**. This repo's own rig is
+  `tests/quick-test.sh` + `tests/full-test.sh` (see "Tests" below); never call or
+  source `geant4_claude` code from it (copy-and-modify is OK — note it in BUILD_LOG).
 - `requirements.txt` — Python analysis deps. NOTE: unlike `geant4_claude`, this
   plugin has **no `hooks/` SessionStart hook** (removed for dual-platform
   simplicity). The venv installs lazily on first `analyze` via
@@ -195,7 +197,9 @@ bin/solid-gemc-run exec <cmd...>              # run cmd inside container with en
 bin/solid-gemc-run root <args...>             # ROOT (-l -b -q) inside container
 bin/solid-gemc-run env                        # print the tcsh setenv block
 bin/solid-gemc-run validate-gcard <file>      # xmllint a GCard inside container
-tests/clean-smoke.sh                          # end-to-end smoke (workspace + image + clone/build + gemc + evio2root + analyze)
+tests/quick-test.sh                           # clean Claude Code + Codex in a sandbox: unit checks (0) + installed-plugin run (A), no model
+tests/basic-test.sh setup|verify|cleanup      # real sessions with the quick test's links; a subagent per tool plays the user
+tests/full-test.sh setup|verify|cleanup       # real first sessions (download, build, default sandbox); a subagent per tool plays the user
 ```
 
 After `bin/solid-gemc-run init`, the upstream
@@ -204,6 +208,39 @@ workspace by init) is the recommended first run — drive it through the
 orchestrator skill in plain language ("run the heavy-gas Cherenkov
 study on He-3"), or follow upstream's `run.sh` via
 `bin/solid-gemc-run shell`.
+
+## Tests
+
+Three automated tests (details: `tests/README.md`). All install the plugin into a
+**clean Claude Code and Codex** in a throwaway sandbox (fake `HOME`, whitelisted
+env), so the running sessions and the real `~/.claude`, `~/.codex` are never touched —
+each ends by checking that.
+
+| | `tests/quick-test.sh` | `tests/basic-test.sh setup/verify/cleanup` | `tests/full-test.sh setup/verify/cleanup` |
+|---|---|---|---|
+| Purpose | fast check of the working tree, every change | the skill in real sessions, after skill/flow changes | release check: a real user's first session |
+| Plugin source | working-tree copy | working-tree copy | published GitHub marketplace (`SGC_SOURCE=local` = fresh clone of HEAD) |
+| Image / solid_gemc | `.sif` + prebuilt `templates/solid_gemc` linked; `init` skips scons | linked; `init` skips scons | real download; `init` really clones + builds |
+| Tiers | 0 unit checks · A installed plugin, no model | B: real sessions in tmux, one fresh subagent per tool playing the user (`tests/full-test-agent.md`), in parallel; `init` skips scons (`SOLID_GEMC_SKIP_BUILD=1`) | 0 · A · B |
+| Cost | ~1 min, no model calls | ~10–15 min, model calls | ~45–60 min, model calls, ~3.4 GB download |
+
+- `templates/solid_gemc` is a gitignored clone + build for the quick test:
+  `bin/solid-gemc-run clone templates/solid_gemc && bin/solid-gemc-run build templates/solid_gemc`.
+- **Agents decide when to run the quick test — not after every change.** Run it after
+  a change that can affect install or runtime behavior (`bin/`, `templates/`, the
+  skill's commands, `tests/`) and before proposing a commit; skip docs-only or wording
+  edits; batch several edits into one run.
+- **Agents suggest the basic test** after changes to `skills/` or the orchestrator flow,
+  with the reason, and run it only when the maintainer says so.
+- **Agents never run the full test** — they recommend it to the maintainer (before a
+  release; after changes to install, image download, `init`/build, or the skill flow),
+  who starts it.
+- Read only a test's summary; triage failures with a fresh subagent on the kept
+  sandbox (`SGC_KEEP=1` keeps it on success too).
+- Known-fail: a Codex-installed `init` writes no workspace `CLAUDE.md` (Codex drops the
+  symlink) — reported, not failed, until fixed.
+- No manual checklists: `tests/README.md` lists what no test covers yet ("Not covered
+  yet") — automate an item before adding a checklist back.
 
 ## Pre-publish checks
 
@@ -214,8 +251,10 @@ Before the v0.0.6 tag, every item must be clean:
   documentation reference.
 - `grep -RIn "TODO\|FIXME\|XXX" .` reviewed; nothing critical left.
 - `bin/solid-gemc-run info` reports the same .sif URL the README claims.
-- `tests/clean-smoke.sh` passes on a fresh clone.
-- `LICENSE` (MIT) present; `README.md` shows the working smoke flow with real
+- `tests/quick-test.sh` passes (needs a built clone at `templates/solid_gemc`).
+- `tests/full-test.sh` passes on the commit being tagged (`SGC_SOURCE=local`; both
+  subagent verdicts `OVERALL: PASS`, `verify` → `RESULT: PASS`).
+- `LICENSE` (MIT) present; `README.md` shows the working flow with real
   output.
 - Version in `.claude-plugin/plugin.json` bumped per semver.
 
