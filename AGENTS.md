@@ -240,6 +240,8 @@ each ends by checking that.
 - **Agents never run the full test** — they recommend it to the maintainer (before a
   release; after changes to install, image download, `init`/build, or the skill flow),
   who starts it.
+- Every test keeps per-step timing in `.test-cache/timing/` (gitignored; basic/full add
+  the subagents' timed step tables via `verify`). Report the slow steps with the result.
 - Read only a test's summary; triage failures with a fresh subagent on the kept
   sandbox (`SGC_KEEP=1` keeps it on success too).
 - Known-fail: a Codex-installed `init` writes no workspace `CLAUDE.md` (Codex drops the

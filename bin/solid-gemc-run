@@ -386,7 +386,7 @@ cmd_clone() {
       dirty=" (uncommitted local changes)"
     fi
     log "warning: ${dest} already cloned at ${existing_sha}${dirty}"
-    log "  using existing tree. To refresh upstream: rm -rf ${dest} && solid-gemc-run clone"
+    log "  using existing tree. To update it: git -C ${dest} pull, then solid-gemc-run build"
     return 0
   fi
   if [[ -e "${dest}" ]]; then
@@ -396,6 +396,10 @@ cmd_clone() {
   log "cloning ${SOLID_GEMC_REPO} -> ${dest}"
   git clone "${SOLID_GEMC_REPO}" "${dest}"
   log "cloned: $(cd "${dest}" && git rev-parse HEAD)"
+  # Upstream takes changes only as fork -> pull request (its README).
+  log "note: this clone of JeffersonLab/solid_gemc is for reading and running. To submit"
+  log "  changes, fork it on GitHub, then: git -C ${dest} remote rename origin upstream &&"
+  log "  git -C ${dest} remote add origin https://github.com/<you>/solid_gemc.git"
 }
 
 cmd_build() {

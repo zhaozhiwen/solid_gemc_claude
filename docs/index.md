@@ -56,6 +56,7 @@ Init writes `bin/solid-gemc-run` into your workspace — a launcher that runs th
 
 - **NL-driven simulation as a first-class step.** The orchestrator turns a plain-English study spec into a validated GCard + run command. Edit the GCard or re-describe to iterate.
 - **Single runtime seam.** All `gemc`, `xmllint`, ROOT, and `evio2root` calls go through `bin/solid-gemc-run`. The container tag is pinned in one place. No host-side ROOT required.
+- **solid_gemc clone for reading.** Init clones JeffersonLab/solid_gemc, which takes changes only as fork → pull request. To keep or submit edits, fork it and run `git -C solid_gemc remote rename origin upstream && git -C solid_gemc remote add origin https://github.com/<you>/solid_gemc.git`.
 - **EVIO + post-convert to ROOT.** `gemc` 2.9 writes EVIO natively; the wrapper post-converts to ROOT inside the same container and analysis runs on the container's ROOT (host uproot optional). Both files end up in `runs/<id>/`.
 
 ## Requirements

@@ -55,6 +55,14 @@ tests/quick-test.sh                 # needs claude, codex, apptainer, git, wget,
 SGC_SIF=/abs/path/<sif> tests/quick-test.sh   # if no .sif is in your plugin data dir
 SGC_KEEP=1 tests/quick-test.sh      # keep the sandbox for inspection
 ```
+**Step timing (all three tests).** Every `[PASS]` / `[KNOWN-FAIL]` / `[FAIL]` line ends
+with the seconds that step took, and each run keeps its steps in
+`.test-cache/timing/<UTC>-<name>.tsv` (gitignored; `total_s step_s status step`), outside
+the sandbox so cleanup doesn't remove it. Basic and full: the subagent fills a timed
+step table in its verdict (init, plan, run, analyze, …, to its poll resolution), and
+`verify` copies `summary.md` — with both tables — next to the setup's `.tsv` as
+`…-summary.md`. Compare runs there when a test gets slow.
+
 The venvs install from a persistent, test-only uv cache (`.test-cache/uv`, gitignored,
 ~200 MB; never your real `~/.cache/uv`), so only the first run downloads from PyPI. The
 full test doesn't use it.

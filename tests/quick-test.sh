@@ -35,6 +35,7 @@ read_consts "${PLUGIN_ROOT}"
 quick_links "${PLUGIN_ROOT}"
 
 new_sandbox sgc-quick
+timing_start "${PLUGIN_ROOT}" quick
 # Persistent, test-only uv cache (gitignored; never your real ~/.cache/uv).
 SGC_UV_CACHE="${PLUGIN_ROOT}/.test-cache/uv"; mkdir -p "${SGC_UV_CACHE}"
 STATE_BEFORE="$(state_sum)"
@@ -63,5 +64,6 @@ pass "no /home/${USER} in shipped files"
 [[ "$(state_sum)" == "${STATE_BEFORE}" ]] || fail "the operator's real ~/.claude / ~/.codex plugin state changed"
 pass "operator's real ~/.claude + ~/.codex plugin state unchanged"
 
-log "ALL GREEN — ${N_PASS} pass, ${N_KFAIL} known-fail"
+log "ALL GREEN — ${N_PASS} pass, ${N_KFAIL} known-fail, ${SECONDS}s"
+echo "Step timing: ${TIMING_FILE}"
 echo "Sandbox: ${SCRATCH}$([[ -n "${SGC_KEEP:-}" ]] && echo '  (kept)' || echo '  (removed; SGC_KEEP=1 keeps it)')"

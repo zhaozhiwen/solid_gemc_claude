@@ -44,7 +44,8 @@ type exactly:
 
 ## What to record
 Keep notes as you go: every prompt verbatim (or its first lines), your answer and why,
-the time it appeared, and anything a real user would find confusing, slow, or wrong
+the time it appeared (`date -u +%T` when you see it — your poll interval is the
+resolution; mark a step you missed `?`), and anything a real user would find confusing, slow, or wrong
 (unclear wording, misleading paths, errors, retries).
 
 ## When it finishes (or the budget runs out)
@@ -74,7 +75,17 @@ Then write `@VERDICT@`:
 - …
 
 ## Timeline
-- start, request sent, init approved, plan approved, run done (wall-clock times)
+| step | seen at (UTC, `date -u +%T`) | seconds since previous step |
+|---|---|---|
+| session ready (first-run screens done) | | |
+| request sent | | |
+| init question shown | | |
+| init finished | | |
+| plan shown | | |
+| plan approved | | |
+| run finished (gemc + evio2root) | | |
+| analyze finished | | |
+| final report shown | | |
 
 OVERALL: PASS
 ```

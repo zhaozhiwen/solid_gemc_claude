@@ -109,6 +109,21 @@ then `./run.sh`. For detector authoring: edit the `.pl` in
 `solid_gemc/geometry/hgc_moved/`, regenerate, run gemc against your new
 detector.
 
+**The `solid_gemc/` clone is for reading and running.** Init clones
+[JeffersonLab/solid_gemc](https://github.com/JeffersonLab/solid_gemc),
+which accepts changes only as fork → pull request, so you can't push to
+it. To keep or submit changes, fork it on GitHub and point the clone at
+your fork, keeping JeffersonLab as `upstream`:
+
+```sh
+git -C solid_gemc remote rename origin upstream
+git -C solid_gemc remote add origin https://github.com/<you>/solid_gemc.git
+```
+
+Then push branches to `origin`, open pull requests against JeffersonLab, and
+sync with `git -C solid_gemc pull upstream master`. Init reuses an existing
+clone, so it never overwrites your work.
+
 ## Testing (maintainers)
 
 Three automated tests, all against a **clean Claude Code and Codex** set up in a

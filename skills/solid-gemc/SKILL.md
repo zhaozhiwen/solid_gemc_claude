@@ -501,6 +501,17 @@ ready-made workflow with its own `load.sh` / `run.sh` /
 Mention both in the plan when the request maps onto hgc_study;
 let the user pick.
 
+### When the user wants to change solid_gemc itself
+
+The workspace's `solid_gemc/` is a clone of JeffersonLab's repo, which
+takes changes only as fork → pull request. If the request means
+editing files inside `solid_gemc/` (not copying them into `<project>/`)
+and the user wants to keep or share the change, say so in the plan:
+they can't push to that clone; fork it and switch the remotes
+(`origin` = their fork, `upstream` = JeffersonLab) as the workspace
+`CLAUDE.md` / `AGENTS.md` "Changing solid_gemc itself" shows. Changes
+only one study needs belong in `<project>/`.
+
 ## Step 2 — Present a brief plan for approval
 
 Once the spec is complete, show the user a compact plan in this
@@ -719,6 +730,9 @@ out.evio, out.root, log.txt}` exist and are non-empty;
 ```bash
 SIF_NAME=$(grep '^SIF_NAME=' "$SGC_RUN" | head -1 | cut -d'"' -f2)
 SOLID_GEMC_SHA=$(cd solid_gemc && git rev-parse HEAD 2>/dev/null || echo unknown)
+# origin URL without any user:token@ part
+SOLID_GEMC_REPO=$(cd solid_gemc && git remote get-url origin 2>/dev/null | sed -E 's#://[^/@]+@#://#')
+SOLID_GEMC_REPO=${SOLID_GEMC_REPO:-unknown}
 GEMC_VERSION_PINNED=$(grep '^GEMC_VERSION=' "$SGC_RUN" | head -1 | cut -d'"' -f2)
 N_EVENTS=$(grep -oE '<option name="N" value="[^"]+"' "$RUN_DIR/gcard.gcard" | head -1 | sed 's/.*value="//; s/"$//')
 
@@ -732,7 +746,7 @@ d = {
   "source_dir":       "${SOURCE_DIR}",
   "n_events":         "${N_EVENTS}",
   "sif_name":         "${SIF_NAME}",
-  "solid_gemc_repo":  "https://github.com/JeffersonLab/solid_gemc",
+  "solid_gemc_repo":  "${SOLID_GEMC_REPO}",
   "solid_gemc_sha":   "${SOLID_GEMC_SHA}",
   "gemc_version":     "${GEMC_VERSION_PINNED}",
   "start_utc":        "${START_ISO}",

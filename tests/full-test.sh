@@ -50,6 +50,7 @@ cmd_setup() {
     unset SGC_UV_CACHE; budget=75   # a real first run: fresh downloads, no test cache
   fi
   new_sandbox "sgc-${MODE}"
+  timing_start "${PLUGIN_ROOT}" "$(basename "${SCRATCH}")"
   # A successful setup must leave the sessions (and the Codex daemon) running for
   # the subagents; only a failed setup stops them.
   trap 'rc=$?; if [[ ${rc} -ne 0 ]]; then
@@ -102,10 +103,11 @@ cmd_setup() {
         "${PLUGIN_ROOT}/tests/full-test-agent.md" > "${SCRATCH}/agent-${t}.md"
     pass "${t}: session ${name} started in ${ws}; agent prompt ${SCRATCH}/agent-${t}.md"
   done
-  printf 'MODE=%q\nROOT=%q\nSOURCE=%q\nPROJECT=%q\nREQUEST=%q\n' \
-    "${MODE}" "${root}" "${src}" "${project}" "${request}" > "${SCRATCH}/state.env"
+  printf 'MODE=%q\nROOT=%q\nSOURCE=%q\nPROJECT=%q\nREQUEST=%q\nTIMING=%q\n' \
+    "${MODE}" "${root}" "${src}" "${project}" "${request}" "${TIMING_FILE}" > "${SCRATCH}/state.env"
 
-  log "setup done — ${N_PASS} pass, ${N_KFAIL} known-fail"
+  log "setup done — ${N_PASS} pass, ${N_KFAIL} known-fail, ${SECONDS}s"
+  echo "Step timing: ${TIMING_FILE}"
   echo "SANDBOX=${SCRATCH}"
   echo "Run the two subagents in parallel."
 }
@@ -139,13 +141,16 @@ cmd_verify() {
       check "analyze plots in the run dir" "[[ -n '${run}' ]] && [[ -s '${run}'plots.pdf ]] && ls '${run}'*.svg >/dev/null 2>&1"
       check "request logged verbatim in ${PROJECT}/log.md" "grep -qF '${REQUEST}' '${ws}/${PROJECT}/log.md' 2>/dev/null"
       check "subagent verdict OVERALL: PASS (${v##*/})" "grep -q '^OVERALL: PASS' '${v}' 2>/dev/null"
+      echo; echo "### ${t} timeline (from the subagent)"
+      awk '/^## Timeline/{f=1; next} /^## |^OVERALL/{f=0} f' "${v}" 2>/dev/null || true
       echo
     done
     echo "## isolation"
     check "operator's real ~/.claude + ~/.codex plugin state unchanged" "[[ \"\$(state_sum)\" == \"\$(cat '${S}/state-before.txt')\" ]]"
     echo; [[ ${ok} == 1 ]] && echo "RESULT: PASS" || echo "RESULT: FAIL"
   } > "${out}"
-  cat "${out}"
+  cp "${out}" "${TIMING%.tsv}-summary.md"
+  cat "${out}"; echo "Kept: ${TIMING%.tsv}-summary.md (setup steps: ${TIMING})"
   [[ ${ok} == 1 ]]
 }
 

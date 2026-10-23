@@ -4,11 +4,23 @@
 # plugin, no model).
 
 # --- helpers ----------------------------------------------------------------
-N_PASS=0; N_KFAIL=0
-log()   { printf '\n--- %s ---\n' "$*"; }
-pass()  { printf '  [PASS] %s\n' "$*"; N_PASS=$((N_PASS+1)); }
-kfail() { printf '  [KNOWN-FAIL] %s\n' "$*"; N_KFAIL=$((N_KFAIL+1)); }
-fail()  { printf '\n[FAIL] %s\n' "$*" >&2; exit 1; }
+# Every result line carries the seconds since the previous one (its step). With
+# TIMING_FILE set (timing_start), each line is also kept there as
+# total<TAB>step<TAB>status<TAB>message — outside the sandbox, so it survives cleanup.
+N_PASS=0; N_KFAIL=0; T_LAST=${SECONDS}; TIMING_FILE=""
+step()  { STEP=$((SECONDS-T_LAST)); T_LAST=${SECONDS}
+          [[ -z "${TIMING_FILE}" ]] || printf '%s\t%s\t%s\t%s\n' "${SECONDS}" "${STEP}" "$1" "$2" >> "${TIMING_FILE}"; }
+log()   { [[ -z "${TIMING_FILE}" ]] || printf '%s\t\t--\t%s\n' "${SECONDS}" "$*" >> "${TIMING_FILE}"
+          printf '\n--- %s ---\n' "$*"; }
+pass()  { step PASS "$*"; printf '  [PASS] %s (%ss)\n' "$*" "${STEP}"; N_PASS=$((N_PASS+1)); }
+kfail() { step KNOWN-FAIL "$*"; printf '  [KNOWN-FAIL] %s (%ss)\n' "$*" "${STEP}"; N_KFAIL=$((N_KFAIL+1)); }
+fail()  { step FAIL "$*"; printf '\n[FAIL] %s (%ss)\n' "$*" "${STEP}" >&2; exit 1; }
+# timing_start <plugin-root> <name>: TIMING_FILE = <root>/.test-cache/timing/<UTC>-<name>.tsv
+timing_start() {
+  mkdir -p "$1/.test-cache/timing"
+  TIMING_FILE="$1/.test-cache/timing/$(date -u +%Y%m%d-%H%M%S)-$2.tsv"
+  printf 'total_s\tstep_s\tstatus\tstep\n' > "${TIMING_FILE}"
+}
 require() { command -v "$1" >/dev/null 2>&1 || fail "$1 not found on PATH"; }
 
 read_consts() { # plugin-root → SIF_NAME, DATA_NAME

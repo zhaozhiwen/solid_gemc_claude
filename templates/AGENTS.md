@@ -39,7 +39,7 @@ upstream organizes `solid_gemc/analysis/hgc_study/` and
 | `<name>/result.md`  | Per-run findings, with paths to `<name>/runs/<id>/`. |
 | `<name>/report.html` | Browser-readable summary (rich text + plots referenced relatively from `runs/<id>/`). Opens via `file://` inside the workspace tree; for off-host sharing run the embed script (see non-negotiable #6). |
 | `<name>/runs/<id>/` | Per-run output dirs. The orchestrator skill writes `gcard.gcard`, `out.evio`, `out.root`, `log.txt`, `config.json` per run. **Gitignored.** |
-| `solid_gemc/`       | Cloned + built upstream tree (init artifact). **Gitignored.** Re-running init rebuilds it but keeps the existing clone; to update to upstream HEAD, `rm -rf solid_gemc` then re-run init. |
+| `solid_gemc/`       | Cloned + built upstream tree (init artifact). **Gitignored.** Re-running init rebuilds it but keeps the existing clone; to update, `git -C solid_gemc pull` then re-run init. A clone of JeffersonLab's repo, for reading and running — see "Changing solid_gemc itself". |
 | `bin/solid-gemc-run` | Launcher for the plugin wrapper (init artifact, rewritten by each init). |
 
 ## Non-negotiables
@@ -52,7 +52,8 @@ upstream organizes `solid_gemc/analysis/hgc_study/` and
    `<name>/runs/<id>/` as read-only. New analysis = new
    script in `<name>/`, not edits in the run directory.
 3. **`<name>/runs/<id>/config.json` is the provenance record.**
-   It records the GCard, the .sif name, the solid_gemc commit SHA,
+   It records the GCard, the .sif name, the solid_gemc commit SHA and
+   the clone's `origin` URL (JeffersonLab, or your fork),
    GEMC_VERSION, n_events, the gemc + evio2root exit codes, wall
    time, and which source dir was used as cwd for the gemc step.
    Read it to know what produced the data. Never hand-edit it.
@@ -151,6 +152,34 @@ scripts). Two ways in:
   inside the container and sets PWD there, so paths are the same in
   and out. Use `bin/solid-gemc-run root analysis.C` for the ROOT
   analysis scripts without a host ROOT install.
+
+## Changing solid_gemc itself
+
+`init` clones `https://github.com/JeffersonLab/solid_gemc` as `origin`.
+Upstream accepts changes only as **fork → modify → pull request** (its
+`README.md`), so treat this clone as read-mostly: you can't push to it.
+Before editing files in `solid_gemc/` that you want to keep or share,
+warn the user and switch the clone to their fork, keeping JeffersonLab
+as `upstream`:
+
+```sh
+# after forking JeffersonLab/solid_gemc on GitHub
+git -C solid_gemc remote rename origin upstream
+git -C solid_gemc remote add origin https://github.com/<you>/solid_gemc.git
+git -C solid_gemc fetch origin
+# work on a branch, push to the fork, open a PR against JeffersonLab:
+git -C solid_gemc switch -c <topic>
+git -C solid_gemc push -u origin <topic>
+# stay in sync with JeffersonLab:
+git -C solid_gemc pull upstream master
+```
+
+Never `rm -rf solid_gemc` once it holds your work — init reuses an
+existing clone. Changes that only your study needs (a custom
+detector, a modified GCard) belong in `<name>/`, not in the clone.
+Each run's `config.json` records the clone's `origin` URL and commit
+SHA; a commit that exists only on your fork is reproducible by others
+only after you push it.
 
 ## Reference example for custom detectors
 
