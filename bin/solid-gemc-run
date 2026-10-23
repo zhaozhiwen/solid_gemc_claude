@@ -266,7 +266,7 @@ in_container() {
   wd="$(container_workdir)"
   # SOLID_GEMC_RUN_DRYRUN=1: print the resolved apptainer bind/pwd argv and
   # return without touching the .sif. A container-free seam for the bind
-  # regression test in tests/clean-smoke.sh — short-circuits before
+  # regression test in tests/quick-test.sh — short-circuits before
   # ensure_sif so it needs neither the 1.7 GB image nor a network pull.
   if [[ -n "${SOLID_GEMC_RUN_DRYRUN:-}" ]]; then
     resolve_cache_dir
@@ -404,6 +404,9 @@ cmd_build() {
     || die "missing ${gemc_dir} — solid_gemc layout may have changed; bump GEMC_VERSION in bin/solid-gemc-run?"
   [[ -d "${solid_dir}" ]] \
     || die "missing ${solid_dir} — solid_gemc layout may have changed?"
+  # source/<v> finds the GEMC headers/library via $GEMC, which env_block derives
+  # from SoLID_GEMC — so it must name the tree being built, not ./solid_gemc.
+  SoLID_GEMC="$(cd "${dest}" && pwd)"; export SoLID_GEMC
 
   # LIBRARY=shared is REQUIRED — mod/gemc/2.9/SConstruct gates libgemc.so
   # behind it. Without LIBRARY=shared, scons builds only the per-module
@@ -511,7 +514,16 @@ cmd_init() {
 
   cmd_pull
   cmd_clone
-  cmd_build
+  # SOLID_GEMC_SKIP_BUILD=1: test seam (tests/quick-test.sh, tests/basic-test.sh) —
+  # those test the plugin, not solid_gemc, and link an already-built tree, so the
+  # two scons passes are skipped; the binary must exist and the smoke below still runs.
+  if [[ -n "${SOLID_GEMC_SKIP_BUILD:-}" ]]; then
+    [[ -x "solid_gemc/source/${GEMC_VERSION}/solid_gemc" ]] \
+      || die "SOLID_GEMC_SKIP_BUILD is set but solid_gemc/source/${GEMC_VERSION}/solid_gemc is not built"
+    log "skipping the scons build (SOLID_GEMC_SKIP_BUILD): using the prebuilt tree"
+  else
+    cmd_build
+  fi
 
   # Post-build smoke: confirm the freshly built binary actually resolves on the
   # in-container PATH. Catches a broken build or a broken env block immediately,
