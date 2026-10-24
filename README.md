@@ -68,6 +68,10 @@ Codex reads `AGENTS.md` — the canonical project-rules file.
 `CLAUDE.md` is a symlink to it and Claude Code reads it.
 `codex plugin add` drops the symlink but keeps the real `AGENTS.md`.
 
+apptainer can't run inside Codex's sandbox, so Codex must be able to ask before
+running `solid-gemc-run` outside it. If it doesn't ask (the run fails with
+`operation not permitted`), set `/permissions` to **Ask for approval** in the session.
+
 ## Try this after install
 
 You can ask your agent harness to
@@ -100,7 +104,7 @@ Two upstream worked examples live in your workspace after init, both fully self-
 
 Init also writes `bin/solid-gemc-run` into your workspace: a small launcher that runs the newest installed plugin wrapper, so the commands below work from the workspace root (`../bin/solid-gemc-run` from a project subdir), in the agent or a plain terminal. A plain terminal uses an image an agent session already downloaded; it never downloads one itself.
 
-`bin/solid-gemc-run analyze runs/<id>` would produce default plots from out.root (the post-converted file) with ROOT in the container: `hist_*.svg`, `plots.pdf` and a stats line per branch. `analyze --python` makes uproot PNGs instead.
+`bin/solid-gemc-run run <project>/<gcard> <source-dir>` is one whole run: gemc, `evio2root` with the GCard's detector banks, `config.json` and default plots. `bin/solid-gemc-run analyze runs/<id>` would produce default plots from out.root (the post-converted file) with ROOT in the container: `hist_*.svg`, `plots.pdf` and a stats line per branch. `analyze --python` makes uproot PNGs instead.
 
 `bin/solid-gemc-run shell` drops you into a tcsh prompt with the env
 exported (`SoLID_GEMC`, `GEMC`, `PATH`, `LD_LIBRARY_PATH`) so you can

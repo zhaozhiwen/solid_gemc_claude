@@ -27,6 +27,8 @@ codex plugin marketplace add zhaozhiwen/solid_gemc_claude
 codex plugin add solid-gemc-claude@solid-gemc-claude
 ```
 
+apptainer can't run inside Codex's sandbox: if a run fails with `operation not permitted`, set `/permissions` to **Ask for approval** so Codex asks before running the container.
+
 `/plugin update` (Claude) handles upgrades. [Apptainer](https://apptainer.org) ≥ 1.4 must already be on the host; the plugin pulls its pinned `.sif` on first use via `wget`.
 
 ## Quickstart
@@ -50,7 +52,7 @@ finally show me the results in an html file
 | `solid_gemc/analysis/hgc_study/` | the **config + run + analyze** pipeline — GCards, batch run scripts, ROOT analysis macros |
 | `solid_gemc/geometry/hgc_moved/` | **custom detector authoring** — Perl generators, the factory text files they emit, and the GCard wiring |
 
-Init writes `bin/solid-gemc-run` into your workspace — a launcher that runs the newest installed plugin wrapper, from the agent or a plain terminal (a terminal uses an already-downloaded image; it never downloads one). `bin/solid-gemc-run analyze runs/<id>` plots the post-converted `out.root` with ROOT in the container (SVG + `plots.pdf` + per-branch stats; `--python` for host uproot PNGs). `bin/solid-gemc-run shell` drops you into a tcsh prompt with the env exported, to follow upstream's scripts directly.
+Init writes `bin/solid-gemc-run` into your workspace — a launcher that runs the newest installed plugin wrapper, from the agent or a plain terminal (a terminal uses an already-downloaded image; it never downloads one). `bin/solid-gemc-run run <project>/<gcard> <source-dir>` is one whole run (gemc, `evio2root` with the GCard's detector banks, `config.json`, plots); `bin/solid-gemc-run analyze runs/<id>` re-plots the post-converted `out.root` with ROOT in the container (SVG + `plots.pdf` + per-branch stats; `--python` for host uproot PNGs). `bin/solid-gemc-run shell` drops you into a tcsh prompt with the env exported, to follow upstream's scripts directly.
 
 ## What it does
 

@@ -85,8 +85,10 @@ project dir. Convention from `solid_gemc/analysis/hgc_study/`:
   orchestrator skill writes `gcard.gcard`, `out.evio`,
   `out.root`, `log.txt`, `config.json` per run.
 
-For default plots from `runs/<id>/out.root`, run
-`../bin/solid-gemc-run analyze runs/<id>` — ROOT in the container writes
+A run is one command from the workspace root:
+`bin/solid-gemc-run run <project>/<gcard> <source-dir>` (gemc, evio2root
+with the detector banks, `config.json`, default plots). To re-plot an
+existing run, `../bin/solid-gemc-run analyze runs/<id>` — ROOT in the container writes
 `hist_*.svg` + `plots.pdf` and prints per-branch stats. Add `--python`
 for host-side uproot PNGs instead.
 

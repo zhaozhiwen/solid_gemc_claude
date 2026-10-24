@@ -23,6 +23,8 @@ state and locked decisions), then this file (rules + contracts), then
 `PLAN.md` only if you need the historical context behind a structural
 choice. `PLAN.md` lines about "drop the build subcommand", "pin a
 ghcr.io/gemc tag", "NL → GCard" surfaces are all superseded.
+Known issues and polish no test fails on yet live in `BACKLOG.md` (tracked);
+remove an item in the commit that fixes it.
 
 ## Template repo (read-only reference)
 
@@ -189,6 +191,7 @@ gate; execute with stop-on-failure post-condition checks.
 # through bin/solid-gemc-run. The wrapper is the one seam for everything:
 
 bin/solid-gemc-run init [--force]             # workspace skeleton + pull .sif + clone + 2× scons build
+bin/solid-gemc-run run <gcard> <source-dir> [N] # one run: gemc + evio2root -R=flux -B=<banks> + config.json + analyze
 bin/solid-gemc-run analyze <run|id|root> [N]  # default plots from out.root: container ROOT → SVG + plots.pdf + stats
 bin/solid-gemc-run analyze --python <run> [N] # same with host uproot → PNGs (installs the venv lazily)
 bin/solid-gemc-run setup-python               # idempotently install the venv for analyze --python
@@ -244,8 +247,6 @@ each ends by checking that.
   the subagents' timed step tables via `verify`). Report the slow steps with the result.
 - Read only a test's summary; triage failures with a fresh subagent on the kept
   sandbox (`SGC_KEEP=1` keeps it on success too).
-- Known-fail: a Codex-installed `init` writes no workspace `CLAUDE.md` (Codex drops the
-  symlink) — reported, not failed, until fixed.
 - No manual checklists: `tests/README.md` lists what no test covers yet ("Not covered
   yet") — automate an item before adding a checklist back.
 

@@ -41,8 +41,9 @@ the start. The basic and full tests share one script (`full-test.sh`), its
   `init` writes the workspace files, marker and launcher and no `cache/` →
   `info` through the launcher reports that tool's install and data dir (a plain
   terminal is read-only) → the workspace and solid_gemc tree are bind-mounted from a
-  deep folder → a 2-event `cherenkov.gcard` run (gemc + `evio2root -R=flux`) →
-  `analyze` (container ROOT) writes SVGs, `plots.pdf` and stats lines without a venv →
+  deep folder → the skill's GCard edit on `cherenkov.gcard` (2 events, optical photons) →
+  one `run` (gemc + `evio2root -R=flux -B` + `config.json` + analyze): SVGs, `plots.pdf`,
+  many `solid_hgc` hits, no venv →
   `analyze --python` writes PNGs and the venv sits at the workspace root.
 - **Leak scan**: no `/home/$USER` in shipped files.
 
@@ -67,8 +68,8 @@ The venvs install from a persistent, test-only uv cache (`.test-cache/uv`, gitig
 ~200 MB; never your real `~/.cache/uv`), so only the first run downloads from PyPI. The
 full test doesn't use it.
 
-Pass: `ALL GREEN — N pass, 1 known-fail`. A failure keeps the sandbox
-(`/tmp/sgc-quick.*`, path printed); its `logs/` has every install and init log.
+Pass: `ALL GREEN — N pass, 0 known-fail`. A failure keeps the sandbox
+(`/var/tmp/sgc-quick.*`, path printed); its `logs/` has every install and init log.
 
 ## Basic test
 
@@ -125,13 +126,7 @@ tests/full-test.sh cleanup <dir>         # stops sessions + sandbox processes; S
 - If the image host (personal Duke webhome, no SLA) is down, the test fails at the
   download — what a real user would hit. There is no fallback.
 - Read only `summary.md`; triage a FAIL with a fresh subagent on `<dir>/logs/`.
-- Status: built, not yet run (basic test likewise).
-
-## Known-fail
-A Codex-installed `init` writes no workspace `CLAUDE.md`: `codex plugin add` drops
-symlinks, and `templates/CLAUDE.md` is a symlink to `AGENTS.md`. Codex itself reads
-`AGENTS.md`, but a later Claude Code session in that workspace gets no rules. Reported
-as `KNOWN-FAIL`, not a failure, until `init` is fixed.
+- Status: the full test is built, not yet run. The basic test passed on 2026-10-24 (round 7: Claude ~3.5 min, Codex ~6 min, request to final report).
 
 ## Not covered yet
 Behaviors already in the plugin that no test checks (from the deleted manual

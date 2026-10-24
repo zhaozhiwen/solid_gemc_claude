@@ -32,8 +32,11 @@ read_consts() { # plugin-root → SIF_NAME, DATA_NAME
 # new_sandbox prefix. Every tool call runs through iso():
 # fake HOME + whitelisted env, so nothing from the operator's session
 # (CLAUDECODE, CODEX_*, CLAUDE_CODE_*) leaks in.
+# /var/tmp, not /tmp: Codex refuses to create its sandbox helper when CODEX_HOME
+# is under the temp dir, and then no shell command starts. Not inside the repo
+# either — both tools would load the maintainer AGENTS.md/CLAUDE.md up-tree.
 new_sandbox() {
-  SCRATCH=$(mktemp -d -t "$1.XXXXXX")
+  SCRATCH=$(mktemp -d -p /var/tmp "$1.XXXXXX")
   mkdir -p "${SCRATCH}/logs"
   FAKE_HOME="${SCRATCH}/home"; mkdir -p "${FAKE_HOME}"
   TOOL_PATH="$(dirname "$(command -v claude)"):$(dirname "$(command -v codex)"):$(dirname "$(command -v apptainer)"):/usr/local/bin:/usr/bin:/bin"
@@ -141,11 +144,11 @@ tier_0() { # plugin-root — unit checks of that root's wrapper + launcher templ
   # Container-free, no network. Verifies the subcommands exist, that the .sif
   # cache follows the detected agent tool, and that the venv is workspace-rooted.
   log "tier 0 — wrapper unit checks on ${T0_ROOT} (no container, no network)"
-  for sub in init analyze setup-python paths; do
+  for sub in init run analyze setup-python paths; do
     "${T0_ROOT}/bin/solid-gemc-run" help | grep -qE "^  ${sub} " \
       || fail "subcommand '${sub}' missing from help"
   done
-  pass "init/analyze/setup-python/paths present in help"
+  pass "init/run/analyze/setup-python/paths present in help"
 
   # Run the wrapper with every detection/home var cleared, then the given
   # VAR=value pairs applied: sgclean [VAR=value...] -- <subcommand...>
@@ -283,12 +286,11 @@ tier_a() {
   ( cd "${ws}" && iso "${v}" ${sg:+SOLID_GEMC_SKIP_BUILD=1} "${W}" init ) > "${SCRATCH}/logs/A-${t}-init.log" 2>&1 \
     || fail "${t}: init failed; see logs/A-${t}-init.log"
   [[ -f "${ws}/.solid-gemc-workspace" ]] || fail "${t}: init wrote no workspace marker"
-  for f in AGENTS.md .gitignore log.md result.md report.html; do
+  for f in CLAUDE.md AGENTS.md .gitignore log.md result.md report.html; do
     [[ -f "${ws}/${f}" ]] || fail "${t}: workspace ${f} missing after init"
   done
-  if [[ -f "${ws}/CLAUDE.md" ]]; then pass "${t}: init wrote the workspace files incl. CLAUDE.md"
-  elif [[ "${t}" == codex ]]; then kfail "codex: no workspace CLAUDE.md (Codex drops the CLAUDE.md→AGENTS.md symlink on install)"
-  else fail "${t}: workspace CLAUDE.md missing after init"; fi
+  cmp -s "${ws}/CLAUDE.md" "${ws}/AGENTS.md" || fail "${t}: workspace CLAUDE.md differs from AGENTS.md"
+  pass "${t}: init wrote the workspace files incl. CLAUDE.md (= AGENTS.md)"
   [[ -x "${L}" ]] || fail "${t}: init wrote no executable bin/solid-gemc-run"
   grep -qF "\"${W}\"" "${L}" || fail "${t}: launcher fallback is not the installed wrapper"
   [[ -e "${ws}/cache" ]] && fail "${t}: a cache/ dir appeared in the workspace"
@@ -315,50 +317,38 @@ tier_a() {
   grep -qxF -- "$(readlink -f "${ws}/solid_gemc")" <<<"${out}" || fail "${t}: solid_gemc tree not bound: ${out}"
   pass "${t}: workspace root + solid_gemc tree bound from a deep cwd"
 
-  # The skill's run loop, by hand: seed a project, prep cherenkov.gcard, run
-  # gemc from the upstream dir (cwd-relative detectors), evio2root, analyze.
+  # The skill's run loop: seed a project, prep cherenkov.gcard (the skill's 3c
+  # edit, OPTICAL=1), then one `run` through the launcher: gemc from the upstream
+  # dir, evio2root -R=flux -B=<banks>, config.json, analyze.
   local root proj=quick_${t} SRC DEST SOURCE_DIR RUN_DIR
   root=$( iso "${v}" "${L}" paths | awk '/^root:/{print $2}' )
-  ( cd "${ws}" && cp -r "${root}/templates/workspace/." "${proj}/" )
+  ( cd "${ws}" && cp -r "${root}/templates/workspace/." "${proj}/" \
+      && { [[ -f "${proj}/CLAUDE.md" ]] || cp "${proj}/AGENTS.md" "${proj}/CLAUDE.md"; } )
   [[ -f "${ws}/${proj}/log.md" ]] || fail "${t}: project not seeded from the installed templates"
   SRC=$(cd "${ws}" && find -L solid_gemc/analysis -mindepth 2 -maxdepth 2 -name cherenkov.gcard | head -1)
   [[ -n "${SRC}" ]] || fail "${t}: cherenkov.gcard not found under solid_gemc/analysis/"
-  DEST="${ws}/${proj}/cherenkov.gcard"; SOURCE_DIR="${ws}/$(dirname "${SRC}")"
-  cp "${ws}/${SRC}" "${DEST}"
-  python3 - "${DEST}" 2 out.evio 0 <<'PY'
-import re, sys, pathlib
-path, n_events, output_name, gui_keep = sys.argv[1:5]
-strip_keys = ['OUTPUT', 'N'] + ([] if gui_keep == '1' else ['USE_GUI'])
-text = pathlib.Path(path).read_text()
-m = re.search(r'(<gcard>)(.*?)(</gcard>)', text, re.DOTALL)
-head, body, tail = m.groups()
-body = re.sub(r'^[ \t]*<option name="(' + '|'.join(strip_keys) + r')"[^>]*/>[ \t]*\n',
-              '', body, flags=re.MULTILINE)
-adds = [f'<option name="OUTPUT" value="evio,{output_name}"/>',
-        f'<option name="N" value="{n_events}"/>']
-if gui_keep != '1':
-    adds.append('<option name="USE_GUI" value="0"/>')
-new_body = body.rstrip() + '\n' + '\n'.join(adds) + '\n'
-pathlib.Path(path).write_text(text[:m.start(2)] + new_body + text[m.end(2):])
-PY
-  ( cd "${ws}" && iso "${v}" "${L}" validate-gcard "${DEST}" ) >/dev/null || fail "${t}: GCard invalid"
-  RUN_DIR="${ws}/${proj}/runs/$(date -u +%Y%m%d-%H%M%S)-quick"
-  mkdir -p "${RUN_DIR}" && cp "${DEST}" "${RUN_DIR}/gcard.gcard"
-  ( cd "${SOURCE_DIR}" && iso "${v}" "${sgv}" "${L}" exec \
-      "solid_gemc '${RUN_DIR}/gcard.gcard' -OUTPUT='evio,${RUN_DIR}/out.evio'" ) > "${RUN_DIR}/log.txt" 2>&1 \
-    || fail "${t}: gemc failed; see ${RUN_DIR}/log.txt"
-  ( cd "${RUN_DIR}" && iso "${v}" "${sgv}" "${L}" exec "evio2root -INPUTF=out.evio -R=flux" ) >> "${RUN_DIR}/log.txt" 2>&1 \
-    || fail "${t}: evio2root failed; see ${RUN_DIR}/log.txt"
-  [[ -s "${RUN_DIR}/out.evio" && -s "${RUN_DIR}/out.root" ]] || fail "${t}: out.evio/out.root missing"
+  DEST="${proj}/cherenkov.gcard"; SOURCE_DIR="$(dirname "${SRC}")"
+  cp "${ws}/${SRC}" "${ws}/${DEST}"
+  sed -n '/^### 3c. Prepare the GCard/,/^### 3d/p' "${root}/skills/solid-gemc/SKILL.md" \
+    | awk '/^python3 - "\$DEST"/{f=1; next} /^PY$/{f=0} f' > "${SCRATCH}/gcardprep.py"
+  python3 "${SCRATCH}/gcardprep.py" "${ws}/${DEST}" 2 1 || fail "${t}: the skill's GCard edit failed"
+  ( cd "${ws}" && iso "${v}" "${L}" run "${DEST}" "${SOURCE_DIR}" 4 ) > "${SCRATCH}/logs/A-${t}-run.log" 2>&1 \
+    || fail "${t}: run failed; see logs/A-${t}-run.log"
+  RUN_DIR=$(awk '/^run dir: /{print $3}' "${SCRATCH}/logs/A-${t}-run.log")
+  [[ -n "${RUN_DIR}" ]] || fail "${t}: run printed no 'run dir:' line"
+  for f in gcard.gcard out.evio out.root log.txt config.json plots.pdf; do
+    [[ -s "${RUN_DIR}/${f}" ]] || fail "${t}: run dir has no ${f}"
+  done
+  python3 -c "import json,sys; d=json.load(open(sys.argv[1])); sys.exit(d['exit_code'] != 0 or d['n_events'] != '2' or not d['evio2root_banks'])" \
+    "${RUN_DIR}/config.json" || fail "${t}: config.json exit_code/n_events/evio2root_banks wrong"
   grep -q "Number of events to be simulated set to: 2" "${RUN_DIR}/log.txt" || fail "${t}: gemc did not run N=2"
-  pass "${t}: gemc + evio2root (out.root $(stat -c %s "${RUN_DIR}/out.root") bytes)"
-  ( cd "${ws}" && iso "${v}" "${L}" analyze "${RUN_DIR}" 4 ) > "${SCRATCH}/logs/A-${t}-analyze.log" 2>&1 \
-    || fail "${t}: analyze failed; see logs/A-${t}-analyze.log"
   (( $(ls "${RUN_DIR}"/*.svg 2>/dev/null | wc -l) >= 1 )) || fail "${t}: analyze wrote no SVGs"
-  [[ -s "${RUN_DIR}/plots.pdf" ]] || fail "${t}: analyze wrote no plots.pdf"
-  grep -q "entries=.*mean=" "${SCRATCH}/logs/A-${t}-analyze.log" || fail "${t}: analyze printed no stats lines"
+  # -B decoded the HGC bank and optical photons were recorded: many solid_hgc hits.
+  local nhits
+  nhits=$(awk '/tree solid_hgc: /{f=1; next} f && /entries=/{sub(/.*entries=/, ""); print $1; exit}' "${SCRATCH}/logs/A-${t}-run.log")
+  (( ${nhits:-0} > 10 )) || fail "${t}: solid_hgc has ${nhits:-no} hits (want optical photons; evio2root -B); see logs/A-${t}-run.log"
   [[ -e "${ws}/venv" ]] && fail "${t}: default analyze created a venv"
-  pass "${t}: analyze (container ROOT) → SVGs + plots.pdf + stats, no venv"
+  pass "${t}: run → gemc + evio2root -B + config.json + analyze; solid_hgc ${nhits} hits; no venv"
   ( cd "${ws}" && iso "${v}" "${L}" analyze --python "${RUN_DIR}" 4 ) > "${SCRATCH}/logs/A-${t}-analyze-python.log" 2>&1 \
     || fail "${t}: analyze --python failed; see logs/A-${t}-analyze-python.log"
   (( $(ls "${RUN_DIR}"/*.png 2>/dev/null | wc -l) >= 1 )) || fail "${t}: analyze --python wrote no PNGs"

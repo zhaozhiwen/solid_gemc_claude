@@ -497,12 +497,15 @@ cmd_init() {
   local tdir="${PLUGIN_ROOT}/templates" f src dst
   for f in CLAUDE.md AGENTS.md .gitignore log.md result.md report.html; do
     src="${tdir}/${f}"; dst="./${f}"
+    # CLAUDE.md is a symlink to AGENTS.md in the repo; `codex plugin add` drops
+    # symlinks, so write it from the real AGENTS.md on every platform.
+    [[ "${f}" == CLAUDE.md ]] && src="${tdir}/AGENTS.md"
     [[ -e "${src}" ]] || continue
     if [[ -e "${dst}" && ${force} -eq 0 ]]; then
       log "exists, skipping (use --force to overwrite): ${dst}"
       continue
     fi
-    cp -L "${src}" "${dst}"   # -L derefs the AGENTS.md->CLAUDE.md symlink
+    cp -L "${src}" "${dst}"
     log "wrote ${dst}"
   done
 
@@ -539,9 +542,16 @@ cmd_init() {
   # in-container PATH. Catches a broken build or a broken env block immediately,
   # while the user is watching init, instead of at the first real run.
   log "verifying solid_gemc resolves inside the container..."
-  if in_container "which solid_gemc" >/dev/null 2>&1; then
+  local smoke
+  if smoke="$(in_container "which solid_gemc" 2>&1)"; then
     log "smoke ok: solid_gemc on PATH in-container"
+  elif grep -qiE "operation not permitted|FATAL" <<<"${smoke}"; then
+    printf '%s\n' "${smoke}" | tail -5 >&2
+    [[ -n "${CODEX_THREAD_ID:-}${CODEX_CI:-}" ]] \
+      && die "apptainer could not start the container — Codex's sandbox blocks it. Approve running solid-gemc-run outside the sandbox, or set /permissions to 'Ask for approval' so Codex can ask."
+    die "apptainer could not start the container (see the error above)"
   else
+    printf '%s\n' "${smoke}" | tail -5 >&2
     die "post-build smoke failed: 'solid_gemc' not found on PATH inside the container (build or env block is broken)"
   fi
 }
@@ -578,6 +588,97 @@ cmd_analyze() {
   ls -1 "${run_dir}"/*.svg "${run_dir}"/plots.pdf 2>/dev/null || true
 }
 
+# One simulation run, end to end, as one command (one step for an agent to run
+# and a user to approve): check the GCard, freeze it into <project>/runs/<id>/,
+# run gemc from <source-dir> (gemc resolves <detector name> from its cwd),
+# convert with evio2root -R=flux -B=<the GCard's detector banks> (without -B the
+# detector trees come out empty), write config.json, then analyze.
+cmd_run() {
+  local gcard="${1:-}" src="${2:-}" max_plots="${3:-12}"
+  [[ -f "${gcard}" && -d "${src}" ]] \
+    || die "usage: solid-gemc-run run <project>/<preset>.gcard <source-dir> [max-plots]"
+  resolve_solid_gemc
+  if [[ -z "${SoLID_GEMC:-}" ]]; then
+    [[ -d solid_gemc ]] || die "no solid_gemc/ here; run from the workspace root (see 'init')"
+    export SoLID_GEMC="$(pwd)/solid_gemc"
+  fi
+  # Logical (not -P) paths: provenance names the workspace's solid_gemc/ even
+  # when it is a symlink.
+  gcard="$(cd "$(dirname "${gcard}")" && pwd)/$(basename "${gcard}")"
+  src="$(cd "${src}" && pwd)"
+  cmd_validate_gcard "${gcard}"
+
+  local id run_dir log start t0 gemc_exit=0 e2r_exit=- banks=""
+  id="$(date -u +%Y%m%d-%H%M%S)-$(printf '%06x' $(( (RANDOM << 15 | RANDOM) & 0xffffff )))"
+  run_dir="$(dirname "${gcard}")/runs/${id}"; log="${run_dir}/log.txt"
+  mkdir -p "${run_dir}"
+  cp "${gcard}" "${run_dir}/gcard.gcard"
+  EXTRA_BIND_PATHS=("${run_dir}")
+  start="$(date -u +%Y-%m-%dT%H:%M:%SZ)"; t0=${SECONDS}
+
+  log "run ${id}: gemc from ${src}"
+  ( cd "${src}" && in_container \
+      "solid_gemc '${run_dir}/gcard.gcard' -OUTPUT='evio,${run_dir}/out.evio'" ) \
+    > "${log}" 2>&1 || gemc_exit=$?
+  tail -n 5 "${log}" >&2
+  if (( gemc_exit == 0 )) && [[ -s "${run_dir}/out.evio" ]]; then
+    banks="$(python3 - "${run_dir}/gcard.gcard" "${src}" <<'PY'
+import os, re, sys, pathlib
+text = re.sub(r'<!--.*?-->', '', pathlib.Path(sys.argv[1]).read_text(), flags=re.DOTALL)
+banks = []
+for name in re.findall(r'<detector\s+name="([^"]+)"', text):
+    p = os.path.abspath(os.path.join(sys.argv[2], name))
+    if pathlib.Path(p + "__bank.txt").is_file() and p not in banks:
+        banks.append(p)
+print(" ".join(banks))
+PY
+)"
+    log "evio2root -R=flux${banks:+ -B=${banks}}"
+    e2r_exit=0
+    ( cd "${run_dir}" && in_container \
+        "evio2root -INPUTF=out.evio -R=flux${banks:+ -B='${banks}'}" ) \
+      >> "${log}" 2>&1 || e2r_exit=$?
+    tail -n 3 "${log}" >&2
+  fi
+
+  local sha repo n
+  sha="$(git -C "${SoLID_GEMC}" rev-parse HEAD 2>/dev/null || echo unknown)"
+  repo="$(git -C "${SoLID_GEMC}" remote get-url origin 2>/dev/null | sed -E 's#://[^/@]+@#://#' || true)"
+  n="$(grep -oE '<option name="N" value="[^"]+"' "${run_dir}/gcard.gcard" | head -1 | sed 's/.*value="//; s/"$//' || true)"
+  python3 - "${run_dir}/config.json" "${id}" "$(basename "$(dirname "${gcard}")")" "${gcard}" \
+      "${run_dir}" "${src}" "${n}" "${SIF_NAME}" "${repo:-unknown}" "${sha}" "${GEMC_VERSION}" \
+      "${SoLID_GEMC}" "${start}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$((SECONDS - t0))" \
+      "${gemc_exit}" "${e2r_exit}" "${banks}" <<'PY'
+import json, sys, pathlib
+(out, rid, project, gsrc, rdir, src, n, sif, repo, sha, gv, sg,
+ start, end, wall, gx, ex, banks) = sys.argv[1:]
+num = lambda v: None if v == "-" else int(v)
+gx, ex = int(gx), num(ex)
+d = {
+  "run_id": rid, "project": project,
+  "gcard_source": gsrc, "gcard_frozen": f"{rdir}/gcard.gcard",
+  "source_dir": src, "n_events": n, "sif_name": sif,
+  "solid_gemc": sg, "solid_gemc_repo": repo, "solid_gemc_sha": sha, "gemc_version": gv,
+  "start_utc": start, "end_utc": end, "wall_seconds": int(wall),
+  "gemc_exit_code": gx, "evio2root_exit": ex,
+  "exit_code": gx if gx else (ex if ex is not None else 1),
+  "evio2root_banks": banks,
+  "command": "solid_gemc <gcard_frozen> -OUTPUT=evio,<run>/out.evio  (cwd: source_dir); "
+             "evio2root -INPUTF=out.evio -R=flux -B=<evio2root_banks>  (cwd: run dir)",
+}
+pathlib.Path(out).write_text(json.dumps(d, indent=2) + "\n")
+PY
+  (( gemc_exit == 0 )) || die "gemc failed (exit ${gemc_exit}); see ${log}. Run dir: ${run_dir}"
+  # gemc exits 0 even when it can't load a detector ("Failed to open geometry
+  # file … Exiting.") — usually a <detector name> not found from <source-dir>.
+  [[ -s "${run_dir}/out.evio" ]] \
+    || die "gemc wrote no out.evio (a detector not found from ${src}? see ${log}). Run dir: ${run_dir}"
+  [[ "${e2r_exit}" == 0 ]] || die "evio2root failed (exit ${e2r_exit}); see ${log}. Run dir: ${run_dir}"
+  log "run ${id}: gemc + evio2root ok ($((SECONDS - t0)) s); config.json written"
+  cmd_analyze "${run_dir}" "${max_plots}"
+  echo "run dir: ${run_dir}"
+}
+
 # Print resolved paths so a platform-neutral skill can locate the plugin's
 # templates/reference dirs and the cache/venv without knowing the host's
 # env-var conventions.
@@ -603,6 +704,9 @@ Usage: solid-gemc-run <subcommand> [args]
 
 Subcommands:
   init [--force]                Bootstrap workspace: scaffold files + pull + clone + build.
+  run <gcard> <source-dir> [N]  One run: check + freeze the GCard into <project>/runs/<id>/,
+                                gemc from <source-dir>, evio2root -R=flux -B=<detector banks>,
+                                config.json, then analyze (max N plots).
   analyze [--python] <run|id|root> [N]
                                 Default plots from a run's out.root (max N): ROOT in the
                                 container (SVG + plots.pdf); --python: host uproot PNGs.
@@ -640,6 +744,7 @@ case "${sub}" in
 esac
 case "${sub}" in
   init)            cmd_init "$@" ;;
+  run)             cmd_run "$@" ;;
   analyze)         cmd_analyze "$@" ;;
   setup-python)    cmd_setup_python "$@" ;;
   paths)           cmd_paths "$@" ;;

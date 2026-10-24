@@ -12,9 +12,9 @@ a helper: never fix files, run the plugin yourself, or hint at commands to the a
 ## How to interact
 Only through tmux, from your own shell:
 
-- Read the screen: `tmux capture-pane -p -t '=@SESSION@' -S -120`
-- Type text: `tmux send-keys -t '=@SESSION@' -l '<text>'`, then **wait 2 s**, then
-  `tmux send-keys -t '=@SESSION@' Enter` (Codex treats text followed at once by Enter
+- Read the screen: `tmux capture-pane -p -t '=@SESSION@:' -S -120`
+- Type text: `tmux send-keys -t '=@SESSION@:' -l '<text>'`, then **wait 2 s**, then
+  `tmux send-keys -t '=@SESSION@:' Enter` (Codex treats text followed at once by Enter
   as a paste and inserts a newline instead of submitting).
 - Pick a highlighted menu option: `Enter`; move with `Down` / `Up`.
 - Poll every 20–30 s while it works (`esc to interrupt` on screen means busy). Don't
@@ -26,6 +26,10 @@ Once the session is idle at its input prompt (answer any first-run screens first
 type exactly:
 
 > @REQUEST@
+
+Then check that it shows as a sent message. A fresh Codex can ignore input for a few
+minutes while it sets itself up; if the text sits unsent or vanishes, clear the input,
+send it again, and note the delay.
 
 ## Answering prompts — as a sensible new user
 - **First-run screens** (theme, tips, notices, "trust this folder?"): pick the default
@@ -43,6 +47,8 @@ type exactly:
 - **Anything else unexpected**: answer as a reasonable user would, and record it.
 
 ## What to record
+Keep any working files (poll scripts, notes) in `@SANDBOX@/logs/@TOOL@-work/` only —
+another tester runs in parallel, so never use a shared scratch or temp path.
 Keep notes as you go: every prompt verbatim (or its first lines), your answer and why,
 the time it appeared (`date -u +%T` when you see it — your poll interval is the
 resolution; mark a step you missed `?`), and anything a real user would find confusing, slow, or wrong
@@ -65,7 +71,9 @@ Then write `@VERDICT@`:
 - [x|  ] Every prompt was answerable by a new user without outside knowledge
 - [x|  ] The run finished; the session reported where the results are
 - [x|  ] @PROJECT@/runs/<id>/ has out.root, config.json and plots
-- [x|  ] Nothing tried to act outside the sandbox (or every such attempt was denied)
+- [x|  ] Nothing tried to act outside the sandbox (or every such attempt was denied).
+  The session's temp dir (`TMPDIR`) is inside the sandbox; a tool's own scratch or
+  state files elsewhere are not the plugin acting — note them, don't fail on them
 
 ## Prompts seen
 | time | prompt (verbatim, short) | answer | why |

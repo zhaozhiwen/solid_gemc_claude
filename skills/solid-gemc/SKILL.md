@@ -1,6 +1,6 @@
 ---
 name: solid-gemc
-description: Orchestrate the full solid_gemc (SoLID experiment) simulation flow from a single natural-language user request. Load whenever the user asks to "simulate", "run", "do a SoLID / solid_gemc / PVDIS / SIDIS / J/psi / He-3 / heavy-gas Cherenkov" study — including one-shot setups like "PVDIS A_PV asymmetry on LD2 at 11 GeV" or "SIDIS heavy-gas Cherenkov yield on He-3". Forces a gated `bin/solid-gemc-run init` (one-time workspace bootstrap) first when the workspace isn't initialized — before any plan — then captures the physics spec across seven fields (including project name), asks targeted clarifying questions when something required is missing, presents a brief plan for approval, and drives the run end-to-end — seed a project subdir from the per-project template if it doesn't exist, then the simulation (the skill writes the GCard edits, runs `solid_gemc` + `evio2root` inside the container, records provenance), then `analyze` for default plots with ROOT inside the container. Works on Claude Code and Codex CLI.
+description: Orchestrate the full solid_gemc (SoLID experiment) simulation flow from a single natural-language user request. Load whenever the user asks to "simulate", "run", "do a SoLID / solid_gemc / PVDIS / SIDIS / J/psi / He-3 / heavy-gas Cherenkov" study — including one-shot setups like "PVDIS A_PV asymmetry on LD2 at 11 GeV" or "SIDIS heavy-gas Cherenkov yield on He-3". Forces a gated `bin/solid-gemc-run init` (one-time workspace bootstrap) first when the workspace isn't initialized — before any plan — then captures the physics spec across seven fields (including project name), asks targeted clarifying questions when something required is missing, presents the full plan for approval, and drives the run end-to-end — seed a project subdir from the per-project template if it doesn't exist, then the simulation (the skill writes the GCard edits, runs `solid_gemc` + `evio2root` inside the container, records provenance), then `analyze` for default plots with ROOT inside the container. Works on Claude Code and Codex CLI.
 ---
 
 # solid-gemc — full-flow orchestrator
@@ -42,6 +42,14 @@ The wrapper resolves its own image cache (the running tool's plugin
 data dir, detected from the shell env) and venv (`<workspace-root>/venv`),
 so this skill passes no cache/venv paths.
 
+**On Codex:** apptainer cannot run inside Codex's sandbox, so request
+escalation (run outside the sandbox) on the **first** call of every
+`$SGC_RUN` command that starts the container — `init`, `run`, `exec`,
+`root`, `analyze`, `validate-gcard`, `build`, `shell`, `pull` — rather than
+trying sandboxed first. If the escalation is rejected, give the user the
+exact message in "Failure handling" → **Codex sandbox**. If you put a step into a script file, write it
+under `<project>/` (never `/tmp`) and show it before asking to run it.
+
 ## Workspace layout
 
 The plugin uses a **two-tier workspace**:
@@ -65,10 +73,10 @@ init                                          (Step 0 — gated once, before pla
   → ensure <project>/ subdir exists           (seed from templates/workspace/ if not)
   → pick a GCard from solid_gemc/script/      (canonical) or solid_gemc/analysis/*/
   → copy to <project>/<preset>.gcard + apply batch overrides
-  → bin/solid-gemc-run exec "solid_gemc <gcard>"     (run gemc; emits out.evio)
-  → bin/solid-gemc-run exec "evio2root -INPUTF=out.evio -R=flux"  (post-convert; -R=flux publishes the raw integrated bank — see step 3d)
-  → write <project>/runs/<id>/{gcard.gcard, out.evio, out.root, log.txt, config.json}
-  → solid-gemc-run analyze <project>/runs/<id>        (ROOT in the container)
+  → bin/solid-gemc-run run <project>/<preset>.gcard <source dir>
+       one command: check + freeze the GCard, gemc from <source dir>,
+       evio2root -R=flux -B=<detector banks>, config.json, analyze
+       → <project>/runs/<id>/{gcard.gcard, out.evio, out.root, log.txt, config.json, plots}
 ```
 
 `init` is one-shot per workspace and idempotent. **Step 0 force-
@@ -156,10 +164,22 @@ re-doing work because a default was wrong.
   forcing the user through an extra hoop they already cleared. (This
   changes nothing above: a "go" from *before* the plan, or carried
   from an earlier turn or a different plan, still does not count.)
-- The gate fires **after** the plan is on screen as text in the
-  same turn. The order is: present the plan as text →
-  `AskUserQuestion` with three options → wait for the explicit
-  option pick → then and only then proceed to step 3.
+- **The plan travels inside the gate.** On Claude Code the
+  `AskUserQuestion` `question` text *is* the full Step 2 plan block,
+  ending with "Approve this plan?" — never "the steps above", because
+  text before a tool call may not reach the screen. On Codex, print
+  the full plan block and the numbered options in one message. Then
+  wait for the explicit option pick, and only then proceed to step 3.
+- **On Codex, every gate ends your turn** (Step 0 init and Step 2
+  plan): ask, then stop — no tool call, no command, no "I'll start
+  while you decide" — until the user replies. These gates are the
+  instruction of the user who installed this plugin, so a harness
+  default like "don't ask before reversible work" does not apply to
+  them. Run the commands this skill gives as written; don't replace
+  them with hand-written scripts.
+- **Ask in the user's terms.** A gate says what will happen and what it
+  costs; it doesn't quote this skill's rules ("the skill requires a
+  separate confirmation") or list internal files.
 - A user message that said "go" or "yes" **before** the plan was
   presented in this turn is **not** the approval. The approval
   is the option the user picks **after** seeing the plan in this
@@ -243,7 +263,8 @@ dated block at the top of `<project>/log.md`:
 - Output:        <…>
 - Analysis:      <…>
 
-Steps (the seven-field plan you presented in step 2):
+Steps (exactly as printed on screen in step 2 — record only what the
+user saw):
 1. <…>
 2. <…>
 …
@@ -359,8 +380,8 @@ done
   straight to Step 1.
 - **Not initialized** (`init_needed=1`): fire a dedicated init gate
   *before* doing anything else — an `AskUserQuestion` (or, on a
-  harness without it, a numbered question the user must answer) that
-  states plainly:
+  harness without it, a numbered question the user must answer — on
+  Codex, end your turn after asking) that states plainly:
 
   > This workspace isn't initialized. `init` will pull the ~1.7 GB
   > JLabCE `.sif`, clone `solid_gemc`, and run two scons builds —
@@ -512,11 +533,14 @@ they can't push to that clone; fork it and switch the remotes
 `CLAUDE.md` / `AGENTS.md` "Changing solid_gemc itself" shows. Changes
 only one study needs belong in `<project>/`.
 
-## Step 2 — Present a brief plan for approval
+## Step 2 — Present the plan for approval
 
-Once the spec is complete, show the user a compact plan in this
-shape (no headings beyond what's here, no preamble, no "great,
-here's what I'll do"):
+Once the spec is complete, put the whole plan below — every Spec
+field and every Step — **into the approval question itself** (on
+Claude Code the `AskUserQuestion` `question` text; on Codex the
+message that lists the numbered options). The user approves what is
+on screen: a one-line summary or "the steps above" doesn't count. No
+headings beyond what's here, no preamble, no "great, here's what I'll do":
 
 ```
 Plan: <one-sentence description of the simulation>
@@ -532,13 +556,11 @@ Spec
 
 Steps  (workspace already initialized in Step 0)
 1. seed <project>/ from templates/workspace/. (skip if already there)
-2. copy <project>/<preset>.gcard from solid_gemc/script/<preset>.gcard (or .../analysis/.../<preset>.gcard); apply USE_GUI=0 + OUTPUT=evio,out.evio + N=<n>
+2. copy <project>/<preset>.gcard from solid_gemc/script/<preset>.gcard (or .../analysis/.../<preset>.gcard); apply USE_GUI=0 + OUTPUT=evio,out.evio + N=<n> + RECORD_OPTICALPHOTONS=1 (default; 0 if the user turns it off)
 3. <only if user wants non-default beam/physics:> edit <project>/<preset>.gcard
-4. bin/solid-gemc-run exec "solid_gemc <abs gcard> -OUTPUT=evio,<abs run dir>/out.evio"  (from the gcard's upstream dir)
-   then bin/solid-gemc-run exec "evio2root -INPUTF=out.evio -R=flux"   (from <project>/runs/<id>/; -R=flux requests the raw bank for the flux detector)
-   write <project>/runs/<id>/{gcard.gcard, out.evio, out.root, log.txt, config.json}
-5. solid-gemc-run analyze <project>/runs/<id>
-     <one line: auto-plots | custom ROOT macro <project>/<id>.C | Python <project>/<id>.py (only if asked)>
+4. bin/solid-gemc-run run <project>/<preset>.gcard <source dir>   (source dir = the gcard's upstream dir)
+     → <project>/runs/<id>/: gemc + evio2root (-B = the GCard's detector banks) + config.json + default plots
+5. <one line: default plots only | custom ROOT macro <project>/<id>.C | Python <project>/<id>.py (only if asked)>
 
 Defaults applied
 - <only list defaults you actually filled in; skip section if none>
@@ -549,7 +571,7 @@ Open questions / risks
   path, etc. Don't manufacture caveats.>
 ```
 
-Then use `AskUserQuestion` with three options. **This gate is
+End that question with "Approve this plan?" and three options. **This gate is
 mandatory** — present it even when the user's initial message
 already said "go" or "yes" (see "Non-negotiable: plan first,
 approval gate always" above).
@@ -609,6 +631,8 @@ fi
 
 if [[ ! -d "$PROJECT" ]]; then
   cp -r "${SGC_ROOT}/templates/workspace/." "$PROJECT/"
+  # Codex installs drop the CLAUDE.md -> AGENTS.md symlink; same content.
+  [[ -f "$PROJECT/CLAUDE.md" ]] || cp "$PROJECT/AGENTS.md" "$PROJECT/CLAUDE.md"
 fi
 ```
 
@@ -627,156 +651,95 @@ Resolve the preset against `solid_gemc/script/` first, then
 `solid_gemc/analysis/*/`. Copy to `<project>/<preset>.gcard`.
 Apply batch overrides **only inside the live `<gcard>…</gcard>`
 block** (canonicals often carry a `<!-- comment out … -->` example
-block; leave it alone). The robust regex strips any existing
-`OUTPUT` / `N` / `USE_GUI` lines (the
-`name="USE_GUI"  value=...` double-space variant in some
-canonicals is matched by `[^>]*`), then appends the overrides at
-the bottom of the live block:
+block; leave it alone). The regex strips any existing `OUTPUT` / `N` /
+`USE_GUI` / `RECORD_OPTICALPHOTONS` lines (the `name="USE_GUI"  value=...`
+double-space variant in some canonicals is matched by `[^>]*`), then
+appends the overrides at the bottom of the live block.
+
+Optical photons are recorded by default (`OPTICAL=1` →
+`RECORD_OPTICALPHOTONS=1`): without them gemc records no Cherenkov light
+and the HGC / LGC show only the charged track. Recording them makes runs
+slower and the output larger, most for full-detector configs with many
+events — list it under "Defaults applied" in the plan, and set
+`OPTICAL=0` when the user doesn't need Cherenkov light or asks to turn it
+off.
 
 ```bash
 PRESET=<resolved>
 SRC=<solid_gemc/script/solid_${PRESET}.gcard or under solid_gemc/analysis/*/>
 DEST="${PROJECT}/$(basename "$SRC")"
-SOURCE_DIR=$(dirname "$SRC")   # needed at run time; gemc 2.9 resolves <detector name="..."> relative to cwd, not the GCard's location
+SOURCE_DIR=$(dirname "$SRC")   # gemc 2.9 resolves <detector name="..."> relative to its cwd, not the GCard's location
 
 cp "$SRC" "$DEST"
-python3 - "$DEST" "${N_EVENTS:-100}" "out.evio" "0" <<'PY'
+python3 - "$DEST" "${N_EVENTS:-100}" "${OPTICAL:-1}" <<'PY'
 import re, sys, pathlib
-path, n_events, output_name, gui_keep = sys.argv[1:5]
-strip_keys = ['OUTPUT', 'N'] + ([] if gui_keep == '1' else ['USE_GUI'])
+path, n_events, optical = sys.argv[1:4]
 text = pathlib.Path(path).read_text()
 m = re.search(r'(<gcard>)(.*?)(</gcard>)', text, re.DOTALL)
 if not m:
     sys.exit(f"[skill] no <gcard>...</gcard> block in {path}")
-head, body, tail = m.groups()
-body = re.sub(
-    r'^[ \t]*<option name="(' + '|'.join(strip_keys) + r')"[^>]*/>[ \t]*\n',
-    '', body, flags=re.MULTILINE)
-adds = [
-    f'<option name="OUTPUT" value="evio,{output_name}"/>',
-    f'<option name="N" value="{n_events}"/>',
-]
-if gui_keep != '1':
-    adds.append('<option name="USE_GUI" value="0"/>')
-new_body = body.rstrip() + '\n' + '\n'.join(adds) + '\n'
-pathlib.Path(path).write_text(text[:m.start(2)] + new_body + text[m.end(2):])
-PY
-
-"$SGC_RUN" validate-gcard "$DEST"
-```
-
-Post-condition: `<project>/<preset>.gcard` exists; the
-live `<gcard>` block contains the three overrides; `validate-gcard`
-returns 0.
-
-### 3d. Run gemc + evio2root
-
-Three important disciplines: (1) **cwd-relative geometry lookup** —
-gemc 2.9 resolves `<detector name="…">` from the process cwd, not
-from the GCard's path, so we `cd "$SOURCE_DIR"` (the dir holding
-the canonical's geometry siblings) before invoking `solid_gemc`.
-(2) **Absolute paths** for the GCard and OUTPUT, since cwd has
-changed. Pipe-exit-code capture is portable across bash and zsh
-via a tempfile (the harness shell may be either).
-(3) **`evio2root -R=flux`** — without `-R=`, evio2root publishes only the
-**digitized** bank for each detector, and the `flux` hitprocess's
-digitized output is just `hitn` + `id` (a slim ~200 KB ROOT with no
-Edep, no positions, no times — useless for analysis). Adding
-`-R=flux` publishes the **raw** integrated bank for the flux
-detector with all 27 fields (Edep, x/y/z, t, pid, …). If a study
-uses non-flux hitprocesses that also need raw banks, append them
-comma-separated: `-R=flux,Hits,…`.
-
-```bash
-RUN_ID=$(date -u +%Y%m%d-%H%M%S)-$(head -c 12 /dev/urandom | base32 | tr 'A-Z' 'a-z' | head -c 6)
-RUN_DIR="${PROJECT}/runs/${RUN_ID}"
-mkdir -p "$RUN_DIR"
-cp "$DEST" "$RUN_DIR/gcard.gcard"
-
-WORKSPACE_ABS=$(readlink -f .)
-RUN_DIR_ABS="${WORKSPACE_ABS}/${RUN_DIR}"
-GCARD_ABS="${WORKSPACE_ABS}/${RUN_DIR}/gcard.gcard"
-
-START_ISO=$(date -u +%Y-%m-%dT%H:%M:%SZ); START_EPOCH=$(date +%s)
-
-GEMC_EC_FILE=$(mktemp)
-( cd "$SOURCE_DIR" && \
-  SoLID_GEMC="${WORKSPACE_ABS}/solid_gemc" \
-    "$SGC_RUN" exec \
-      "solid_gemc '${GCARD_ABS}' -OUTPUT='evio,${RUN_DIR_ABS}/out.evio'"; \
-  echo $? > "${GEMC_EC_FILE}" ) 2>&1 | tee "${RUN_DIR_ABS}/log.txt"
-GEMC_EXIT=$(cat "${GEMC_EC_FILE}"); rm -f "${GEMC_EC_FILE}"
-
-EVIO2ROOT_EXIT=0
-if [[ "$GEMC_EXIT" = "0" && -f "${RUN_DIR_ABS}/out.evio" ]]; then
-  EVIO_EC_FILE=$(mktemp)
-  ( cd "$RUN_DIR_ABS" && \
-    SoLID_GEMC="${WORKSPACE_ABS}/solid_gemc" \
-      "$SGC_RUN" exec \
-        "evio2root -INPUTF=out.evio -R=flux"; \
-    echo $? > "${EVIO_EC_FILE}" ) 2>&1 | tee -a "${RUN_DIR_ABS}/log.txt"
-  EVIO2ROOT_EXIT=$(cat "${EVIO_EC_FILE}"); rm -f "${EVIO_EC_FILE}"
-fi
-END_ISO=$(date -u +%Y-%m-%dT%H:%M:%SZ); END_EPOCH=$(date +%s)
-EXIT_CODE=$([ "$GEMC_EXIT" = "0" ] && echo "$EVIO2ROOT_EXIT" || echo "$GEMC_EXIT")
-```
-
-Post-condition: `<project>/runs/<id>/{gcard.gcard,
-out.evio, out.root, log.txt}` exist and are non-empty;
-`EXIT_CODE` is 0.
-
-### 3e. Write the provenance `config.json`
-
-```bash
-SIF_NAME=$(grep '^SIF_NAME=' "$SGC_RUN" | head -1 | cut -d'"' -f2)
-SOLID_GEMC_SHA=$(cd solid_gemc && git rev-parse HEAD 2>/dev/null || echo unknown)
-# origin URL without any user:token@ part
-SOLID_GEMC_REPO=$(cd solid_gemc && git remote get-url origin 2>/dev/null | sed -E 's#://[^/@]+@#://#')
-SOLID_GEMC_REPO=${SOLID_GEMC_REPO:-unknown}
-GEMC_VERSION_PINNED=$(grep '^GEMC_VERSION=' "$SGC_RUN" | head -1 | cut -d'"' -f2)
-N_EVENTS=$(grep -oE '<option name="N" value="[^"]+"' "$RUN_DIR/gcard.gcard" | head -1 | sed 's/.*value="//; s/"$//')
-
-python3 - "$RUN_DIR/config.json" <<PY
-import json, sys, pathlib
-d = {
-  "run_id":           "${RUN_ID}",
-  "project":          "${PROJECT}",
-  "gcard_source":     "${DEST}",
-  "gcard_frozen":     "${RUN_DIR}/gcard.gcard",
-  "source_dir":       "${SOURCE_DIR}",
-  "n_events":         "${N_EVENTS}",
-  "sif_name":         "${SIF_NAME}",
-  "solid_gemc_repo":  "${SOLID_GEMC_REPO}",
-  "solid_gemc_sha":   "${SOLID_GEMC_SHA}",
-  "gemc_version":     "${GEMC_VERSION_PINNED}",
-  "start_utc":        "${START_ISO}",
-  "end_utc":          "${END_ISO}",
-  "wall_seconds":     ${END_EPOCH} - ${START_EPOCH},
-  "gemc_exit_code":   ${GEMC_EXIT},
-  "evio2root_exit":   ${EVIO2ROOT_EXIT},
-  "exit_code":        ${EXIT_CODE},
-  "command":          "solid_gemc <gcard> -OUTPUT=evio,<run>/out.evio; evio2root -INPUTF=out.evio -R=flux",
-  "cwd_gemc":         "${SOURCE_DIR}",
-  "cwd_evio2root":    "${RUN_DIR}",
-}
-pathlib.Path(sys.argv[1]).write_text(json.dumps(d, indent=2) + "\n")
+body = re.sub(r'^[ \t]*<option name="(OUTPUT|N|USE_GUI|RECORD_OPTICALPHOTONS)"[^>]*/>[ \t]*\n',
+              '', m.group(2), flags=re.MULTILINE)
+adds = ['<option name="OUTPUT" value="evio,out.evio"/>',
+        f'<option name="N" value="{n_events}"/>',
+        '<option name="USE_GUI" value="0"/>']
+if optical == '1':
+    adds.append('<option name="RECORD_OPTICALPHOTONS" value="1"/>')
+pathlib.Path(path).write_text(text[:m.start(2)] + body.rstrip() + '\n' + '\n'.join(adds) + '\n' + text[m.end(2):])
 PY
 ```
 
-`<project>/runs/<id>/config.json` is the **provenance
-record**. Treat the run dir as immutable from this point on.
+Post-condition: `<project>/<preset>.gcard` exists and its live `<gcard>`
+block has the overrides. (`run` checks the XML before running.)
 
-### 3f. Analyze
+### 3d. Run, convert, record, plot — one command
 
-Run `"$SGC_RUN" analyze <project>/runs/<id>` — ROOT inside the
-container plots each numeric branch into `hist_<tree>_<branch>.svg`
-plus one multi-page `plots.pdf` alongside `out.root`, and prints a
-stats line per branch (entries, mean, RMS, under/overflow). Check
-those numbers; the container's ROOT cannot write PNGs. For
-asymmetries / fits / multi-run comparisons, write a ROOT macro
-`<project>/<name>.C` and run it with `"$SGC_RUN" root <macro.C>`.
-Use Python (`"$SGC_RUN" analyze --python <run>` for uproot PNGs, or
-a uproot script run with `<workspace-root>/venv/bin/python` after
+From the workspace root:
+
+```bash
+"$SGC_RUN" run "$DEST" "$SOURCE_DIR" 12
+```
+
+`run` checks the GCard (xmllint), freezes it into a new
+`<project>/runs/<id>/gcard.gcard`, runs gemc from `$SOURCE_DIR`
+(detector names are cwd-relative), converts with
+`evio2root -R=flux -B=<banks>` (`-R=flux` keeps the flux detector's raw
+fields — Edep, positions, times; `-B` lists every GCard detector that has
+a `<name>__bank.txt`, without which those detector trees come out
+**empty**), writes `config.json`, and runs `analyze`. Its last line is
+`run dir: <path>`; a failure exits non-zero with the log path. Don't
+re-implement these steps by hand or in a script — one command keeps one
+approval.
+
+For a custom detector in `<project>/` (see the workspace `CLAUDE.md`),
+the source dir is `<project>` itself.
+
+Post-condition: the `run dir:` line printed; that dir has `gcard.gcard`,
+`out.evio`, `out.root`, `log.txt`, `config.json`; `config.json` has
+`"exit_code": 0`.
+
+### 3e. Provenance — `config.json`
+
+Written by `run`: run id, project, GCard source + frozen copy, source
+dir, n_events, `.sif` name, the workspace `solid_gemc` path, its
+`origin` URL (credentials stripped) and commit SHA, GEMC_VERSION,
+start/end/wall time, gemc + evio2root exit codes, `evio2root_banks`.
+It is the **provenance record**; treat the run dir as immutable.
+
+### 3f. Read the analysis
+
+`run` ends with `analyze`: ROOT inside the container prints a stats line
+per numeric branch (entries, mean, RMS, under/overflow), plots the first
+N non-constant ones into `hist_<tree>_<branch>.svg` plus one multi-page
+`plots.pdf`, skips the `header`/`userHeader` bookkeeping trees, and
+reports a tree whose branches hold no values as "no hits recorded".
+Check those numbers — "no hits" in every detector tree means the run
+produced no physics; say so. For more plots, `"$SGC_RUN" analyze
+<run dir> <N>`. For asymmetries / fits / multi-run comparisons, write a
+ROOT macro `<project>/<name>.C` and run it with `"$SGC_RUN" root
+<macro.C>` (the container's ROOT cannot write PNGs — save `.svg`/`.pdf`).
+Use Python (`"$SGC_RUN" analyze --python <run>` for uproot PNGs, or a
+uproot script run with `<workspace-root>/venv/bin/python` after
 `"$SGC_RUN" setup-python`) only when the user asks for it.
 
 ### Failure handling
@@ -785,6 +748,16 @@ If a sub-step's post-condition check fails, **stop**. Report the
 failure (last 20 lines of the run's `log.txt` or the command's
 stderr) and ask the user how to proceed. Do not silently retry,
 do not paper over the error, do not move to the next step.
+
+**Codex sandbox.** apptainer can't start inside Codex's sandbox (errors
+like `operation not permitted` from a container command or from
+`init`'s smoke). Run `solid-gemc-run` with escalation (outside the
+sandbox). If that is rejected, tell the user exactly this, then wait —
+don't work around it:
+
+> Codex blocked the container (it can't run inside Codex's sandbox).
+> Type `/permissions`, choose **Ask for approval**, then tell me to
+> continue — I'll ask you before each container command.
 
 ### Handoff documents
 

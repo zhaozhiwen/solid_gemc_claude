@@ -90,12 +90,12 @@ cmd_setup() {
   log "tier B — start one real session per tool (driven by subagents)"
   for t in "${TOOLS[@]}"; do
     name="$(session_name "${SCRATCH}" "${t}")"; ws="${SCRATCH}/wsB-${t}"
-    mkdir -p "${ws}"
+    mkdir -p "${ws}" "${SCRATCH}/tmp-${t}"
     [[ "${MODE}" == basic ]] && ln -s "${SG}" "${ws}/solid_gemc"
     # Default modes on purpose: Claude Code's default permission mode, Codex's
     # default sandbox + approvals. The `sleep` keeps the pane for capture.
     tmux new-session -d -s "${name}" -x 220 -y 50 \
-      "cd '${ws}' && env -i HOME='${FAKE_HOME}' PATH='${TOOL_PATH}' USER='${USER}' LOGNAME='${USER}' LANG=C.UTF-8 TERM=xterm-256color ${testenv} ${t}; sleep 86400"
+      "cd '${ws}' && env -i HOME='${FAKE_HOME}' PATH='${TOOL_PATH}' USER='${USER}' LOGNAME='${USER}' LANG=C.UTF-8 TERM=xterm-256color TMPDIR='${SCRATCH}/tmp-${t}' ${testenv} ${t}; sleep 86400"
     sed -e "s|@TOOL@|${t}|g" -e "s|@SESSION@|${name}|g" -e "s|@SANDBOX@|${SCRATCH}|g" \
         -e "s|@WS@|${ws}|g" -e "s|@REQUEST@|${request}|g" -e "s|@PROJECT@|${project}|g" \
         -e "s|@BUDGET@|${budget}|g" \

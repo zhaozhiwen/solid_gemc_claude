@@ -113,15 +113,16 @@ the seven-field spec, presents a plan, and on approval drives:
 1. Copy a canonical GCard from `solid_gemc/script/` or
    `solid_gemc/analysis/*/` into `<name>/<preset>.gcard`,
    applying batch overrides (`USE_GUI=0`, `OUTPUT=evio,out.evio`,
-   `N=<n>`) inside the live `<gcard>` block.
-2. Run `solid_gemc <gcard>` inside the container from the upstream
-   source dir (cwd-relative geometry lookup — gemc 2.9 resolves
-   `<detector name="...">` from the process cwd, not the GCard's
-   path). Writes `<name>/runs/<id>/out.evio`.
-3. Post-convert `out.evio` → `out.root` via `evio2root` in the
-   same container, from the run directory. Capture combined log +
-   provenance.
-4. Run `bin/solid-gemc-run analyze <name>/runs/<id>`.
+   `N=<n>`, and `RECORD_OPTICALPHOTONS=1` — on by default, so the HGC/LGC
+   record Cherenkov light; ask to turn it off for faster, smaller runs)
+   inside the live `<gcard>` block.
+2. `bin/solid-gemc-run run <name>/<preset>.gcard <source-dir>` — one
+   command: checks and freezes the GCard into `<name>/runs/<id>/`, runs
+   gemc from `<source-dir>` (the upstream folder the GCard came from:
+   gemc 2.9 resolves `<detector name="...">` from its cwd, not the
+   GCard's path), converts with `evio2root -R=flux -B=<the GCard's
+   detector banks>` (without `-B` the detector trees are empty), writes
+   `config.json` and makes the default plots.
 
 For variations: edit `<name>/<preset>.gcard` between steps
 1 and 2 (beam energy, physics list, target). GCard option
@@ -206,7 +207,8 @@ default run folder is the upstream folder the canonical GCard came
 from, and from there your `<name>/` files are not found ("Failed to
 open geometry file … Exiting."). So for a custom detector:
 
-- put the GCard in `<name>/` and run it with cwd = `<name>/`;
+- put the GCard in `<name>/` and run it from there:
+  `bin/solid-gemc-run run <name>/<gcard> <name>`;
 - point upstream detectors at the clone, e.g.
   `name="../solid_gemc/geometry/hgc_moved/solid_SIDIS_hgc"`;
 - give your detector a new name — a copy that keeps an upstream name
