@@ -10,8 +10,8 @@
 #   - each workspace's solid_gemc/ is a symlink to templates/solid_gemc
 #     (a gitignored clone + build: bin/solid-gemc-run clone|build templates/solid_gemc).
 #
-# Tiers: 0 = unit checks of the working tree's wrapper; A = installed plugin,
-# no model (init → info → bind check → gemc + evio2root → analyze, through the
+# Parts: unit checks of the working tree's wrapper; the scripted run of the
+# installed plugin, no model (init → info → bind check → gcard → run, through the
 # workspace launcher, once per tool). Real agent sessions: tests/full-test.sh.
 #
 # Usage:
@@ -40,7 +40,7 @@ timing_start "${PLUGIN_ROOT}" quick
 SGC_UV_CACHE="${PLUGIN_ROOT}/.test-cache/uv"; mkdir -p "${SGC_UV_CACHE}"
 STATE_BEFORE="$(state_sum)"
 
-tier_0 "${PLUGIN_ROOT}"
+unit_checks "${PLUGIN_ROOT}"
 
 # --- setup: clean Claude Code + Codex, plugin from the working tree ----------
 log "setup — clean Claude Code + Codex (fake HOME), plugin from the working tree"
@@ -48,8 +48,8 @@ plugin_copy "${PLUGIN_ROOT}"
 install_plugin "${PLUGIN_COPY}"
 link_sif
 
-tier_a claude "${SG}"
-tier_a codex "${SG}"
+scripted_run claude "${SG}"
+scripted_run codex "${SG}"
 
 # --- leakage scan + isolation guard ------------------------------------------
 # Hard-block the literal /home/${USER} in shipped files only (tracked +

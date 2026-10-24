@@ -230,8 +230,8 @@ each ends by checking that.
 | Purpose | fast check of the working tree, every change | the skill in real sessions, after skill/flow changes | release check: a real user's first session |
 | Plugin source | working-tree copy | working-tree copy | published GitHub marketplace (run after a push) |
 | Image / solid_gemc | `.sif` + prebuilt `templates/solid_gemc` linked; `init` skips scons | linked; `init` skips scons | real download; `init` really clones + builds |
-| Tiers | 0 unit checks · A installed plugin, no model | B: real sessions in tmux, one fresh subagent per tool playing the user (`tests/full-test-agent.md`), in parallel; `init` skips scons (`SOLID_GEMC_SKIP_BUILD=1`) | 0 · A · B |
-| Cost | ~1 min, no model calls | ~10–15 min, model calls | ~45–60 min, model calls, ~3.4 GB download |
+| Parts | unit checks · scripted run (installed plugin, no model) | session: real sessions in tmux, one fresh subagent per tool playing the user (`tests/full-test-agent.md`), in parallel; `init` skips scons (`SOLID_GEMC_SKIP_BUILD=1`) | unit checks · session (each session's `init` downloads, clones, builds) |
+| Cost | ~1 min, no model calls | ~10–15 min, model calls | ~25–35 min, model calls, ~3.4 GB download |
 
 - `templates/solid_gemc` is a gitignored clone + build for the quick test:
   `bin/solid-gemc-run clone templates/solid_gemc && bin/solid-gemc-run build templates/solid_gemc`.

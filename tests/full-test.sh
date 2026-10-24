@@ -8,12 +8,13 @@
 # auth.json copied), and any org-managed plugins that come with the account.
 #
 # Two modes (see tests/README.md):
-#   full  (this script)        no shortcuts — published install, real image
-#                              download, init really clones + builds, tiers 0 + A
-#                              on the installed plugin
+#   full  (this script)        no shortcuts — published install; each session's
+#                              init really downloads the image, clones and builds;
+#                              unit checks on the installed plugin (the scripted run
+#                              is the quick test's: it would pre-fill the image)
 #   basic (tests/basic-test.sh) the quick test's shortcuts — working-tree copy,
 #                              .sif and prebuilt templates/solid_gemc linked (init
-#                              skips scons), no tiers 0/A
+#                              skips scons), sessions only
 # In both modes the two subagents run in parallel.
 #
 # Flow (the main agent orchestrates):
@@ -80,14 +81,12 @@ cmd_setup() {
   read_consts "${root}"
 
   if [[ "${MODE}" == basic ]]; then
-    link_sif   # tiers 0 + A are the quick test's job
+    link_sif   # unit checks + scripted run are the quick test's job
   else
-    tier_0 "${root}"
-    tier_a claude ""   # real init: download into the fake data dir + clone + build
-    tier_a codex ""
+    unit_checks "${root}"   # no scripted run: the sessions' own init is the real first run
   fi
 
-  log "tier B — start one real session per tool (driven by subagents)"
+  log "session — start one real session per tool (driven by subagents)"
   for t in "${TOOLS[@]}"; do
     name="$(session_name "${SCRATCH}" "${t}")"; ws="${SCRATCH}/wsB-${t}"
     mkdir -p "${ws}" "${SCRATCH}/tmp-${t}"

@@ -16,15 +16,15 @@ the start. The basic and full tests share one script (`full-test.sh`), its
 | Plugin source | a copy of the working tree | a copy of the working tree | the published GitHub marketplace |
 | Image | symlinked into each fake data dir | symlinked | really downloaded by the plugin |
 | solid_gemc | workspaces link `templates/solid_gemc` | linked | `init` really clones and builds |
-| Tiers | 0 + A | B only | 0 + A + B |
+| Parts | unit + scripted | session | unit + session |
 | Agents | none | one real session per tool, a subagent playing the user; both in parallel | same |
-| Time | ~1 min | ~10–15 min | ~45–60 min |
-| Cost | no model calls; PyPI only on the first run (then the test uv cache) | model calls (2 sessions + 2 subagents) | model calls; ~3.4 GB download; 4 scons builds |
+| Time | ~1 min | ~10–15 min | ~25–35 min |
+| Cost | no model calls; PyPI only on the first run (then the test uv cache) | model calls (2 sessions + 2 subagents) | model calls; ~3.4 GB download; 2 builds (one `init` per session) |
 
 ## Quick test
 
 **What it checks**
-- **Tier 0 — wrapper unit checks** (container-free, on the working tree):
+- **Unit checks — the wrapper** (no container, no network, on the working tree):
   - the image cache follows the detected tool (Claude Code / Codex, custom and
     default homes); no tool or both → an existing `.sif` is used read-only and
     nothing is downloaded;
@@ -37,11 +37,11 @@ the start. The basic and full tests share one script (`full-test.sh`), its
 - `init` runs with `SOLID_GEMC_SKIP_BUILD=1`: no scons on the linked prebuilt tree (the
   test is for the plugin, not solid_gemc); `init` still requires the binary and runs its
   in-container `which solid_gemc` check.
-- **Tier A — installed plugin, no model** (once per tool): the installed wrapper's
+- **Scripted run — the installed plugin, no model** (once per tool): the installed wrapper's
   `init` writes the workspace files, marker and launcher and no `cache/` →
   `info` through the launcher reports that tool's install and data dir (a plain
   terminal is read-only) → the workspace and solid_gemc tree are bind-mounted from a
-  deep folder → the skill's GCard edit on `cherenkov.gcard` (2 events, optical photons) →
+  deep folder → `gcard cherenkov` (2 events, optical photons on; refuses to overwrite) →
   one `run` (gemc + `evio2root -R=flux -B` + `config.json` + analyze): SVGs, `plots.pdf`,
   many `solid_hgc` hits, no venv →
   `analyze --python` writes PNGs and the venv sits at the workspace root.
@@ -74,8 +74,8 @@ Pass: `ALL GREEN — N pass, 0 known-fail`. A failure keeps the sandbox
 ## Basic test
 
 The full test's real agent sessions, with the quick test's shortcuts: the plugin from
-the working tree, the `.sif` and `templates/solid_gemc` linked, no tiers 0/A (run the
-quick test for those). It checks the part only an agent session reaches — the skill
+the working tree, the `.sif` and `templates/solid_gemc` linked, sessions only (the
+quick test runs the unit checks and the scripted run). It checks the part only an agent session reaches — the skill
 picking up the request, the init and plan gates, and how the agent drives the run —
 in ~10–15 min instead of an hour.
 
@@ -102,8 +102,9 @@ if it matches the request, approving Codex escalations only for this study's com
 inside the sandbox — and writes a verdict listing every prompt it saw.
 
 **What it checks**
-- tier 0 on the **installed** plugin; tier A with a real `init` (download into the
-  fake data dir + clone + build);
+- unit checks on the **installed** plugin. No scripted run: it would pre-fill the image
+  for the sessions; the quick test runs it on every change. Each session's `init` is the real
+  first run — download into that tool's data dir, clone, build;
 - per tool, from the subagent's session (`verify`): workspace initialized (marker +
   launcher); `.sif` downloaded into that tool's data dir; no workspace `cache/`;
   solid_gemc cloned + built; `hgc_full/runs/<id>/` with `gcard.gcard`, `out.evio`,
@@ -153,7 +154,7 @@ checklists):
 ## Files
 | File | Role |
 |---|---|
-| `lib.sh` | shared: sandbox + `iso`, install, isolation guard, sandbox-process cleanup, tier 0, tier A |
+| `lib.sh` | shared: sandbox + `iso`, install, isolation guard, sandbox-process cleanup, unit checks, scripted run |
 | `quick-test.sh` | the quick test |
 | `full-test.sh` | `setup` / `verify` / `cleanup` for the full test (`SGC_TEST_MODE=basic` → basic) |
 | `basic-test.sh` | the basic test: runs `full-test.sh` in basic mode |

@@ -1,6 +1,6 @@
 # tests/lib.sh — shared by tests/quick-test.sh and tests/full-test.sh. Sourced,
 # not executed. Sets up a clean Claude Code + Codex in a sandbox (fake HOME,
-# whitelisted env) and holds tier 0 (wrapper unit checks) and tier A (installed
+# whitelisted env) and holds the unit checks (wrapper, no container) and the scripted run (installed
 # plugin, no model).
 
 # --- helpers ----------------------------------------------------------------
@@ -138,17 +138,17 @@ link_sif() { # symlink SIF_SRC into both fake tools' data dirs
   pass ".sif linked into both fake data dirs"
 }
 
-# --- tier 0 ------------------------------------------------------------------
-tier_0() { # plugin-root — unit checks of that root's wrapper + launcher template
-  T0_ROOT="$1"
+# --- unit checks -------------------------------------------------------------
+unit_checks() { # plugin-root — unit checks of that root's wrapper + launcher template
+  UNIT_ROOT="$1"
   # Container-free, no network. Verifies the subcommands exist, that the .sif
   # cache follows the detected agent tool, and that the venv is workspace-rooted.
-  log "tier 0 — wrapper unit checks on ${T0_ROOT} (no container, no network)"
-  for sub in init run analyze setup-python paths; do
-    "${T0_ROOT}/bin/solid-gemc-run" help | grep -qE "^  ${sub} " \
+  log "unit — wrapper checks on ${UNIT_ROOT} (no container, no network)"
+  for sub in init gcard run analyze setup-python paths; do
+    "${UNIT_ROOT}/bin/solid-gemc-run" help | grep -qE "^  ${sub} " \
       || fail "subcommand '${sub}' missing from help"
   done
-  pass "init/run/analyze/setup-python/paths present in help"
+  pass "init/gcard/run/analyze/setup-python/paths present in help"
 
   # Run the wrapper with every detection/home var cleared, then the given
   # VAR=value pairs applied: sgclean [VAR=value...] -- <subcommand...>
@@ -156,7 +156,7 @@ tier_0() { # plugin-root — unit checks of that root's wrapper + launcher templ
     local -a kv=()
     while [[ "$1" != "--" ]]; do kv+=("$1"); shift; done; shift
     env -u CLAUDECODE -u CODEX_THREAD_ID -u CODEX_CI -u CLAUDE_CONFIG_DIR -u CODEX_HOME \
-      "${kv[@]}" "${T0_ROOT}/bin/solid-gemc-run" "$@"
+      "${kv[@]}" "${UNIT_ROOT}/bin/solid-gemc-run" "$@"
   }
   cache_of() { sgclean "$@" -- paths | awk '/^cache:/{print $2}'; }
 
@@ -210,7 +210,7 @@ tier_0() { # plugin-root — unit checks of that root's wrapper + launcher templ
   done
   stub "${LH}/codex/plugins/cache/other/solid-gemc-claude/0.0.7/bin/solid-gemc-run" "codex-0.0.7"
   stub "${LH}/init-wrapper" "init"
-  TPL="$(<"${T0_ROOT}/templates/workspace-launcher.sh")"
+  TPL="$(<"${UNIT_ROOT}/templates/workspace-launcher.sh")"
   printf '%s\n' "${TPL//@SGC_INIT_WRAPPER@/"${LH}/init-wrapper"}" > "${LH}/ws/bin/solid-gemc-run"
   chmod +x "${LH}/ws/bin/solid-gemc-run"
   launch() {
@@ -239,17 +239,17 @@ tier_0() { # plugin-root — unit checks of that root's wrapper + launcher templ
   ( cd "${IW}" && sgclean "${INIT_ENV[@]}" -- init >/dev/null 2>&1 ) \
     && fail "init unexpectedly passed the clone step in ${IW}"
   [[ -x "${IW}/bin/solid-gemc-run" ]] || fail "init did not write an executable bin/solid-gemc-run"
-  grep -qF "\"${T0_ROOT}/bin/solid-gemc-run\"" "${IW}/bin/solid-gemc-run" \
+  grep -qF "\"${UNIT_ROOT}/bin/solid-gemc-run\"" "${IW}/bin/solid-gemc-run" \
     || fail "init's launcher lacks the init-time wrapper fallback"
   grep -q '@SGC_INIT_WRAPPER@' "${IW}/bin/solid-gemc-run" && fail "launcher placeholder left unsubstituted"
   RC="${SCRATCH}/plugin-checkout"; mkdir -p "${RC}/solid_gemc"
   # Only what init reads: bin/ + top-level template files (not templates/workspace/
   # or the 1.1 GB templates/solid_gemc clone).
-  cp -r "${T0_ROOT}/bin" "${T0_ROOT}/requirements.txt" "${RC}/" && mkdir -p "${RC}/templates"
-  find "${T0_ROOT}/templates" -maxdepth 1 \( -type f -o -type l \) -exec cp -P {} "${RC}/templates/" \;
+  cp -r "${UNIT_ROOT}/bin" "${UNIT_ROOT}/requirements.txt" "${RC}/" && mkdir -p "${RC}/templates"
+  find "${UNIT_ROOT}/templates" -maxdepth 1 \( -type f -o -type l \) -exec cp -P {} "${RC}/templates/" \;
   OUT=$( cd "${RC}" && env -u CLAUDECODE -u CODEX_THREAD_ID -u CODEX_CI "${INIT_ENV[@]}" \
     "${RC}/bin/solid-gemc-run" init 2>&1 ) && fail "init unexpectedly passed the clone step in ${RC}"
-  cmp -s "${RC}/bin/solid-gemc-run" "${T0_ROOT}/bin/solid-gemc-run" \
+  cmp -s "${RC}/bin/solid-gemc-run" "${UNIT_ROOT}/bin/solid-gemc-run" \
     || fail "init inside a plugin checkout overwrote bin/solid-gemc-run"
   grep -q 'skipping workspace launcher' <<<"${OUT}" || fail "init did not log the launcher skip: ${OUT}"
   pass "init: writes the launcher in a workspace, never overwrites the wrapper in a plugin checkout"
@@ -273,18 +273,18 @@ tier_0() { # plugin-root — unit checks of that root's wrapper + launcher templ
   pass "no-marker fallback: venv at \$PWD/venv"
 }
 
-# --- tier A: installed plugin, no model --------------------------------------
-# tier_a <tool> <solid_gemc-source>: "" = real clone + build by init (full test),
-# else a dir to symlink as the workspace's solid_gemc (quick test).
-tier_a() {
+# --- scripted run: installed plugin, no model ---------------------------------
+# scripted_run <tool> <solid_gemc-tree>: the built tree is symlinked as the workspace's
+# solid_gemc (quick test only; the full test's sessions do the real init).
+scripted_run() {
   local t="$1" sg="$2" v="${VAR[$1]}" W="${WRAPPER[$1]}" ws="${SCRATCH}/ws-$1" L out f
-  log "tier A (${t}) — installed wrapper + workspace launcher"
-  mkdir -p "${ws}"; [[ -n "${sg}" ]] && ln -s "${sg}" "${ws}/solid_gemc"
+  log "scripted (${t}) — installed wrapper + workspace launcher"
+  mkdir -p "${ws}"; ln -s "${sg}" "${ws}/solid_gemc"
   L="${ws}/bin/solid-gemc-run"
 
   # A linked (prebuilt) tree → no scons: the test is for the plugin, not solid_gemc.
-  ( cd "${ws}" && iso "${v}" ${sg:+SOLID_GEMC_SKIP_BUILD=1} "${W}" init ) > "${SCRATCH}/logs/A-${t}-init.log" 2>&1 \
-    || fail "${t}: init failed; see logs/A-${t}-init.log"
+  ( cd "${ws}" && iso "${v}" SOLID_GEMC_SKIP_BUILD=1 "${W}" init ) > "${SCRATCH}/logs/scripted-${t}-init.log" 2>&1 \
+    || fail "${t}: init failed; see logs/scripted-${t}-init.log"
   [[ -f "${ws}/.solid-gemc-workspace" ]] || fail "${t}: init wrote no workspace marker"
   for f in CLAUDE.md AGENTS.md .gitignore log.md result.md report.html; do
     [[ -f "${ws}/${f}" ]] || fail "${t}: workspace ${f} missing after init"
@@ -317,24 +317,24 @@ tier_a() {
   grep -qxF -- "$(readlink -f "${ws}/solid_gemc")" <<<"${out}" || fail "${t}: solid_gemc tree not bound: ${out}"
   pass "${t}: workspace root + solid_gemc tree bound from a deep cwd"
 
-  # The skill's run loop: seed a project, prep cherenkov.gcard (the skill's 3c
-  # edit, OPTICAL=1), then one `run` through the launcher: gemc from the upstream
+  # The skill's run loop through the launcher: seed a project, `gcard` (copy +
+  # options, optical photons on by default), then one `run`: gemc from the source
   # dir, evio2root -R=flux -B=<banks>, config.json, analyze.
-  local root proj=quick_${t} SRC DEST SOURCE_DIR RUN_DIR
+  local root proj=quick_${t} OUT DEST SOURCE_DIR RUN_DIR
   root=$( iso "${v}" "${L}" paths | awk '/^root:/{print $2}' )
   ( cd "${ws}" && cp -r "${root}/templates/workspace/." "${proj}/" \
       && { [[ -f "${proj}/CLAUDE.md" ]] || cp "${proj}/AGENTS.md" "${proj}/CLAUDE.md"; } )
   [[ -f "${ws}/${proj}/log.md" ]] || fail "${t}: project not seeded from the installed templates"
-  SRC=$(cd "${ws}" && find -L solid_gemc/analysis -mindepth 2 -maxdepth 2 -name cherenkov.gcard | head -1)
-  [[ -n "${SRC}" ]] || fail "${t}: cherenkov.gcard not found under solid_gemc/analysis/"
-  DEST="${proj}/cherenkov.gcard"; SOURCE_DIR="$(dirname "${SRC}")"
-  cp "${ws}/${SRC}" "${ws}/${DEST}"
-  sed -n '/^### 3c. Prepare the GCard/,/^### 3d/p' "${root}/skills/solid-gemc/SKILL.md" \
-    | awk '/^python3 - "\$DEST"/{f=1; next} /^PY$/{f=0} f' > "${SCRATCH}/gcardprep.py"
-  python3 "${SCRATCH}/gcardprep.py" "${ws}/${DEST}" 2 1 || fail "${t}: the skill's GCard edit failed"
-  ( cd "${ws}" && iso "${v}" "${L}" run "${DEST}" "${SOURCE_DIR}" 4 ) > "${SCRATCH}/logs/A-${t}-run.log" 2>&1 \
-    || fail "${t}: run failed; see logs/A-${t}-run.log"
-  RUN_DIR=$(awk '/^run dir: /{print $3}' "${SCRATCH}/logs/A-${t}-run.log")
+  OUT=$( cd "${ws}" && iso "${v}" "${L}" gcard cherenkov "${proj}" --events 2 2>"${SCRATCH}/logs/scripted-${t}-gcard.log" ) \
+    || fail "${t}: gcard failed; see logs/scripted-${t}-gcard.log"
+  DEST=$(awk '/^gcard: /{print $2}' <<<"${OUT}"); SOURCE_DIR=$(awk '/^source dir: /{print $3}' <<<"${OUT}")
+  [[ "${DEST}" == "${proj}/cherenkov.gcard" && -d "${SOURCE_DIR}" ]] || fail "${t}: gcard printed '${OUT}'"
+  grep -q 'RECORD_OPTICALPHOTONS" value="1"' "${ws}/${DEST}" || fail "${t}: gcard did not turn optical photons on"
+  ( cd "${ws}" && iso "${v}" "${L}" gcard cherenkov "${proj}" ) >/dev/null 2>&1 \
+    && fail "${t}: gcard overwrote an existing project GCard without --force"
+  ( cd "${ws}" && iso "${v}" "${L}" run "${DEST}" "${SOURCE_DIR}" 4 ) > "${SCRATCH}/logs/scripted-${t}-run.log" 2>&1 \
+    || fail "${t}: run failed; see logs/scripted-${t}-run.log"
+  RUN_DIR=$(awk '/^run dir: /{print $3}' "${SCRATCH}/logs/scripted-${t}-run.log")
   [[ -n "${RUN_DIR}" ]] || fail "${t}: run printed no 'run dir:' line"
   for f in gcard.gcard out.evio out.root log.txt config.json plots.pdf; do
     [[ -s "${RUN_DIR}/${f}" ]] || fail "${t}: run dir has no ${f}"
@@ -345,12 +345,12 @@ tier_a() {
   (( $(ls "${RUN_DIR}"/*.svg 2>/dev/null | wc -l) >= 1 )) || fail "${t}: analyze wrote no SVGs"
   # -B decoded the HGC bank and optical photons were recorded: many solid_hgc hits.
   local nhits
-  nhits=$(awk '/tree solid_hgc: /{f=1; next} f && /entries=/{sub(/.*entries=/, ""); print $1; exit}' "${SCRATCH}/logs/A-${t}-run.log")
-  (( ${nhits:-0} > 10 )) || fail "${t}: solid_hgc has ${nhits:-no} hits (want optical photons; evio2root -B); see logs/A-${t}-run.log"
+  nhits=$(awk '/tree solid_hgc: /{f=1; next} f && /entries=/{sub(/.*entries=/, ""); print $1; exit}' "${SCRATCH}/logs/scripted-${t}-run.log")
+  (( ${nhits:-0} > 10 )) || fail "${t}: solid_hgc has ${nhits:-no} hits (want optical photons; evio2root -B); see logs/scripted-${t}-run.log"
   [[ -e "${ws}/venv" ]] && fail "${t}: default analyze created a venv"
-  pass "${t}: run → gemc + evio2root -B + config.json + analyze; solid_hgc ${nhits} hits; no venv"
-  ( cd "${ws}" && iso "${v}" "${L}" analyze --python "${RUN_DIR}" 4 ) > "${SCRATCH}/logs/A-${t}-analyze-python.log" 2>&1 \
-    || fail "${t}: analyze --python failed; see logs/A-${t}-analyze-python.log"
+  pass "${t}: gcard (optical on, no overwrite) + run → evio2root -B, config.json, analyze; solid_hgc ${nhits} hits; no venv"
+  ( cd "${ws}" && iso "${v}" "${L}" analyze --python "${RUN_DIR}" 4 ) > "${SCRATCH}/logs/scripted-${t}-analyze-python.log" 2>&1 \
+    || fail "${t}: analyze --python failed; see logs/scripted-${t}-analyze-python.log"
   (( $(ls "${RUN_DIR}"/*.png 2>/dev/null | wc -l) >= 1 )) || fail "${t}: analyze --python wrote no PNGs"
   [[ -d "${ws}/venv" ]] || fail "${t}: venv not at the workspace root"
   pass "${t}: analyze --python → PNGs, venv at ${ws##*/}/venv"
