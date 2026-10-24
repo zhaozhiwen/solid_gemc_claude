@@ -320,6 +320,25 @@ scripted_run() {
   grep -qxF -- "$(readlink -f "${ws}/solid_gemc")" <<<"${out}" || fail "${t}: solid_gemc tree not bound: ${out}"
   pass "${t}: workspace root + solid_gemc tree bound from a deep cwd"
 
+  # Symlinked-workspace regression (user report, ifarm ~/work -> /work/...): from a
+  # cwd reached through a symlink, nothing handed to the container may name the
+  # symlink — the container mounts physical paths only, so a logical one can be
+  # missing inside it (build: GEMC headers not found; run: GCard unreadable,
+  # evio2root silently drops the detector banks).
+  local lnk="${SCRATCH}/ws-link-${t}" lproj=link_${t} lout
+  ln -sfn "${ws}" "${lnk}"
+  mkdir -p "${ws}/${lproj}" && cp "${ws}/solid_gemc/analysis/hgc_study/cherenkov.gcard" "${ws}/${lproj}/"
+  lout=$( cd "${lnk}" && iso "${v}" SOLID_GEMC_RUN_DRYRUN=1 "SoLID_GEMC=${lnk}/solid_gemc" "${L}" exec true )
+  ( cd "${lnk}" && iso "${v}" SOLID_GEMC_RUN_DRYRUN=1 "${L}" run "${lnk}/${lproj}/cherenkov.gcard" \
+      "${lnk}/solid_gemc/analysis/hgc_study" ) >/dev/null 2>&1 || true
+  lout+=$'\n'$(cat "${ws}/${lproj}"/runs/*/log.txt 2>/dev/null)
+  grep -E '^(env|cmd): |^/' <<<"${lout}" | grep -qF "${lnk}" \
+    && fail "${t}: symlinked workspace: a container path names the symlink: $(grep -F "${lnk}" <<<"${lout}")"
+  grep -q "^cmd: solid_gemc '$(readlink -f "${ws}")/${lproj}/runs/" <<<"${lout}" \
+    || fail "${t}: symlinked workspace: no gemc command seen in the dry run: ${lout}"
+  rm -rf "${ws:?}/${lproj}" "${lnk}"
+  pass "${t}: symlinked workspace: container env, binds and gemc command use physical paths"
+
   # The skill's run loop through the launcher: seed a project, `gcard` (copy +
   # options, optical photons on by default), then one `run`: gemc from the source
   # dir, evio2root -R=flux -B=<banks>, config.json, analyze.

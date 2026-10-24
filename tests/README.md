@@ -41,7 +41,9 @@ the start. The basic and full tests share one script (`full-test.sh`), its
   `init` writes the workspace files, marker and launcher and no `cache/` →
   `info` through the launcher reports that tool's install and data dir (a plain
   terminal is read-only) → the workspace and solid_gemc tree are bind-mounted from a
-  deep folder → `gcard cherenkov` (2 events, optical photons on; refuses to overwrite) →
+  deep folder → from a workspace reached through a symlink (ifarm `~/work → /work/…`),
+  no path handed to the container (env, binds, gemc command) names the symlink
+  (dry run) → `gcard cherenkov` (2 events, optical photons on; refuses to overwrite) →
   one `run` (gemc + `evio2root -R=flux -B` + `config.json` + analyze): SVGs, `plots.pdf`,
   many `solid_hgc` hits, no venv →
   `analyze --python` writes PNGs and the venv sits at the workspace root.

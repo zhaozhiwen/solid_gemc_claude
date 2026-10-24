@@ -265,9 +265,17 @@ container_binds() {
 # current working directory plus the cache bind-mounted.
 in_container() {
   local cmd="$1"
-  local wd cache_real env
+  local wd cache_real env sg_real
   resolve_solid_gemc
   wd="$(container_workdir)"
+  # The container gets a physical SoLID_GEMC (and so GEMC): a logical path
+  # through a host symlink (~/work -> /work/...) may not exist inside it, and
+  # gcc then silently drops the -I dirs. Scoped to this call; callers keep the
+  # logical path for provenance.
+  sg_real="${SoLID_GEMC:-}"
+  [[ -n "${sg_real}" && -d "${sg_real}" ]] && sg_real="$(readlink -f "${sg_real}")"
+  local -a container_env=()
+  [[ -n "${sg_real}" ]] && container_env=("SoLID_GEMC=${sg_real}")
   # SOLID_GEMC_RUN_DRYRUN=1: print the resolved apptainer bind/pwd argv and
   # return without touching the .sif. A container-free seam for the bind
   # regression test in tests/quick-test.sh — short-circuits before
@@ -277,6 +285,7 @@ in_container() {
     cache_real="$(container_cache_dir)"
     container_binds "${wd}" "${cache_real}"
     printf -- '--pwd\n%s\n' "${wd}"
+    printf -- 'env: %s\ncmd: %s\n' "${container_env[*]-}" "${cmd}"
     return 0
   fi
   ensure_sif
@@ -285,7 +294,7 @@ in_container() {
   local -a binds=()
   while IFS= read -r line; do binds+=("${line}"); done < <(
     container_binds "${wd}" "${cache_real}")
-  apptainer exec \
+  env ${container_env[@]+"${container_env[@]}"} apptainer exec \
     "${binds[@]}" \
     --pwd "${wd}" \
     "${SIF_PATH}" \
@@ -466,7 +475,7 @@ cmd_validate_gcard() {
   local gcard="${1:-}"
   [[ -n "${gcard}" ]] || die "usage: solid-gemc-run validate-gcard <file.gcard>"
   [[ -f "${gcard}"  ]] || die "GCard not found: ${gcard}"
-  in_container "xmllint --noout '${gcard}'"
+  in_container "xmllint --noout '$(readlink -f "${gcard}")'"
   log "GCard well-formed: ${gcard}"
 }
 
@@ -671,27 +680,30 @@ cmd_run() {
     [[ -d solid_gemc ]] || die "no solid_gemc/ here; run from the workspace root (see 'init')"
     export SoLID_GEMC="$(pwd)/solid_gemc"
   fi
-  # Logical (not -P) paths: provenance names the workspace's solid_gemc/ even
-  # when it is a symlink.
+  # Logical (not -P) paths for provenance (names the workspace's solid_gemc/
+  # even when it is a symlink); the container gets the physical ones (run_c,
+  # banks), since a logical path through a host symlink may not exist inside it.
   gcard="$(cd "$(dirname "${gcard}")" && pwd)/$(basename "${gcard}")"
   src="$(cd "${src}" && pwd)"
   cmd_validate_gcard "${gcard}"
 
-  local id run_dir log start t0 gemc_exit=0 e2r_exit=- banks=""
+  local id run_dir log start t0 gemc_exit=0 e2r_exit=- banks="" banks_c=""
   id="$(date -u +%Y%m%d-%H%M%S)-$(printf '%06x' $(( (RANDOM << 15 | RANDOM) & 0xffffff )))"
   run_dir="$(dirname "${gcard}")/runs/${id}"; log="${run_dir}/log.txt"
   mkdir -p "${run_dir}"
   cp "${gcard}" "${run_dir}/gcard.gcard"
-  EXTRA_BIND_PATHS=("${run_dir}")
+  local run_c; run_c="$(readlink -f "${run_dir}")"
+  EXTRA_BIND_PATHS=("${run_c}")
   start="$(date -u +%Y-%m-%dT%H:%M:%SZ)"; t0=${SECONDS}
 
   log "run ${id}: gemc from ${src}"
   ( cd "${src}" && in_container \
-      "solid_gemc '${run_dir}/gcard.gcard' -OUTPUT='evio,${run_dir}/out.evio'" ) \
+      "solid_gemc '${run_c}/gcard.gcard' -OUTPUT='evio,${run_c}/out.evio'" ) \
     > "${log}" 2>&1 || gemc_exit=$?
   tail -n 5 "${log}" >&2
   if (( gemc_exit == 0 )) && [[ -s "${run_dir}/out.evio" ]]; then
-    banks="$(python3 - "${run_dir}/gcard.gcard" "${src}" <<'PY'
+    # Line 1: logical bank paths (log, config.json); line 2: physical (container).
+    { read -r banks; read -r banks_c; } < <(python3 - "${run_dir}/gcard.gcard" "${src}" <<'PY'
 import os, re, sys, pathlib
 text = re.sub(r'<!--.*?-->', '', pathlib.Path(sys.argv[1]).read_text(), flags=re.DOTALL)
 banks = []
@@ -700,12 +712,13 @@ for name in re.findall(r'<detector\s+name="([^"]+)"', text):
     if pathlib.Path(p + "__bank.txt").is_file() and p not in banks:
         banks.append(p)
 print(" ".join(banks))
+print(" ".join(os.path.realpath(p) for p in banks))
 PY
-)"
+)
     log "evio2root -R=flux${banks:+ -B=${banks}}"
     e2r_exit=0
     ( cd "${run_dir}" && in_container \
-        "evio2root -INPUTF=out.evio -R=flux${banks:+ -B='${banks}'}" ) \
+        "evio2root -INPUTF=out.evio -R=flux${banks_c:+ -B='${banks_c}'}" ) \
       >> "${log}" 2>&1 || e2r_exit=$?
     tail -n 3 "${log}" >&2
   fi
