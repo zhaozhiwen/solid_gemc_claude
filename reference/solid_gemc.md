@@ -44,11 +44,12 @@ The second is what this digest covers. Key lines:
 
 Notes that contradict common assumptions:
 
-- **There is no `OPT=1` flag.** The plugin's `SConstruct` does not pass any
-  optimization variable; it relies on whatever `init_environment` sets.
-  (`grep OPT source/2.9/SConstruct` is empty.)
-- **HIPO is listed as a dependency** even though gemc 2.9 in JLabCE 2.5
-  cannot write HIPO output (`SConstruct:5`).
+- **solid_gemc's `SConstruct` sets no optimization flag itself**
+  (`grep OPT source/2.9/SConstruct` is empty); `init_environment` honors
+  `scons OPT=1`, which `bin/solid-gemc-run build` passes (see `gemc.md` §3.3).
+- **HIPO is listed as a dependency** (`SConstruct:5`). gemc's source registers
+  a hipo writer (`gemc.md` §8), but the plugin uses EVIO only and
+  HIPO output is untested in JLabCE 2.5.
 - **CCDB is included** at the env level and `#include <CCDB/Calibration.h>`
   appears in every hit processor that does any work, but **no
   CCDB::Calibration is ever instantiated** in any of the seven files.

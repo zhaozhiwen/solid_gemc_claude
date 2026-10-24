@@ -35,7 +35,14 @@ apptainer can't run inside Codex's sandbox: if a run fails with `operation not p
 
 There are no slash commands. The `solid-gemc` orchestrator skill auto-loads on any SoLID-flavored request (Claude Code or Codex CLI), gap-checks a seven-field spec (project name, physics goal, SoLID config, beam, GCard, output, analysis), shows a plan, and runs it on approval — driving everything through `bin/solid-gemc-run` (bootstrap the workspace, pick + edit a GCard, run `solid_gemc`, convert EVIO → ROOT, record provenance, plot).
 
-Ask your harness something like:
+Start your agent in an empty folder; it becomes your workspace (`init` puts the ~1 GB `solid_gemc` build and all run outputs there):
+
+```sh
+mkdir ~/solid_ws && cd ~/solid_ws
+claude            # or: codex
+```
+
+A good first request is "Run the heavy-gas Cherenkov study on He-3, 100 events". Results land in `<project>/runs/<id>/` and `<project>/report.html`; the workspace's own `README.md` explains the rest. A bigger request, once that works:
 
 ```text
 Learn the examples at solid_gemc repo "solid_gemc/analysis/hgc_study/" and "solid_gemc/geometry/hgc_moved/",
@@ -45,20 +52,20 @@ verify the sim result with physics analytic calculation,
 finally show me the results in an html file
 ```
 
-`init` runs once as a one-shot bootstrap (pull the `.sif`, clone `solid_gemc`, run both scons builds, scaffold a workspace) — automatically on first use, or when you ask to "init solid-gemc-claude". After it, two upstream worked examples live in your workspace, both self-contained:
+`init` runs once per workspace (pull the `.sif`, clone `solid_gemc`, run both scons builds, scaffold the workspace) — on your first request after you confirm it, or when you ask to "init solid-gemc-claude". After it, two upstream worked examples live in your workspace, both self-contained:
 
 | Example | What it teaches |
 |---|---|
 | `solid_gemc/analysis/hgc_study/` | the **config + run + analyze** pipeline — GCards, batch run scripts, ROOT analysis macros |
 | `solid_gemc/geometry/hgc_moved/` | **custom detector authoring** — Perl generators, the factory text files they emit, and the GCard wiring |
 
-Init writes `bin/solid-gemc-run` into your workspace — a launcher that runs the newest installed plugin wrapper, from the agent or a plain terminal (a terminal uses an already-downloaded image; it never downloads one). `bin/solid-gemc-run run <project>/<gcard> <source-dir>` is one whole run (gemc, `evio2root` with the GCard's detector banks, `config.json`, plots); `bin/solid-gemc-run analyze runs/<id>` re-plots the post-converted `out.root` with ROOT in the container (SVG + `plots.pdf` + per-branch stats; `--python` for host uproot PNGs). `bin/solid-gemc-run shell` drops you into a tcsh prompt with the env exported, to follow upstream's scripts directly.
+Init writes `bin/solid-gemc-run` into your workspace — a launcher that runs the newest installed plugin wrapper, from the agent or a plain terminal (a terminal uses an already-downloaded image; it never downloads one). `bin/solid-gemc-run run <project>/<gcard> <source-dir>` is one whole run (gemc, `evio2root` with the GCard's detector banks, `config.json`, plots); `bin/solid-gemc-run analyze <project>/runs/<id>` re-plots the post-converted `out.root` with ROOT in the container (SVG + `plots.pdf` + per-branch stats; `--python` for host uproot PNGs). `bin/solid-gemc-run shell` drops you into a tcsh prompt with the env exported, to follow upstream's scripts directly.
 
 ## What it does
 
 - **NL-driven simulation as a first-class step.** The orchestrator turns a plain-English study spec into a validated GCard + run command. Edit the GCard or re-describe to iterate.
 - **Single runtime seam.** All `gemc`, `xmllint`, ROOT, and `evio2root` calls go through `bin/solid-gemc-run`. The container tag is pinned in one place. No host-side ROOT required.
-- **solid_gemc clone for reading.** Init clones JeffersonLab/solid_gemc, which takes changes only as fork → pull request. To keep or submit edits, fork it and run `git -C solid_gemc remote rename origin upstream && git -C solid_gemc remote add origin https://github.com/<you>/solid_gemc.git`.
+- **solid_gemc clone for reading.** Init clones JeffersonLab/solid_gemc, which takes changes only as fork → pull request. To keep or submit edits, point the clone at your fork; the workspace `README.md` has the commands.
 - **EVIO + post-convert to ROOT.** `gemc` 2.9 writes EVIO natively; the wrapper post-converts to ROOT inside the same container and analysis runs on the container's ROOT (host uproot optional). Both files end up in `runs/<id>/`.
 
 ## Requirements
@@ -71,12 +78,7 @@ Init writes `bin/solid-gemc-run` into your workspace — a launcher that runs th
 
 ## Testing
 
-Three automated tests run the plugin in a **clean Claude Code and Codex** inside a
-throwaway sandbox: a quick test (~1 min, no model calls, installed plugin run end to
-end), a basic test (~15 min, real sessions with an agent playing the user, image and
-build linked in) and a full test (a real first session in each tool — published
-install, real image download and build, an agent playing the user). See
-[`tests/README.md`](https://github.com/zhaozhiwen/solid_gemc_claude/blob/main/tests/README.md).
+See [`tests/README.md`](https://github.com/zhaozhiwen/solid_gemc_claude/blob/main/tests/README.md).
 
 ## Links
 

@@ -9,8 +9,8 @@ analysis runs on that ROOT inside the container (host-side
 
 > The name keeps its `-claude` suffix for historical/repo-stability reasons;
 > the plugin is not Claude-specific. The whole workflow runs through one
-> platform-neutral wrapper (`bin/solid-gemc-run`), with thin per-harness
-> adapters on top.
+> platform-neutral wrapper (`bin/solid-gemc-run`) and one skill, identical on
+> both tools.
 
 **Docs site:** [zhaozhiwen.github.io/solid_gemc_claude](https://zhaozhiwen.github.io/solid_gemc_claude/) (install + quickstart + two demo run reports).
 
@@ -41,14 +41,9 @@ on first use; URL is pinned in [`bin/solid-gemc-run`](bin/solid-gemc-run).
 
 ## Install
 
-The repo is one source of truth for both harnesses — shared
-`bin/solid-gemc-run` + `skills/solid-gemc/`, with `.claude-plugin/` and
-`.codex-plugin/` manifests side by side (plus the per-harness marketplace
-descriptors `.claude-plugin/marketplace.json` and
-`.agents/plugins/marketplace.json`) and `CLAUDE.md` / `AGENTS.md` (same
-content) at the root. Analysis needs no host install: `analyze` runs ROOT in
-the container. The optional Python venv installs lazily on the first
-`analyze --python` (idempotent; `bin/solid-gemc-run setup-python` pre-installs it).
+One repo serves both tools. Analysis needs no host install: `analyze` runs ROOT
+in the container. The optional Python venv installs on the first
+`analyze --python` (`bin/solid-gemc-run setup-python` pre-installs it).
 
 ### Claude Code
 
@@ -64,10 +59,6 @@ codex plugin marketplace add zhaozhiwen/solid_gemc_claude
 codex plugin add solid-gemc-claude@solid-gemc-claude
 ```
 
-Codex reads `AGENTS.md` — the canonical project-rules file.
-`CLAUDE.md` is a symlink to it and Claude Code reads it.
-`codex plugin add` drops the symlink but keeps the real `AGENTS.md`.
-
 apptainer can't run inside Codex's sandbox, so Codex must be able to ask before
 running `solid-gemc-run` outside it. If it doesn't ask (the run fails with
 `operation not permitted`), set `/permissions` to **Ask for approval** in the session.
@@ -77,9 +68,23 @@ ask for approval. That comes from the host's `bubblewrap`, not the plugin — ch
 `bwrap --ro-bind / / true` as a normal user; some mount layouts (e.g. a stacked
 `/proc/sys/fs/binfmt_misc` mount) make bubblewrap 0.6 fail there. Runs still work.
 
-## Try this after install
+## First run
 
-You can ask your agent harness to
+Start your agent in an empty folder; it becomes your workspace (`init` puts the
+~1 GB solid_gemc build and all run outputs there):
+
+```sh
+mkdir ~/solid_ws && cd ~/solid_ws
+claude            # or: codex
+```
+
+Then ask, for example, "Run the heavy-gas Cherenkov study on He-3, 100 events".
+The first request asks to initialize the workspace (download the ~1.7 GB image,
+clone and build solid_gemc), then shows a plan and waits for your approval.
+Results land in `<project>/runs/<id>/` (`out.root`, `plots.pdf`, `config.json`)
+and `<project>/report.html`. The workspace's own `README.md` explains the rest.
+
+A bigger request, once that works:
 
 ```text
 Learn the examples at solid_gemc repo "solid_gemc/analysis/hgc_study/" and "solid_gemc/geometry/hgc_moved/",
@@ -97,8 +102,9 @@ then drives the whole run through `bin/solid-gemc-run` (bootstrap
 the workspace, pick + edit a GCard, run `solid_gemc`, convert EVIO → ROOT,
 record provenance, plot). Works the same on Claude Code and Codex CLI.
 
-You can ask your agent harness to init solid-gemc-claude,
-which will run `bin/solid-gemc-run init` to pull .sif, clone solid_gemc, run both scons builds, scaffold workspace as a one-shot bootstrap. Or it will run at the first time you use it.
+The first SoLID request runs `bin/solid-gemc-run init` once you confirm it:
+download the image, clone solid_gemc, build it, and write the workspace files.
+You can also ask for just that step.
 
 Two upstream worked examples live in your workspace after init, both fully self-contained:
 
@@ -109,7 +115,14 @@ Two upstream worked examples live in your workspace after init, both fully self-
 
 Init also writes `bin/solid-gemc-run` into your workspace: a small launcher that runs the newest installed plugin wrapper, so the commands below work from the workspace root (`../bin/solid-gemc-run` from a project subdir), in the agent or a plain terminal. A plain terminal uses an image an agent session already downloaded; it never downloads one itself.
 
-`bin/solid-gemc-run gcard <preset> <project> --events N` copies a GCard into a project with the batch options set (optical photons on; `--no-optical` to turn off), and `bin/solid-gemc-run run <project>/<gcard> <source-dir>` is one whole run: gemc, `evio2root` with the GCard's detector banks, `config.json` and default plots. `bin/solid-gemc-run analyze runs/<id>` would produce default plots from out.root (the post-converted file) with ROOT in the container: `hist_*.svg`, `plots.pdf` and a stats line per branch. `analyze --python` makes uproot PNGs instead.
+- `bin/solid-gemc-run gcard <preset> <project> --events N` copies a GCard into a
+  project with the batch options set (optical photons on; `--no-optical` turns
+  them off).
+- `bin/solid-gemc-run run <project>/<gcard> <source-dir>` is one whole run: gemc,
+  `evio2root` with the GCard's detector banks, `config.json` and default plots.
+- `bin/solid-gemc-run analyze <project>/runs/<id>` re-plots a run with ROOT in the
+  container: `hist_*.svg`, `plots.pdf` and a stats line per branch
+  (`--python` makes uproot PNGs instead).
 
 `bin/solid-gemc-run shell` drops you into a tcsh prompt with the env
 exported (`SoLID_GEMC`, `GEMC`, `PATH`, `LD_LIBRARY_PATH`) so you can
@@ -118,37 +131,15 @@ then `./run.sh`. For detector authoring: edit the `.pl` in
 `solid_gemc/geometry/hgc_moved/`, regenerate, run gemc against your new
 detector.
 
-**The `solid_gemc/` clone is for reading and running.** Init clones
-[JeffersonLab/solid_gemc](https://github.com/JeffersonLab/solid_gemc),
-which accepts changes only as fork → pull request, so you can't push to
-it. To keep or submit changes, fork it on GitHub and point the clone at
-your fork, keeping JeffersonLab as `upstream`:
-
-```sh
-git -C solid_gemc remote rename origin upstream
-git -C solid_gemc remote add origin https://github.com/<you>/solid_gemc.git
-```
-
-Then push branches to `origin`, open pull requests against JeffersonLab, and
-sync with `git -C solid_gemc pull upstream master`. Init reuses an existing
-clone, so it never overwrites your work.
+**The `solid_gemc/` clone is for reading and running.** It comes from
+[JeffersonLab/solid_gemc](https://github.com/JeffersonLab/solid_gemc), which
+accepts changes only as fork → pull request. To keep or submit changes, point
+the clone at your fork; the workspace `README.md` ("Changing solid_gemc itself")
+has the commands. Init reuses an existing clone, so it never overwrites your work.
 
 ## Testing (maintainers)
 
-Three automated tests, all against a **clean Claude Code and Codex** set up in a
-throwaway sandbox, so your own sessions and `~/.claude`, `~/.codex` are never touched:
-
-- `tests/quick-test.sh` — ~1 min, no model calls. Installs the working tree into both
-  tools and runs the installed plugin end to end (init → gemc → evio2root → analyze),
-  with the image and a prebuilt `templates/solid_gemc` linked in.
-- `tests/basic-test.sh setup` / `verify` / `cleanup` — ~10–15 min. Real Claude Code
-  and Codex sessions driven by a subagent playing the user, with the quick test's
-  shortcuts. Run after changes to the skill.
-- `tests/full-test.sh setup` / `verify` / `cleanup` — a real first session in each tool:
-  installed from the published marketplace, real image download and build, default
-  permissions, and a subagent playing the user. Run before a release.
-
-Design and details: [`tests/README.md`](tests/README.md).
+See [`tests/README.md`](tests/README.md).
 
 ## Known limitations (v0.0.7)
 

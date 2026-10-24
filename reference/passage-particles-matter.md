@@ -6,12 +6,12 @@ source: PDG 2025 Review of Particle Physics, Chapter 34 "Passage of Particles Th
 source_url: https://pdg.lbl.gov/2025/reviews/rpp2025-rev-passage-particles-matter.pdf
 license: CC-BY-4.0
 citation: S. Navas et al. (Particle Data Group), Phys. Rev. D 110, 030001 (2024) and 2025 update.
-related: ["[[pdg-api-access]]", "[[em-processes]]", "[[optical-photon-physics]]", "[[passage-particles-matter-summary]]"]
+related: ["passage-particles-matter-summary.md"]
 ---
 
 # Passage of Particles Through Matter (PDG Ch. 34) — full content
 
-> Verbatim rendering of PDG Ch. 34, revised August 2023 by D.E. Groom (LBNL) and S.R. Klein (NSD LBNL; UC Berkeley). For a tighter wiki summary that paraphrases prose and adds a Geant4 cross-references appendix, see [[passage-particles-matter-summary]].
+> Verbatim rendering of PDG Ch. 34, revised August 2023 by D.E. Groom (LBNL) and S.R. Klein (NSD LBNL; UC Berkeley). For a one-screen summary, see [`passage-particles-matter-summary.md`](passage-particles-matter-summary.md).
 >
 > *Source*: PDG 2025 Review of Particle Physics, Phys. Rev. D 110, 030001 (2024) and 2025 update. Released under CC-BY-4.0.
 

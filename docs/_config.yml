@@ -1,5 +1,5 @@
 title: solid_gemc_claude
-description: A Claude Code plugin for SoLID GEMC simulations — describe a study, run it, analyze it.
+description: A Claude Code and Codex CLI plugin for SoLID GEMC simulations — describe a study, run it, analyze it.
 url: https://zhaozhiwen.github.io
 baseurl: /solid_gemc_claude
 repository: zhaozhiwen/solid_gemc_claude

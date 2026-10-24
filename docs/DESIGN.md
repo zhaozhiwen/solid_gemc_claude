@@ -28,8 +28,8 @@ Code and Codex CLI.
   skills/solid-gemc/        ─┐                            JLabCE 2.5 .sif
   (orchestrator, NL)         │      bin/                  ┌─────────────┐
                              ┼  solid-gemc-run ─► apptainer│ gemc, ROOT, │
-  bin/solid-gemc-run         │   init/analyze/    exec ───►│ evio2root,  │
-  init / analyze / …        ─┤   exec/…                    │ solid_gemc  │
+  bin/solid-gemc-run         │   init/gcard/run/  exec ───►│ evio2root,  │
+  init / gcard / run / …    ─┤   analyze/exec/…            │ solid_gemc  │
                              │                            └──────┬──────┘
   optional Python (uproot)   │      (ROOT analysis in here)      │
   analyze --python ◄─────────┴── runs/<id>/out.root ──────────── ┘
@@ -40,9 +40,9 @@ Two components live on the host (no slash commands):
 - **One orchestrator skill** — `skills/solid-gemc/`. Drives the whole
   workflow from natural language; auto-loads on SoLID-flavored requests.
 - **One runtime wrapper** — `bin/solid-gemc-run`. The single command
-  surface and the single container seam: `init` / `analyze` /
-  `setup-python` / pull / clone / build / shell / exec / root /
-  validate-gcard.
+  surface and the single container seam: `init` sets up a workspace,
+  `gcard` + `run` do a simulation, `analyze` plots it; the rest is listed
+  by `bin/solid-gemc-run help`.
 
 Everything else lives inside the JLabCE 2.5 apptainer image: gemc 2.9,
 Geant4, ROOT, evio2root, plus the freshly cloned and built `solid_gemc`
@@ -78,18 +78,17 @@ on Codex), presents a plan, gates on user approval, and drives
 
 ## Design principles
 
-These rules every command and skill follows. They aren't suggestions —
+The wrapper, the skill and the templates follow these rules. They aren't suggestions —
 breaking them creates the failure modes they were written to prevent.
 
-**Single runtime seam.** All `gemc`, `xmllint`, `root` invocations go
-through `bin/solid-gemc-run`. Commands and skills never call
+**Single runtime seam.** Every container invocation (`gemc`, `xmllint`,
+ROOT, `evio2root`, scons) goes through `bin/solid-gemc-run`. The skill never calls
 `apptainer exec` directly. Upgrading the container image is a one-file
 change.
 
 **Pinned image, one source of truth.** The container tag lives only in
-`bin/solid-gemc-run`. Anywhere else that displays the tag (info
-subcommand, README) reads from that script. Eliminates docs/runtime
-drift.
+`bin/solid-gemc-run`; `info` prints it from there. The README also shows the
+download link, and a pre-publish check keeps it equal to what `info` prints.
 
 **No host-side ROOT requirement.** Default analysis runs ROOT inside the
 container (`analyze`, `.C` macros via `bin/solid-gemc-run root`). Users
@@ -102,8 +101,9 @@ on a machine with apptainer + Python 3. No reliance on cached state in
 the maintainer's `$HOME` or absolute `/home/$USER` paths.
 
 **No leakage.** No internal hostnames, absolute home paths, API tokens,
-or personal email in committed files. The one allowed exception is
-`gemc.jlab.org` as a documentation reference URL.
+or personal email in committed files. Allowed: `gemc.jlab.org` as a
+documentation reference URL, and the upstream links inside the `reference/`
+mirrors of published JLab documents.
 
 **Idempotent operations.** Running anything twice doesn't corrupt
 state. `bin/solid-gemc-run init` re-detects existing files and refuses
@@ -117,7 +117,7 @@ in that tool's persistent per-plugin data dir,
 Both tools key that dir on plugin + marketplace, not version, so the
 ~1.7 GB image survives plugin updates and is shared by all workspaces.
 No override and no workspace fallback; outside an agent tool the
-wrapper refuses to pull or run. The venv stays at
+wrapper never downloads, but uses an image already in either tool's data dir. The venv stays at
 `<workspace-root>/venv`.
 
 ## Resolved decisions
@@ -128,10 +128,10 @@ only Geant4 — gemc itself isn't prebuilt. JLabCE 2.5 is the standard
 SoLID build environment.
 
 **Why EVIO + post-convert, not direct ROOT output?** gemc 2.9 in
-JLabCE 2.5 supports only EVIO and TXT output (`-help-output` confirms).
+JLabCE 2.5 has no ROOT output writer.
 We post-convert EVIO → ROOT inside the container with `evio2root`, so
 both `out.evio` and `out.root` end up in `runs/<id>/`. Analysis runs on
-the container's ROOT (host uproot optional). HIPO output deferred past v0.0.7.
+the container's ROOT (host uproot optional). HIPO output is deferred.
 
 **Why `wget` to pull the `.sif`, not `apptainer pull docker://`?** The
 `.sif` is hosted at a webhome URL, not a container registry. Direct
@@ -141,11 +141,11 @@ expectations.
 **Why two `scons` builds in `init`?** `solid_gemc` builds in two
 passes: `mod/gemc/2.9` produces `libgemc.so` (requires
 `LIBRARY=shared`), then `source/2.9` links against it. Skipping or
-reordering produces an unlinked binary that segfaults on first run.
+reordering makes the `source/2.9` link fail (`cannot find -lgemc`).
 
 ## Testing
 
-**Test what a user gets, not the repo.** Both tests install the plugin with the
+**Test what a user gets, not the repo.** All three tests install the plugin with the
 tools' own `plugin` commands into a clean Claude Code and Codex — a fake `HOME` and a
 whitelisted environment, so nothing from the maintainer's sessions leaks in and nothing
 leaks out (checked by hashing the real plugin state before and after). Running the
@@ -154,12 +154,12 @@ dir, the workspace launcher, and how each tool loads the skill.
 
 **Three speeds.** The quick test (`tests/quick-test.sh`, ~1 min, no model) links the
 image and a prebuilt solid_gemc and runs the installed plugin end to end. The full test
-(`tests/full-test.sh`, ~1 h) removes every shortcut — published install, real download
+(`tests/full-test.sh`, ~25–35 min) removes every shortcut — published install, real download
 and build, default permission/sandbox modes — and a fresh subagent per tool plays the
 user, answering prompts only as a sensible new user would and writing a verdict. A
 script answering by regex can't tell a confusing prompt from a good one; an agent with
 a user's brief can. The basic test (`tests/basic-test.sh`, ~15 min) runs those agent
-sessions with the quick test's links, to check skill changes without an hour-long
+sessions with the quick test's links, to check skill changes without the full
 run. Details: `tests/README.md`.
 
 ## Known limitations (v0.0.7)

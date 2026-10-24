@@ -1,7 +1,7 @@
 # `reference/` — background knowledge for working with `solid_gemc`
 
 These files are **not** part of the plugin's runtime. They're the
-reference library a Claude Code session should consult when helping
+reference library the agent (Claude Code or Codex) should consult when helping
 a user reason about the SoLID GEMC simulation stack — geant4 → gemc →
 solid_gemc — that the plugin drives.
 
@@ -91,11 +91,10 @@ file.
 
 ## What's NOT in here
 
-- Plugin-internal docs (CLAUDE.md, PLAN.md, BUILD_LOG.md, command
-  bodies, skill bodies) — those live in the repo root and the relevant
-  dirs.
+- Plugin-internal docs (AGENTS.md / CLAUDE.md, the skill body) — those live
+  in the repo root and `skills/`.
 - Upstream worked examples — those live in the user's workspace after
-  `solid-gemc-init`, at `solid_gemc/analysis/hgc_study/` (config + run +
+  `bin/solid-gemc-run init`, at `solid_gemc/analysis/hgc_study/` (config + run +
   analyze pipeline) and `solid_gemc/geometry/hgc_moved/` (custom-
   detector authoring with Perl generators).
 - Geant4 user docs and gemc.jlab.org HTML docs — link to upstream
