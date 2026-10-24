@@ -35,14 +35,20 @@ apptainer can't run inside Codex's sandbox: if a run fails with `operation not p
 
 There are no slash commands. The `solid-gemc` orchestrator skill auto-loads on any SoLID-flavored request (Claude Code or Codex CLI), gap-checks a seven-field spec (project name, physics goal, SoLID config, beam, GCard, output, analysis), shows a plan, and runs it on approval — driving everything through `bin/solid-gemc-run` (bootstrap the workspace, pick + edit a GCard, run `solid_gemc`, convert EVIO → ROOT, record provenance, plot).
 
-Start your agent in an empty folder; it becomes your workspace (`init` puts the ~1 GB `solid_gemc` build and all run outputs there):
+**1. Set up a workspace — once, right after installing (5–15 min).** Start your agent in an empty folder; it becomes your workspace (the ~1 GB `solid_gemc` build and all run outputs go there). Then ask it to initialize:
 
 ```sh
 mkdir ~/solid_ws && cd ~/solid_ws
 claude            # or: codex
 ```
 
-A good first request is "Run the heavy-gas Cherenkov study on He-3, 100 events". Results land in `<project>/runs/<id>/` and `<project>/report.html`; the workspace's own `README.md` explains the rest. A bigger request, once that works:
+```text
+Initialize the solid_gemc workspace
+```
+
+The agent says what setup will do, then downloads the ~1.7 GB container image (first time only; every workspace shares it), clones `solid_gemc` and builds it, reporting each step. On Codex, if it says the container was blocked, type `/permissions`, choose **Ask for approval**, then `continue`.
+
+**2. Run a study** in the same folder. A good first request is "Run the heavy-gas Cherenkov study on He-3, 100 events"; the agent shows a plan and waits for your approval. (Skip step 1 and your first study request offers to run the setup first.) Results land in `<project>/runs/<id>/` and `<project>/report.html`; the workspace's own `README.md` explains the rest. A bigger request, once that works:
 
 ```text
 Learn the examples at solid_gemc repo "solid_gemc/analysis/hgc_study/" and "solid_gemc/geometry/hgc_moved/",
@@ -52,7 +58,7 @@ verify the sim result with physics analytic calculation,
 finally show me the results in an html file
 ```
 
-`init` runs once per workspace (pull the `.sif`, clone `solid_gemc`, run both scons builds, scaffold the workspace) — on your first request after you confirm it, or when you ask to "init solid-gemc-claude". After it, two upstream worked examples live in your workspace, both self-contained:
+Setup (`bin/solid-gemc-run init`) runs once per workspace: pull the `.sif`, clone `solid_gemc`, run both scons builds, scaffold the workspace. After it, two upstream worked examples live in your workspace, both self-contained:
 
 | Example | What it teaches |
 |---|---|

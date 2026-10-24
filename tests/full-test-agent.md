@@ -5,8 +5,9 @@ You are testing the `solid-gemc-claude` plugin by acting as a **new user** of
 in the tmux session `@SESSION@`, in the empty project folder `@WS@`. Everything lives
 in a throwaway sandbox (`@SANDBOX@`); nothing outside it is yours to touch.
 
-Your job: ask for one simulation in plain language, answer the session's questions
-the way a sensible new user would, and write an honest verdict. You are the user, not
+Your job: follow the plugin's README like a new user — first ask it to set up the
+workspace, then ask for one simulation in plain language — answer the session's
+questions the way a sensible new user would, and write an honest verdict. You are the user, not
 a helper: never fix files, run the plugin yourself, or hint at commands to the agent.
 
 ## How to interact
@@ -21,13 +22,21 @@ Only through tmux, from your own shell:
   interrupt it. Budget: @BUDGET@ minutes in total — a first run may download a ~1.7 GB
   image and build solid_gemc, so long quiet stretches are normal.
 
-## The request
-Once the session is idle at its input prompt (answer any first-run screens first),
-type exactly:
+## The requests
+**1. Setup.** Once the session is idle at its input prompt (answer any first-run
+screens first), type exactly:
+
+> Initialize the solid_gemc workspace
+
+You asked for the setup, so it should run init without a separate "Run init now"
+question (saying first what it does and how long it takes), then stop and say the
+workspace is ready — without asking about a simulation or showing a plan.
+
+**2. Study.** When setup has finished and the session is idle again, type exactly:
 
 > @REQUEST@
 
-Then check that it shows as a sent message. A fresh Codex can ignore input for a few
+After each, check that it shows as a sent message. A fresh Codex can ignore input for a few
 minutes while it sets itself up; if the text sits unsent or vanishes, clear the input,
 send it again, and note the delay.
 
@@ -35,7 +44,8 @@ send it again, and note the delay.
 - **First-run screens** (theme, tips, notices, "trust this folder?"): pick the default
   or "yes". If the tool tells you to do something (for example run `/reload-plugins`,
   or restart), do what a user would and note it.
-- **"Run init now"** (the plugin's first question): yes — you want the study to run.
+- **"Run init now"** (if the plugin asks anyway): yes — you asked for the setup, but
+  note the extra question.
 - **The plan**: read it. Approve only if it matches the request (heavy-gas Cherenkov,
   cherenkov.gcard, 2 events, project @PROJECT@). If it doesn't, choose to edit it and
   say what is wrong, once; if it still doesn't match, fail.
@@ -66,7 +76,9 @@ Then write `@VERDICT@`:
 
 ## Checks
 - [x|  ] The skill picked up the plain-language request
-- [x|  ] It asked before running init, and the question was clear
+- [x|  ] Before init it said what setup does and how long it takes
+- [x|  ] The setup request stopped after init with a "ready" message — no plan, no
+  simulation questions
 - [x|  ] It showed a plan that matched the request before running anything
 - [x|  ] Every prompt was answerable by a new user without outside knowledge
 - [x|  ] The run finished; the session reported where the results are
@@ -86,9 +98,10 @@ Then write `@VERDICT@`:
 | step | seen at (UTC, `date -u +%T`) | seconds since previous step |
 |---|---|---|
 | session ready (first-run screens done) | | |
-| request sent | | |
-| init question shown | | |
-| init finished | | |
+| setup request sent | | |
+| init started | | |
+| init finished ("ready" message) | | |
+| study request sent | | |
 | plan shown | | |
 | plan approved | | |
 | run finished (gemc + evio2root) | | |

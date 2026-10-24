@@ -1,6 +1,6 @@
 ---
 name: solid-gemc
-description: Run SoLID detector simulations with solid_gemc (GEMC) from a plain-language request — PVDIS, SIDIS, J/psi, He-3, DDVCS, LD2/LH2/NH3 targets, heavy-gas or light-gas Cherenkov, GEM, EC, MRPC or baffle studies, or "where do I start" in a solid_gemc workspace, e.g. "PVDIS A_PV on LD2 at 11 GeV" or "HGC photoelectron yield on He-3". Ensures the workspace is initialized (a gated `bin/solid-gemc-run init`) before any plan, captures a seven-field spec, gets explicit approval for the plan, then drives `bin/solid-gemc-run` (gcard, run, analyze). Not for plain Geant4/GDML work without SoLID context. Claude Code and Codex CLI.
+description: Run SoLID detector simulations with solid_gemc (GEMC) from a plain-language request — PVDIS, SIDIS, J/psi, He-3, DDVCS, LD2/LH2/NH3 targets, heavy-gas or light-gas Cherenkov, GEM, EC, MRPC or baffle studies, "set up / initialize a solid_gemc workspace", or "where do I start" in one, e.g. "PVDIS A_PV on LD2 at 11 GeV" or "HGC photoelectron yield on He-3". Ensures the workspace is initialized (a gated `bin/solid-gemc-run init`) before any plan, captures a seven-field spec, gets explicit approval for the plan, then drives `bin/solid-gemc-run` (gcard, run, analyze). Not for plain Geant4/GDML work without SoLID context. Claude Code and Codex CLI.
 ---
 
 # solid-gemc — full-flow orchestrator
@@ -67,7 +67,8 @@ hand-author one.
 
 **No file is created and no container command (`run`, `exec`, `root`, `build`,
 …) runs until the user picks "Approve and run" at the Step 2 gate in this turn.**
-Only `init` comes earlier, behind its own "Run init now" pick; reads on the host
+Only `init` comes earlier — behind its own "Run init now" pick, or requested
+outright by the user (a setup-only request, Step 0); reads on the host
 (the Step 0 check, `info`, listing GCards) need no gate. Not when the user says
 "go", "yes", "just run it", "skip the approval" or "no clarifying questions", and
 not when the request looks fully specified. Your reading of "PVDIS LD2 11 GeV 10000 events" is
@@ -75,8 +76,9 @@ one of many — the wrong canonical GCard (`solid_PVDIS_LD2_moved_full` vs
 `solid_PVDIS_simple`), analysis, project name or default; showing the plan first
 catches that before any artifact exists.
 
-There are **two independent gates**: Step 0's "Run init now" approves init only;
-Step 2's "Approve and run" approves the run. Never collapse them.
+There are **two independent approvals**: init (Step 0 — the "Run init now" pick,
+or the user's own setup-only request) and the run (Step 2's "Approve and run").
+Approving init never approves a run. Never collapse them.
 
 | Question | Covers | Can the user waive it? |
 |---|---|---|
@@ -158,9 +160,14 @@ echo "init_needed=${init_needed}"
 "$SGC_RUN" info | grep '^sif file:' || true   # [present] = image already downloaded
 ```
 
-- `init_needed=0`: say nothing; go to Step 1.
-- `init_needed=1`: fire the init gate before anything else. Name only what is
-  missing — the image download only when `sif file:` isn't `[present]`:
+- `init_needed=0`: say nothing; go to Step 1. If the request was only to set up
+  the workspace, say it is already set up and suggest a first study instead.
+- `init_needed=1` on a **setup-only request** (see below): the request is the
+  approval — don't ask again. Say in one line what init will do and how long it
+  takes, then run it as below.
+- `init_needed=1` on any other request: fire the init gate before anything else.
+  Name only what is missing — the image download only when `sif file:` isn't
+  `[present]`:
 
   > This workspace isn't set up yet. `init` will <download the ~1.7 GB
   > container image,> clone solid_gemc and build it (two builds) —
@@ -171,11 +178,18 @@ echo "init_needed=${init_needed}"
 
   On **Run init now**: say it takes 5–15 minutes and that you'll report its steps,
   then run `"$SGC_RUN" init` with the longest timeout your tool allows, its output
-unfiltered (no `| tail`, `| head`, so the step lines appear as they come). It prints
+  unfiltered (no `| tail`, `| head`, so the step lines appear as they come). It prints
   `step N/4` and `build N/2` lines with elapsed time; if your tool backgrounds it,
   check about once a minute and relay each new step line. Don't start it twice.
   When it ends, re-run the check. Non-zero exit or still `init_needed=1` → **stop**
   and report init's last 20 lines. On **Cancel**: stop entirely — no spec, no plan.
+
+**Setup-only request** ("initialize the workspace", "set up solid-gemc" — the
+step the docs tell users to do right after installing): the user asked for init, so
+it runs without the gate; after a successful init, stop. Say the workspace is ready (and how long init took), suggest a first study
+— e.g. "Run the heavy-gas Cherenkov study on He-3, 100 events" — and add one line
+at the top of the workspace `log.md`: `- YYYY-MM-DD — workspace initialized`. No
+spec, no plan.
 
 This has no waiver. Exceptions (a)–(c) already assume an initialized workspace.
 

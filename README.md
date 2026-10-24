@@ -70,17 +70,27 @@ ask for approval. That comes from the host's `bubblewrap`, not the plugin — ch
 
 ## First run
 
-Start your agent in an empty folder; it becomes your workspace (`init` puts the
-~1 GB solid_gemc build and all run outputs there):
+**1. Set up a workspace — once, right after installing (5–15 min).** Start your
+agent in an empty folder; it becomes your workspace (the ~1 GB solid_gemc build and
+all run outputs go there). Then ask it to initialize:
 
 ```sh
 mkdir ~/solid_ws && cd ~/solid_ws
 claude            # or: codex
 ```
 
-Then ask, for example, "Run the heavy-gas Cherenkov study on He-3, 100 events".
-The first request asks to initialize the workspace (download the ~1.7 GB image,
-clone and build solid_gemc), then shows a plan and waits for your approval.
+```text
+Initialize the solid_gemc workspace
+```
+
+The agent says what setup will do, then downloads the ~1.7 GB container image
+(first time only; every workspace shares it), clones solid_gemc and builds it,
+reporting each step. On Codex, if it says the container was blocked, type
+`/permissions`, choose **Ask for approval**, then `continue`.
+
+**2. Run a study** in the same folder, for example "Run the heavy-gas Cherenkov
+study on He-3, 100 events". The agent shows a plan and waits for your approval.
+(Skip step 1 and your first study request offers to run the setup first.)
 Results land in `<project>/runs/<id>/` (`out.root`, `plots.pdf`, `config.json`)
 and `<project>/report.html`. The workspace's own `README.md` explains the rest.
 
@@ -102,9 +112,9 @@ then drives the whole run through `bin/solid-gemc-run` (bootstrap
 the workspace, pick + edit a GCard, run `solid_gemc`, convert EVIO → ROOT,
 record provenance, plot). Works the same on Claude Code and Codex CLI.
 
-The first SoLID request runs `bin/solid-gemc-run init` once you confirm it:
-download the image, clone solid_gemc, build it, and write the workspace files.
-You can also ask for just that step.
+Setup is `bin/solid-gemc-run init` (step 1 of "First run"): download the image,
+clone solid_gemc, build it, and write the workspace files. A study request in a
+folder that isn't set up asks you before running it.
 
 Two upstream worked examples live in your workspace after init, both fully self-contained:
 

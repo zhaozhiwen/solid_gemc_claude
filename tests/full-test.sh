@@ -128,6 +128,7 @@ cmd_verify() {
       echo "## ${t}"
       check "workspace initialized (marker + launcher)" "[[ -f '${ws}/.solid-gemc-workspace' && -x '${ws}/bin/solid-gemc-run' ]]"
       check "no cache/ in the workspace" "[[ ! -e '${ws}/cache' ]]"
+      check "setup request logged in the workspace log.md" "grep -q 'workspace initialized' '${ws}/log.md' 2>/dev/null"
       if [[ "${MODE}" == full ]]; then
         check ".sif downloaded into the fake ${t} data dir (a real file)" "[[ -f '${sif}' && ! -L '${sif}' ]]"
         check "solid_gemc cloned + built in the workspace" "[[ -d '${ws}/solid_gemc/.git' && -x '${ws}/solid_gemc/source/2.9/solid_gemc' ]]"

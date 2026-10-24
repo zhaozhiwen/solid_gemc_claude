@@ -98,8 +98,9 @@ nothing in common and run in parallel. The full test never sets it.
 A real user's first session in each tool, with none of the quick test's shortcuts:
 published install, real download and build, Claude Code's default permission mode,
 Codex's default sandbox and approvals, nothing pre-trusted. A fresh subagent per tool
-plays a new user (`tests/full-test-agent.md`): it types one plain-language request,
-answers every prompt as a sensible user would — approving init, approving the plan only
+plays a new user (`tests/full-test-agent.md`) following the README: it first asks to
+"Initialize the solid_gemc workspace", then types one plain-language study request,
+answers every prompt as a sensible user would — approving the plan only
 if it matches the request, approving Codex escalations only for this study's commands
 inside the sandbox — and writes a verdict listing every prompt it saw.
 
@@ -108,7 +109,8 @@ inside the sandbox — and writes a verdict listing every prompt it saw.
   for the sessions; the quick test runs it on every change. Each session's `init` is the real
   first run — download into that tool's data dir, clone, build;
 - per tool, from the subagent's session (`verify`): workspace initialized (marker +
-  launcher); `.sif` downloaded into that tool's data dir; no workspace `cache/`;
+  launcher); the setup request logged as "workspace initialized" in the workspace
+  `log.md`; `.sif` downloaded into that tool's data dir; no workspace `cache/`;
   solid_gemc cloned + built; `hgc_full/runs/<id>/` with `gcard.gcard`, `out.evio`,
   `out.root`, `log.txt`, `config.json` and plots; the request verbatim in
   `hgc_full/log.md`; the verdict ends `OVERALL: PASS`.
