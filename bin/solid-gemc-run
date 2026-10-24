@@ -421,9 +421,9 @@ cmd_build() {
   # .a static archives and never produces libgemc.so; the downstream
   # source/2.9 link then fails with `cannot find -lgemc`. source/2.9
   # doesn't need its own LIBRARY flag (the gate there is commented out).
-  log "building GEMC library at ${gemc_dir}"
+  log "build 1/2: GEMC library at ${gemc_dir}"
   in_container "cd ${gemc_dir} && scons OPT=1 LIBRARY=shared -j4"
-  log "building solid_gemc at ${solid_dir}"
+  log "build 2/2: solid_gemc at ${solid_dir}"
   in_container "cd ${solid_dir} && scons OPT=1 -j4"
   log "build complete: ${solid_dir}/solid_gemc"
 }
@@ -525,8 +525,14 @@ cmd_init() {
     log "wrote ./bin/solid-gemc-run (workspace launcher)"
   fi
 
+  # Numbered steps with elapsed time: init can run 5–15 min (mostly the two
+  # builds), and agents relay these lines so the user can see it is moving.
+  local t0=${SECONDS}
+  log "step 1/4: container image$([[ -f ${SIF_PATH} ]] && echo ' (already downloaded)' || echo ' (downloading ~1.7 GB)')"
   cmd_pull
+  log "step 2/4: solid_gemc clone ($((SECONDS - t0)) s so far)"
   cmd_clone
+  log "step 3/4: build — two scons passes, usually 5–15 min ($((SECONDS - t0)) s so far)"
   # SOLID_GEMC_SKIP_BUILD=1: test seam (tests/quick-test.sh, tests/basic-test.sh) —
   # those test the plugin, not solid_gemc, and link an already-built tree, so the
   # two scons passes are skipped; the binary must exist and the smoke below still runs.
@@ -541,10 +547,10 @@ cmd_init() {
   # Post-build smoke: confirm the freshly built binary actually resolves on the
   # in-container PATH. Catches a broken build or a broken env block immediately,
   # while the user is watching init, instead of at the first real run.
-  log "verifying solid_gemc resolves inside the container..."
+  log "step 4/4: check that solid_gemc runs in the container ($((SECONDS - t0)) s so far)"
   local smoke
   if smoke="$(in_container "which solid_gemc" 2>&1)"; then
-    log "smoke ok: solid_gemc on PATH in-container"
+    log "init done in $((SECONDS - t0)) s: solid_gemc on PATH in-container"
   elif grep -qiE "operation not permitted|FATAL" <<<"${smoke}"; then
     printf '%s\n' "${smoke}" | tail -5 >&2
     [[ -n "${CODEX_THREAD_ID:-}${CODEX_CI:-}" ]] \
@@ -586,6 +592,69 @@ cmd_analyze() {
   EXTRA_BIND_PATHS=("${PLUGIN_ROOT}/bin" "${run_dir}")
   cmd_root "'${PLUGIN_ROOT}/bin/solid_gemc_analyze.C(\"${root}\",\"${run_dir}\",${max_plots})'"
   ls -1 "${run_dir}"/*.svg "${run_dir}"/plots.pdf 2>/dev/null || true
+}
+
+# Copy a GCard into a project and set the batch options inside its live
+# <gcard> block: OUTPUT=evio,out.evio, N, USE_GUI=0 and RECORD_OPTICALPHOTONS=1
+# (off with --no-optical). <gcard> is a path, or a name looked up under
+# solid_gemc/script/ then solid_gemc/analysis/*/. Host-only (no container).
+# Prints the project copy and the source dir that `run` must start gemc from.
+cmd_gcard() {
+  local name="" project="" n=100 optical=1 force=0
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --events)     n="${2:-}"; shift 2 || die "--events needs a number" ;;
+      --no-optical) optical=0; shift ;;
+      --force)      force=1; shift ;;
+      -*)           die "unknown option: $1" ;;
+      *) if [[ -z "${name}" ]]; then name="$1"; elif [[ -z "${project}" ]]; then project="$1"
+         else die "too many arguments: $1"; fi; shift ;;
+    esac
+  done
+  [[ -n "${name}" && -n "${project}" ]] \
+    || die "usage: solid-gemc-run gcard <gcard|name> <project> [--events N] [--no-optical] [--force]"
+  [[ "${n}" =~ ^[0-9]+(e[0-9]+)?$ ]] || die "--events must be a number like 100 or 1e4: ${n}"
+  [[ -d "${project}" ]] || die "project dir not found: ${project}"
+
+  local src="" sg c
+  if [[ -f "${name}" ]]; then
+    src="${name}"
+  else
+    sg="$(find_workspace_root || pwd)/solid_gemc"
+    local -a hits=()
+    for c in "${sg}/script/${name}" "${sg}/script/${name}.gcard" "${sg}/script/solid_${name}.gcard" \
+             "${sg}"/analysis/*/"${name}" "${sg}"/analysis/*/"${name}.gcard"; do
+      [[ -f "${c}" ]] && hits+=("${c}")
+    done
+    (( ${#hits[@]} > 0 )) || die "no GCard '${name}' under ${sg}/script/ or ${sg}/analysis/*/"
+    (( ${#hits[@]} == 1 )) || die "'${name}' matches several GCards; pass a path: ${hits[*]}"
+    src="${hits[0]}"
+  fi
+  local dest="${project%/}/$(basename "${src}")"
+  [[ ! -e "${dest}" || ${force} -eq 1 ]] \
+    || die "${dest} exists (it may hold your edits); use --force to replace it"
+  cp "${src}" "${dest}"
+  python3 - "${dest}" "${n}" "${optical}" <<'PY'
+import re, sys, pathlib
+path, n_events, optical = sys.argv[1:4]
+text = pathlib.Path(path).read_text()
+m = re.search(r'(<gcard>)(.*?)(</gcard>)', text, re.DOTALL)
+if not m:
+    sys.exit(f"no <gcard>...</gcard> block in {path}")
+# Only the live block; canonicals carry commented examples after it. [^>]* also
+# matches the `name="USE_GUI"  value=` double-space variant.
+body = re.sub(r'^[ \t]*<option name="(OUTPUT|N|USE_GUI|RECORD_OPTICALPHOTONS)"[^>]*/>[ \t]*\n',
+              '', m.group(2), flags=re.MULTILINE)
+adds = ['<option name="OUTPUT" value="evio,out.evio"/>',
+        f'<option name="N" value="{n_events}"/>',
+        '<option name="USE_GUI" value="0"/>']
+if optical == '1':
+    adds.append('<option name="RECORD_OPTICALPHOTONS" value="1"/>')
+pathlib.Path(path).write_text(text[:m.start(2)] + body.rstrip() + '\n' + '\n'.join(adds) + '\n' + text[m.end(2):])
+PY
+  log "N=${n}, optical photons $( (( optical )) && echo on || echo off), USE_GUI=0, OUTPUT=evio"
+  echo "gcard: ${dest}"
+  echo "source dir: $(cd "$(dirname "${src}")" && pwd)"
 }
 
 # One simulation run, end to end, as one command (one step for an agent to run
@@ -704,6 +773,9 @@ Usage: solid-gemc-run <subcommand> [args]
 
 Subcommands:
   init [--force]                Bootstrap workspace: scaffold files + pull + clone + build.
+  gcard <gcard|name> <project> [--events N] [--no-optical] [--force]
+                                Copy a GCard into <project>, set OUTPUT/N/USE_GUI=0 and
+                                RECORD_OPTICALPHOTONS=1; prints the copy + its source dir.
   run <gcard> <source-dir> [N]  One run: check + freeze the GCard into <project>/runs/<id>/,
                                 gemc from <source-dir>, evio2root -R=flux -B=<detector banks>,
                                 config.json, then analyze (max N plots).
@@ -744,6 +816,7 @@ case "${sub}" in
 esac
 case "${sub}" in
   init)            cmd_init "$@" ;;
+  gcard)           cmd_gcard "$@" ;;
   run)             cmd_run "$@" ;;
   analyze)         cmd_analyze "$@" ;;
   setup-python)    cmd_setup_python "$@" ;;

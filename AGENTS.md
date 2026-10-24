@@ -191,6 +191,7 @@ gate; execute with stop-on-failure post-condition checks.
 # through bin/solid-gemc-run. The wrapper is the one seam for everything:
 
 bin/solid-gemc-run init [--force]             # workspace skeleton + pull .sif + clone + 2× scons build
+bin/solid-gemc-run gcard <preset> <project> [--events N] [--no-optical]  # copy a GCard + set batch options (host only)
 bin/solid-gemc-run run <gcard> <source-dir> [N] # one run: gemc + evio2root -R=flux -B=<banks> + config.json + analyze
 bin/solid-gemc-run analyze <run|id|root> [N]  # default plots from out.root: container ROOT → SVG + plots.pdf + stats
 bin/solid-gemc-run analyze --python <run> [N] # same with host uproot → PNGs (installs the venv lazily)

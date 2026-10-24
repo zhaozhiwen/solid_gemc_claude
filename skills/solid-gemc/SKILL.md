@@ -46,7 +46,8 @@ so this skill passes no cache/venv paths.
 escalation (run outside the sandbox) on the **first** call of every
 `$SGC_RUN` command that starts the container — `init`, `run`, `exec`,
 `root`, `analyze`, `validate-gcard`, `build`, `shell`, `pull` — rather than
-trying sandboxed first. If the escalation is rejected, give the user the
+trying sandboxed first (`gcard`, `info` and `paths` run on the host and
+need none). If the escalation is rejected, give the user the
 exact message in "Failure handling" → **Codex sandbox**. If you put a step into a script file, write it
 under `<project>/` (never `/tmp`) and show it before asking to run it.
 
@@ -72,7 +73,7 @@ Per-run outputs land at `<project>/runs/<id>/`.
 init                                          (Step 0 — gated once, before planning)
   → ensure <project>/ subdir exists           (seed from templates/workspace/ if not)
   → pick a GCard from solid_gemc/script/      (canonical) or solid_gemc/analysis/*/
-  → copy to <project>/<preset>.gcard + apply batch overrides
+  → bin/solid-gemc-run gcard <preset> <project> --events N   (copy + set options)
   → bin/solid-gemc-run run <project>/<preset>.gcard <source dir>
        one command: check + freeze the GCard, gemc from <source dir>,
        evio2root -R=flux -B=<detector banks>, config.json, analyze
@@ -239,8 +240,10 @@ exception, you're wrong — fire the gate.
 sessions (or a future human reader) able to tell what was asked
 versus what was inferred — paraphrasing erases that distinction.
 
-A complete log entry has four sections, prepended as a single
-dated block at the top of `<project>/log.md`:
+A complete log entry has four sections, inserted as one dated block
+**directly below the file's title and intro, above the newest existing
+entry** — never appended at the end. Under "Final plan", paste the plan
+block exactly as the user saw it at the approval gate:
 
 ```
 ## YYYY-MM-DD HH:MM UTC — <one-line headline>
@@ -255,22 +258,7 @@ dated block at the top of `<project>/log.md`:
 
 ### Final plan (the approved version)
 
-- Project name:  <…>
-- Physics goal:  <…>
-- SoLID config:  <…>
-- Beam:          <…>
-- GCard:         <preset + parameter overrides>
-- Output:        <…>
-- Analysis:      <…>
-
-Steps (exactly as printed on screen in step 2 — record only what the
-user saw):
-1. <…>
-2. <…>
-…
-
-Defaults applied (only if any):
-- <…>
+<the Step 2 plan block>
 
 ### Decision
 
@@ -374,27 +362,37 @@ for f in CLAUDE.md .gitignore log.md result.md report.html; do
 done
 [[ -d solid_gemc/.git ]]                  || init_needed=1
 [[ -x solid_gemc/source/2.9/solid_gemc ]] || init_needed=1
+echo "init_needed=${init_needed}"
+"$SGC_RUN" info | grep '^sif file:' || true   # [present] = image already downloaded
 ```
+
+Run this check as written (it exits 0 either way); don't probe with
+`ls` or `test` commands of your own — a non-zero exit shows as an error.
 
 - **Already initialized** (`init_needed=0`): say nothing, proceed
   straight to Step 1.
 - **Not initialized** (`init_needed=1`): fire a dedicated init gate
   *before* doing anything else — an `AskUserQuestion` (or, on a
   harness without it, a numbered question the user must answer — on
-  Codex, end your turn after asking) that states plainly:
+  Codex, end your turn after asking). Name only what is actually
+  missing — the image download only when `sif file:` isn't `[present]`:
 
-  > This workspace isn't initialized. `init` will pull the ~1.7 GB
-  > JLabCE `.sif`, clone `solid_gemc`, and run two scons builds —
-  > several minutes, one-time. Run it now?
+  > This workspace isn't set up yet. `init` will <download the ~1.7 GB
+  > container image,> clone solid_gemc and build it (two builds) —
+  > usually 5–15 minutes, once. Run it now?
   >
-  > 1. **Run init now** — bootstrap, then continue.
+  > 1. **Run init now** — set up, then continue.
   > 2. **Cancel** — stop here; nothing downloaded, no files written.
 
-  On **Run init now**: `"$SGC_RUN" init`, wait for it to finish, then
-  re-check the post-conditions above. If init returns non-zero or any
-  post-condition still fails, **stop** — report the last 20 lines of
-  init's output; do not proceed. On **Cancel**: stop entirely — do
-  not capture the spec or draft a plan.
+  On **Run init now**: tell the user it takes 5–15 minutes and that you
+  will report its steps, then run `"$SGC_RUN" init` with the longest
+  timeout your tool allows. It prints `step N/4` and `build N/2` lines
+  with elapsed time; if your tool moves it to the background, check its
+  output about once a minute and relay each new step line. Don't start
+  it twice. When it ends, re-run the check above. If init returns
+  non-zero or `init_needed` is still 1, **stop** — report the last 20
+  lines of init's output; do not proceed. On **Cancel**: stop entirely —
+  do not capture the spec or draft a plan.
 
 This gate is the approval for init **only**; it is independent of the
 Step 2 run-approval gate (see non-negotiable 1). The forced-init-first
@@ -539,36 +537,24 @@ Once the spec is complete, put the whole plan below — every Spec
 field and every Step — **into the approval question itself** (on
 Claude Code the `AskUserQuestion` `question` text; on Codex the
 message that lists the numbered options). The user approves what is
-on screen: a one-line summary or "the steps above" doesn't count. No
-headings beyond what's here, no preamble, no "great, here's what I'll do":
+on screen: a one-line summary or "the steps above" doesn't count. Keep
+it to about 12 lines so it fits a small terminal (80×24) together with
+the options, and print nothing long right before it (no GCard or file
+dumps). No headings beyond what's here, no preamble:
 
 ```
 Plan: <one-sentence description of the simulation>
 
-Spec
-- Project name:  <…>
-- Physics goal:  <…>
-- SoLID config:  <…>
-- Beam:          <…>
-- GCard:         <preset name + parameter overrides>
-- Output:        <<project>/runs/<id>/out.root | other if user asked>
-- Analysis:      <auto-plots | custom script in <project>/ | hgc_study upstream>
+Project   <name>                Goal    <physics goal>
+Config    <SoLID config>        Beam    <beam>
+GCard     <preset> — N=<n>, optical photons <on|off><, other overrides>
+Output    <project>/runs/<id>/ (out.root, config.json, plots)
+Analysis  <default plots | macro <project>/<id>.C | Python (only if asked)>
 
-Steps  (workspace already initialized in Step 0)
-1. seed <project>/ from templates/workspace/. (skip if already there)
-2. copy <project>/<preset>.gcard from solid_gemc/script/<preset>.gcard (or .../analysis/.../<preset>.gcard); apply USE_GUI=0 + OUTPUT=evio,out.evio + N=<n> + RECORD_OPTICALPHOTONS=1 (default; 0 if the user turns it off)
-3. <only if user wants non-default beam/physics:> edit <project>/<preset>.gcard
-4. bin/solid-gemc-run run <project>/<preset>.gcard <source dir>   (source dir = the gcard's upstream dir)
-     → <project>/runs/<id>/: gemc + evio2root (-B = the GCard's detector banks) + config.json + default plots
-5. <one line: default plots only | custom ROOT macro <project>/<id>.C | Python <project>/<id>.py (only if asked)>
-
-Defaults applied
-- <only list defaults you actually filled in; skip section if none>
-
-Open questions / risks
-- <only list real ones — non-standard beam, missing canonical GCard
-  for the requested config, output format that bypasses the analyze
-  path, etc. Don't manufacture caveats.>
+Steps  1 seed <project>/ (if new)  2 gcard: copy + set options
+       <2b edit the GCard: … (only for non-default beam/physics)>  3 run: gemc → evio2root → plots
+Defaults  <only the defaults you filled in; omit the line if none>
+Risks     <only real ones; omit the line if none>
 ```
 
 End that question with "Approve this plan?" and three options. **This gate is
@@ -647,72 +633,46 @@ pre-existed, leave it alone — never clobber a user's project files.
 
 ### 3c. Prepare the GCard
 
-Resolve the preset against `solid_gemc/script/` first, then
-`solid_gemc/analysis/*/`. Copy to `<project>/<preset>.gcard`.
-Apply batch overrides **only inside the live `<gcard>…</gcard>`
-block** (canonicals often carry a `<!-- comment out … -->` example
-block; leave it alone). The regex strips any existing `OUTPUT` / `N` /
-`USE_GUI` / `RECORD_OPTICALPHOTONS` lines (the `name="USE_GUI"  value=...`
-double-space variant in some canonicals is matched by `[^>]*`), then
-appends the overrides at the bottom of the live block.
-
-Optical photons are recorded by default (`OPTICAL=1` →
-`RECORD_OPTICALPHOTONS=1`): without them gemc records no Cherenkov light
-and the HGC / LGC show only the charged track. Recording them makes runs
-slower and the output larger, most for full-detector configs with many
-events — list it under "Defaults applied" in the plan, and set
-`OPTICAL=0` when the user doesn't need Cherenkov light or asks to turn it
-off.
+One host-side command (no container) copies the GCard into the project
+and sets the batch options inside its live `<gcard>` block —
+`OUTPUT=evio,out.evio`, `N`, `USE_GUI=0`, and `RECORD_OPTICALPHOTONS=1`
+(on by default so the HGC / LGC record Cherenkov light; `--no-optical`
+when the user doesn't need it or asks for faster, smaller runs). The
+GCard is a name looked up under `solid_gemc/script/` then
+`solid_gemc/analysis/*/` (`solid_` prefix optional), or a path:
 
 ```bash
-PRESET=<resolved>
-SRC=<solid_gemc/script/solid_${PRESET}.gcard or under solid_gemc/analysis/*/>
-DEST="${PROJECT}/$(basename "$SRC")"
-SOURCE_DIR=$(dirname "$SRC")   # gemc 2.9 resolves <detector name="..."> relative to its cwd, not the GCard's location
-
-cp "$SRC" "$DEST"
-python3 - "$DEST" "${N_EVENTS:-100}" "${OPTICAL:-1}" <<'PY'
-import re, sys, pathlib
-path, n_events, optical = sys.argv[1:4]
-text = pathlib.Path(path).read_text()
-m = re.search(r'(<gcard>)(.*?)(</gcard>)', text, re.DOTALL)
-if not m:
-    sys.exit(f"[skill] no <gcard>...</gcard> block in {path}")
-body = re.sub(r'^[ \t]*<option name="(OUTPUT|N|USE_GUI|RECORD_OPTICALPHOTONS)"[^>]*/>[ \t]*\n',
-              '', m.group(2), flags=re.MULTILINE)
-adds = ['<option name="OUTPUT" value="evio,out.evio"/>',
-        f'<option name="N" value="{n_events}"/>',
-        '<option name="USE_GUI" value="0"/>']
-if optical == '1':
-    adds.append('<option name="RECORD_OPTICALPHOTONS" value="1"/>')
-pathlib.Path(path).write_text(text[:m.start(2)] + body.rstrip() + '\n' + '\n'.join(adds) + '\n' + text[m.end(2):])
-PY
+OUT=$("$SGC_RUN" gcard <preset> "$PROJECT" --events "$N_EVENTS")   # add --no-optical if asked
+DEST=$(awk '/^gcard: /{print $2}' <<<"$OUT")
+SOURCE_DIR=$(awk '/^source dir: /{print $3}' <<<"$OUT")
 ```
 
-Post-condition: `<project>/<preset>.gcard` exists and its live `<gcard>`
-block has the overrides. (`run` checks the XML before running.)
+It refuses to overwrite an existing `<project>/<preset>.gcard` (it may
+hold the user's edits); pass `--force` only when the plan says the copy
+is replaced. For non-default beam / physics, edit `$DEST` afterwards.
+`SOURCE_DIR` is where gemc must run: detector names in a GCard are
+relative to gemc's cwd, not to the GCard.
 
 ### 3d. Run, convert, record, plot — one command
 
 From the workspace root:
 
 ```bash
-"$SGC_RUN" run "$DEST" "$SOURCE_DIR" 12
+"$SGC_RUN" run "$DEST" "$SOURCE_DIR"
 ```
 
 `run` checks the GCard (xmllint), freezes it into a new
-`<project>/runs/<id>/gcard.gcard`, runs gemc from `$SOURCE_DIR`
-(detector names are cwd-relative), converts with
-`evio2root -R=flux -B=<banks>` (`-R=flux` keeps the flux detector's raw
-fields — Edep, positions, times; `-B` lists every GCard detector that has
-a `<name>__bank.txt`, without which those detector trees come out
-**empty**), writes `config.json`, and runs `analyze`. Its last line is
-`run dir: <path>`; a failure exits non-zero with the log path. Don't
-re-implement these steps by hand or in a script — one command keeps one
-approval.
+`<project>/runs/<id>/gcard.gcard`, runs gemc from `$SOURCE_DIR`,
+converts with `evio2root -R=flux -B=<banks>` (`-R=flux` keeps the flux
+detector's raw fields — Edep, positions, times; `-B` lists every GCard
+detector that has a `<name>__bank.txt`, without which those detector
+trees come out **empty**), writes `config.json`, and runs `analyze`.
+Its last line is `run dir: <path>`; a failure exits non-zero with the
+log path. Don't re-implement these steps by hand or in a script — one
+command keeps one approval.
 
 For a custom detector in `<project>/` (see the workspace `CLAUDE.md`),
-the source dir is `<project>` itself.
+pass a GCard path to `gcard` and `<project>` as the source dir.
 
 Post-condition: the `run dir:` line printed; that dir has `gcard.gcard`,
 `out.evio`, `out.root`, `log.txt`, `config.json`; `config.json` has
@@ -735,7 +695,7 @@ N non-constant ones into `hist_<tree>_<branch>.svg` plus one multi-page
 reports a tree whose branches hold no values as "no hits recorded".
 Check those numbers — "no hits" in every detector tree means the run
 produced no physics; say so. For more plots, `"$SGC_RUN" analyze
-<run dir> <N>`. For asymmetries / fits / multi-run comparisons, write a
+<run dir> <N>` (the default is 12). For asymmetries / fits / multi-run comparisons, write a
 ROOT macro `<project>/<name>.C` and run it with `"$SGC_RUN" root
 <macro.C>` (the container's ROOT cannot write PNGs — save `.svg`/`.pdf`).
 Use Python (`"$SGC_RUN" analyze --python <run>` for uproot PNGs, or a

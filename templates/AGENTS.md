@@ -110,12 +110,14 @@ SoLID-flavored simulation in plain language (PVDIS, SIDIS, J/psi,
 He-3, HGC, LGC, GEM, EC, ...). It gap-checks your request against
 the seven-field spec, presents a plan, and on approval drives:
 
-1. Copy a canonical GCard from `solid_gemc/script/` or
-   `solid_gemc/analysis/*/` into `<name>/<preset>.gcard`,
-   applying batch overrides (`USE_GUI=0`, `OUTPUT=evio,out.evio`,
-   `N=<n>`, and `RECORD_OPTICALPHOTONS=1` — on by default, so the HGC/LGC
-   record Cherenkov light; ask to turn it off for faster, smaller runs)
-   inside the live `<gcard>` block.
+1. `bin/solid-gemc-run gcard <preset> <name> --events <n>` copies a
+   canonical GCard from `solid_gemc/script/` or `solid_gemc/analysis/*/`
+   into `<name>/<preset>.gcard` and sets `USE_GUI=0`,
+   `OUTPUT=evio,out.evio`, `N=<n>` and `RECORD_OPTICALPHOTONS=1` (on by
+   default, so the HGC/LGC record Cherenkov light; `--no-optical` for
+   faster, smaller runs) inside the live `<gcard>` block. It prints the
+   copy and the source dir to run from, and won't overwrite your edits
+   without `--force`.
 2. `bin/solid-gemc-run run <name>/<preset>.gcard <source-dir>` — one
    command: checks and freezes the GCard into `<name>/runs/<id>/`, runs
    gemc from `<source-dir>` (the upstream folder the GCard came from:
