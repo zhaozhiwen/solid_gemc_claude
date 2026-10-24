@@ -241,7 +241,7 @@ points at `solid_gemc/analysis/hgc_study/`), offer both in the plan: skill-drive
 
 **Changes to `solid_gemc/` itself.** Its `origin` is JeffersonLab (fork + PR
 only). If the user wants to keep or share edits inside it, say so in the plan:
-fork and switch the remotes as the workspace `AGENTS.md` "Changing solid_gemc"
+fork and switch the remotes as the workspace `AGENTS.md` rule 8
 shows. Changes one study needs belong in `<project>/`.
 
 ## Step 2 — Present the plan for approval

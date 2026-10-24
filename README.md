@@ -144,8 +144,15 @@ detector.
 **The `solid_gemc/` clone is for reading and running.** It comes from
 [JeffersonLab/solid_gemc](https://github.com/JeffersonLab/solid_gemc), which
 accepts changes only as fork → pull request. To keep or submit changes, point
-the clone at your fork; the workspace `README.md` ("Changing solid_gemc itself")
-has the commands. Init reuses an existing clone, so it never overwrites your work.
+the clone at your fork; the docs site has the commands
+("Changing solid_gemc itself" under [Using your workspace](https://zhaozhiwen.github.io/solid_gemc_claude/#using-your-workspace)).
+Init reuses an existing clone, so it never overwrites your work.
+
+## Updating
+
+Update the plugin in Claude Code or Codex and start a new session; existing
+workspaces need nothing (their launcher runs the newest installed plugin). Commands:
+[Updating](https://zhaozhiwen.github.io/solid_gemc_claude/#updating).
 
 ## Testing (maintainers)
 

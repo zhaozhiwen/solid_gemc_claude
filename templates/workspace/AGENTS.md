@@ -17,15 +17,13 @@ Files live flat in this folder; add subfolders only if the project outgrows that
 | `runs/<id>/` | One run, written by `run`; read-only once finished. |
 | `*.C`, `*.py`, `*.pl`, `*.txt`, `*.dat` | Analysis macros and custom-detector files. |
 
-## Running from here
+## Working here
 
-- Run a GCard with this folder as the gemc run folder:
-  `../bin/solid-gemc-run run <gcard> .` — needed whenever the GCard names
-  detectors stored here (detector `name=` paths are relative to the run folder).
-  Point upstream detectors at `../solid_gemc/geometry/…`, and give your own
-  detector a new name so an upstream copy can't load instead.
-- Re-plot: `../bin/solid-gemc-run analyze runs/<id>`; custom analysis:
-  `../bin/solid-gemc-run root <macro.C>` (save `.svg`/`.pdf`, not PNG).
-- Regenerate custom-detector text files:
-  `../bin/solid-gemc-run exec "./<sub>.pl config_<sub>.dat"`. Pattern to follow:
-  `../solid_gemc/geometry/hgc_moved/` (and `../README.md` "Your own detector", if present).
+- Commands: `../bin/solid-gemc-run help` (always the installed plugin's version).
+- A GCard whose detectors live in this folder runs with this folder as gemc's run
+  folder — detector `name=` paths are relative to the run folder. Point upstream
+  detectors at `../solid_gemc/geometry/…`, and give your own detectors new names so
+  an upstream copy can't load instead.
+- Custom detectors follow upstream `../solid_gemc/geometry/hgc_moved/` (Perl
+  generators → text files gemc reads).
+- Plots from the container's ROOT are `.svg` / `.pdf` (it cannot write PNG).
