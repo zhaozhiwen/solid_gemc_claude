@@ -14,7 +14,7 @@ analysis runs on that ROOT inside the container (host-side
 
 **Docs site:** [zhaozhiwen.github.io/solid_gemc_claude](https://zhaozhiwen.github.io/solid_gemc_claude/) (install + quickstart + two demo run reports).
 
-> **Status: v0.0.8.** Dual-platform (Claude Code + Codex CLI). The
+> **Status: v0.0.9.** Dual-platform (Claude Code + Codex CLI). The
 > orchestrator skill drives the full simulation loop through the wrapper. See
 > [`docs/DESIGN.md`](docs/DESIGN.md) for design intent and the cross-platform
 > architecture.
@@ -151,7 +151,7 @@ has the commands. Init reuses an existing clone, so it never overwrites your wor
 
 See [`tests/README.md`](tests/README.md).
 
-## Known limitations (v0.0.8)
+## Known limitations (v0.0.9)
 
 - The .sif is hosted at a personal Duke webhome
   (`http://webhome.phy.duke.edu/~zz81/simg/`). No SLA, may move. Mirror

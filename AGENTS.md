@@ -5,7 +5,7 @@ Maintainer rules for this repository (Claude Code reads `CLAUDE.md`, Codex reads
 
 ## Repo state
 
-v0.0.8, dual-platform (Claude Code + Codex CLI). No slash commands and no hooks:
+v0.0.9, dual-platform (Claude Code + Codex CLI). No slash commands and no hooks:
 the `solid-gemc` skill (auto-loads on SoLID-flavored natural language) drives
 `bin/solid-gemc-run`; `bin/solid-gemc-run help` lists its subcommands.
 
