@@ -17,6 +17,7 @@ __pycache__/
 .env
 BUILD_LOG.md
 HANDOFF.md
+BACKLOG.md
 PLAN.md
 CODEX_PORT_PLAN.md
 

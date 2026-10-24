@@ -27,7 +27,7 @@ codex plugin marketplace add zhaozhiwen/solid_gemc_claude
 codex plugin add solid-gemc-claude@solid-gemc-claude
 ```
 
-apptainer can't run inside Codex's sandbox: if a run fails with `operation not permitted`, set `/permissions` to **Ask for approval** so Codex asks before running the container.
+apptainer can't run inside Codex's sandbox: if a run fails with `operation not permitted`, set `/permissions` to **Ask for approval** so Codex asks before running the container. If Codex says its own sandbox failed to start, read-only commands will ask too — that's the host's `bubblewrap` (test with `bwrap --ro-bind / / true`), not the plugin; runs still work.
 
 `/plugin update` (Claude) handles upgrades. [Apptainer](https://apptainer.org) ≥ 1.4 must already be on the host; the plugin pulls its pinned `.sif` on first use via `wget`.
 

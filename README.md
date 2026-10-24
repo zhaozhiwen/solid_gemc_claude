@@ -72,6 +72,11 @@ apptainer can't run inside Codex's sandbox, so Codex must be able to ask before
 running `solid-gemc-run` outside it. If it doesn't ask (the run fails with
 `operation not permitted`), set `/permissions` to **Ask for approval** in the session.
 
+If Codex reports that its own sandbox failed to start, even read-only commands will
+ask for approval. That comes from the host's `bubblewrap`, not the plugin — check with
+`bwrap --ro-bind / / true` as a normal user; some mount layouts (e.g. a stacked
+`/proc/sys/fs/binfmt_misc` mount) make bubblewrap 0.6 fail there. Runs still work.
+
 ## Try this after install
 
 You can ask your agent harness to

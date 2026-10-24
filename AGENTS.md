@@ -23,8 +23,8 @@ state and locked decisions), then this file (rules + contracts), then
 `PLAN.md` only if you need the historical context behind a structural
 choice. `PLAN.md` lines about "drop the build subcommand", "pin a
 ghcr.io/gemc tag", "NL → GCard" surfaces are all superseded.
-Known issues and polish no test fails on yet live in `BACKLOG.md` (tracked);
-remove an item in the commit that fixes it.
+Known issues and polish no test fails on yet live in `BACKLOG.md`
+(gitignored maintainer file, like `BUILD_LOG.md`); remove an item once it is fixed.
 
 ## Template repo (read-only reference)
 

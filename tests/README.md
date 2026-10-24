@@ -126,7 +126,6 @@ tests/full-test.sh cleanup <dir>         # stops sessions + sandbox processes; S
 - If the image host (personal Duke webhome, no SLA) is down, the test fails at the
   download — what a real user would hit. There is no fallback.
 - Read only `summary.md`; triage a FAIL with a fresh subagent on `<dir>/logs/`.
-- Status: the full test is built, not yet run. The basic test passed on 2026-10-24 (round 7: Claude ~3.5 min, Codex ~6 min, request to final report).
 
 ## Not covered yet
 Behaviors already in the plugin that no test checks (from the deleted manual
