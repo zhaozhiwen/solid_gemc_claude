@@ -373,6 +373,7 @@ cmd_info() {
     echo "cache:          (unresolved: ${CACHE_ERROR})"
   fi
   echo "plugin:         ${PLUGIN_ROOT}"
+  echo "version:        $(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "${PLUGIN_ROOT}/.claude-plugin/plugin.json" 2>/dev/null)"
   echo "solid_gemc:     ${SOLID_GEMC_REPO} (HEAD of master)"
   echo "GEMC_VERSION:   ${GEMC_VERSION}"
   if command -v apptainer >/dev/null 2>&1; then
@@ -520,16 +521,14 @@ cmd_init() {
 
   # Workspace launcher: makes `bin/solid-gemc-run` real in the workspace (the
   # wrapper itself lives in the version-pinned plugin install). Always
-  # (re)written — generated, no user state. Fallback = this wrapper. Never when
-  # ./bin/solid-gemc-run IS this wrapper (init run inside the plugin repo or a
-  # clone): overwriting it would leave a launcher whose fallback is itself.
+  # (re)written — a verbatim copy, no user state. Never when ./bin/solid-gemc-run
+  # IS this wrapper (init run inside the plugin repo or a clone): that would
+  # replace the real wrapper with the launcher.
   if [[ ./bin/solid-gemc-run -ef "${PLUGIN_ROOT}/bin/solid-gemc-run" ]]; then
     log "skipping workspace launcher: ./bin/solid-gemc-run is the plugin wrapper itself"
   else
-    local launcher
-    launcher="$(<"${tdir}/workspace-launcher.sh")"
     mkdir -p ./bin
-    printf '%s\n' "${launcher//@SGC_INIT_WRAPPER@/"${PLUGIN_ROOT}/bin/solid-gemc-run"}" > ./bin/solid-gemc-run
+    cp "${tdir}/workspace-launcher.sh" ./bin/solid-gemc-run
     chmod +x ./bin/solid-gemc-run
     log "wrote ./bin/solid-gemc-run (workspace launcher)"
   fi

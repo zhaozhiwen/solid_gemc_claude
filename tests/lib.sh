@@ -202,18 +202,16 @@ unit_checks() { # plugin-root — unit checks of that root's wrapper + launcher 
     || fail "no-tool fallback not labelled read-only in info"
   pass "no single tool: existing .sif used read-only; none present → unresolved, pull refuses"
 
-  # Workspace launcher (templates/workspace-launcher.sh, as rendered by init): picks
-  # the newest installed wrapper by version, prefers the detected tool, falls
-  # back to the init-time wrapper, else errors.
+  # Workspace launcher (templates/workspace-launcher.sh, copied by init): picks
+  # the newest installed wrapper by version, prefers the detected tool, else
+  # errors — no fallback path that could go stale.
   LH="${SCRATCH}/launcher"; mkdir -p "${LH}/ws/bin"
   stub() { mkdir -p "$(dirname "$1")"; printf '#!/bin/sh\necho "%s $*"\n' "$2" > "$1"; chmod +x "$1"; }
   for v in 0.0.5 0.0.10; do
     stub "${LH}/claude/plugins/cache/mkt/solid-gemc-claude/${v}/bin/solid-gemc-run" "claude-${v}"
   done
   stub "${LH}/codex/plugins/cache/other/solid-gemc-claude/0.0.7/bin/solid-gemc-run" "codex-0.0.7"
-  stub "${LH}/init-wrapper" "init"
-  TPL="$(<"${UNIT_ROOT}/templates/workspace-launcher.sh")"
-  printf '%s\n' "${TPL//@SGC_INIT_WRAPPER@/"${LH}/init-wrapper"}" > "${LH}/ws/bin/solid-gemc-run"
+  cp "${UNIT_ROOT}/templates/workspace-launcher.sh" "${LH}/ws/bin/solid-gemc-run"
   chmod +x "${LH}/ws/bin/solid-gemc-run"
   launch() {
     local -a kv=()
@@ -225,12 +223,9 @@ unit_checks() { # plugin-root — unit checks of that root's wrapper + launcher 
     || fail "launcher (no tool) did not pick newest Claude install: $(launch "${L[@]}" -- info)"
   [[ "$(launch "${L[@]}" CODEX_CI=1 -- info)" == "codex-0.0.7 info" ]] \
     || fail "launcher (Codex) did not prefer the Codex install"
-  [[ "$(launch CLAUDE_CONFIG_DIR="${EH}/claude" CODEX_HOME="${EH}/codex" -- info)" == "init info" ]] \
-    || fail "launcher with no install did not fall back to the init-time wrapper"
-  mv "${LH}/init-wrapper" "${LH}/init-wrapper.gone"
   launch CLAUDE_CONFIG_DIR="${EH}/claude" CODEX_HOME="${EH}/codex" -- info 2>/dev/null \
-    && fail "launcher succeeded with no install and no init-time wrapper"
-  pass "workspace launcher: newest version, detected tool first, init-time fallback, else error"
+    && fail "launcher succeeded with no install"
+  pass "workspace launcher: newest version, detected tool first, else error"
 
   # init's launcher write, through the real cmd_init. A non-git solid_gemc/ makes
   # init stop at clone (no network, no container); the fake read-only .sif above
@@ -241,9 +236,8 @@ unit_checks() { # plugin-root — unit checks of that root's wrapper + launcher 
   ( cd "${IW}" && sgclean "${INIT_ENV[@]}" -- init >/dev/null 2>&1 ) \
     && fail "init unexpectedly passed the clone step in ${IW}"
   [[ -x "${IW}/bin/solid-gemc-run" ]] || fail "init did not write an executable bin/solid-gemc-run"
-  grep -qF "\"${UNIT_ROOT}/bin/solid-gemc-run\"" "${IW}/bin/solid-gemc-run" \
-    || fail "init's launcher lacks the init-time wrapper fallback"
-  grep -q '@SGC_INIT_WRAPPER@' "${IW}/bin/solid-gemc-run" && fail "launcher placeholder left unsubstituted"
+  cmp -s "${IW}/bin/solid-gemc-run" "${UNIT_ROOT}/templates/workspace-launcher.sh" \
+    || fail "init's launcher is not a verbatim copy of templates/workspace-launcher.sh"
   RC="${SCRATCH}/plugin-checkout"; mkdir -p "${RC}/solid_gemc"
   # Only what init reads: bin/ + top-level template files (not templates/workspace/,
   # the 1.1 GB templates/solid_gemc clone, or a 1.7 GB .sif kept in templates/).
@@ -295,11 +289,12 @@ scripted_run() {
   cmp -s "${ws}/CLAUDE.md" "${ws}/AGENTS.md" || fail "${t}: workspace CLAUDE.md differs from AGENTS.md"
   pass "${t}: init wrote the workspace files incl. CLAUDE.md (= AGENTS.md)"
   [[ -x "${L}" ]] || fail "${t}: init wrote no executable bin/solid-gemc-run"
-  grep -qF "\"${W}\"" "${L}" || fail "${t}: launcher fallback is not the installed wrapper"
   [[ -e "${ws}/cache" ]] && fail "${t}: a cache/ dir appeared in the workspace"
-  pass "${t}: launcher written (fallback = installed wrapper), no workspace cache/"
+  pass "${t}: launcher written, no workspace cache/"
 
   out=$( cd "${ws}" && iso "${v}" "${L}" info )
+  grep -qxF "version:        $(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$(dirname "$(dirname "${W}")")/.claude-plugin/plugin.json")" <<<"${out}" \
+    || fail "${t}: info does not report the installed plugin version: ${out}"
   grep -qF "plugin:         $(dirname "$(dirname "${W}")")" <<<"${out}" \
     || fail "${t}: launcher did not run the ${t} install: ${out}"
   grep -qF "cache:          ${FAKE_HOME}/.${t}/plugins/data/${DATA_NAME}/cache  [${LABEL[$t]}]" <<<"${out}" \
