@@ -100,13 +100,15 @@ install_plugin() {
 
 # --- quick shortcuts (quick + basic tests) -------------------------------------
 # quick_links <repo>: SG = the built templates/solid_gemc clone; SIF_SRC = the pinned
-# .sif from $SGC_SIF or the operator's real plugin data dir (read only). Needs read_consts.
+# .sif from $SGC_SIF, templates/ (gitignored), or the operator's real plugin data dir
+# (read only). Needs read_consts.
 quick_links() {
   local d f
   SG="$1/templates/solid_gemc"
   [[ -x "${SG}/source/2.9/solid_gemc" ]] \
     || fail "no built tree at templates/solid_gemc — run: bin/solid-gemc-run clone templates/solid_gemc && bin/solid-gemc-run build templates/solid_gemc"
   SIF_SRC="${SGC_SIF:-}"
+  [[ -z "${SIF_SRC}" && -f "$1/templates/${SIF_NAME}" ]] && SIF_SRC="$1/templates/${SIF_NAME}"
   if [[ -z "${SIF_SRC}" ]]; then
     for d in "${CLAUDE_CONFIG_DIR:-${HOME}/.claude}" "${CODEX_HOME:-${HOME}/.codex}"; do
       f="${d}/plugins/data/${DATA_NAME}/cache/sif/${SIF_NAME}"
@@ -243,10 +245,11 @@ unit_checks() { # plugin-root — unit checks of that root's wrapper + launcher 
     || fail "init's launcher lacks the init-time wrapper fallback"
   grep -q '@SGC_INIT_WRAPPER@' "${IW}/bin/solid-gemc-run" && fail "launcher placeholder left unsubstituted"
   RC="${SCRATCH}/plugin-checkout"; mkdir -p "${RC}/solid_gemc"
-  # Only what init reads: bin/ + top-level template files (not templates/workspace/
-  # or the 1.1 GB templates/solid_gemc clone).
+  # Only what init reads: bin/ + top-level template files (not templates/workspace/,
+  # the 1.1 GB templates/solid_gemc clone, or a 1.7 GB .sif kept in templates/).
   cp -r "${UNIT_ROOT}/bin" "${UNIT_ROOT}/requirements.txt" "${RC}/" && mkdir -p "${RC}/templates"
-  find "${UNIT_ROOT}/templates" -maxdepth 1 \( -type f -o -type l \) -exec cp -P {} "${RC}/templates/" \;
+  find "${UNIT_ROOT}/templates" -maxdepth 1 \( -type f -o -type l \) ! -name '*.sif' \
+    -exec cp -P {} "${RC}/templates/" \;
   OUT=$( cd "${RC}" && env -u CLAUDECODE -u CODEX_THREAD_ID -u CODEX_CI "${INIT_ENV[@]}" \
     "${RC}/bin/solid-gemc-run" init 2>&1 ) && fail "init unexpectedly passed the clone step in ${RC}"
   cmp -s "${RC}/bin/solid-gemc-run" "${UNIT_ROOT}/bin/solid-gemc-run" \
@@ -286,7 +289,7 @@ scripted_run() {
   ( cd "${ws}" && iso "${v}" SOLID_GEMC_SKIP_BUILD=1 "${W}" init ) > "${SCRATCH}/logs/scripted-${t}-init.log" 2>&1 \
     || fail "${t}: init failed; see logs/scripted-${t}-init.log"
   [[ -f "${ws}/.solid-gemc-workspace" ]] || fail "${t}: init wrote no workspace marker"
-  for f in CLAUDE.md AGENTS.md .gitignore log.md result.md report.html; do
+  for f in CLAUDE.md AGENTS.md README.md .gitignore log.md result.md report.html; do
     [[ -f "${ws}/${f}" ]] || fail "${t}: workspace ${f} missing after init"
   done
   cmp -s "${ws}/CLAUDE.md" "${ws}/AGENTS.md" || fail "${t}: workspace CLAUDE.md differs from AGENTS.md"

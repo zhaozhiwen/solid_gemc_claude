@@ -495,7 +495,7 @@ cmd_init() {
   log "venv:          ${VENV_DIR}"
 
   local tdir="${PLUGIN_ROOT}/templates" f src dst
-  for f in CLAUDE.md AGENTS.md .gitignore log.md result.md report.html; do
+  for f in CLAUDE.md AGENTS.md README.md .gitignore log.md result.md report.html; do
     src="${tdir}/${f}"; dst="./${f}"
     # CLAUDE.md is a symlink to AGENTS.md in the repo; `codex plugin add` drops
     # symlinks, so write it from the real AGENTS.md on every platform.

@@ -1,8 +1,8 @@
 # Results
 
 One section per noteworthy run. Link back to `runs/<id>/` for the raw
-outputs (`out.root`, `log.txt`, `config.json`) and to `analysis/` for
-the script that produced each plot. Treat this file as the single
+outputs (`out.root`, `log.txt`, `config.json`) and to the macro in this
+folder that produced each plot. Treat this file as the single
 human-readable summary of what this project has produced — anything
 worth showing a collaborator goes here.
 
@@ -12,5 +12,6 @@ worth showing a collaborator goes here.
   GCard overrides (anything not at default).
 - **Key numbers:** e.g. yield, asymmetry, σ, acceptance —
   whatever the run's purpose was probing.
-- **Plots:** `runs/<id>/<plot>.png`, `analysis/<script>.py`
+- **Plots:** `runs/<id>/plots.pdf` or `runs/<id>/hist_<tree>_<branch>.svg`; custom
+  plots from `<macro>.C` in this folder.
 - **Notes:** interpretation, surprises, what to vary next.

@@ -16,8 +16,8 @@
 #
 # Usage:
 #   tests/quick-test.sh
-#   SGC_SIF=/abs/path/<pinned>.sif tests/quick-test.sh   # else found in your
-#                                       # real ~/.claude|~/.codex plugin data dir
+#   SGC_SIF=/abs/path/<pinned>.sif tests/quick-test.sh   # else templates/<pinned>.sif
+#                                       # or your real ~/.claude|~/.codex plugin data dir
 #   SGC_KEEP=1 tests/quick-test.sh      # keep the sandbox even on success
 #
 # Requires: claude, codex, apptainer, git, wget, python3, and a built

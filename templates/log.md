@@ -1,16 +1,11 @@
 # Workspace log
 
-Top-level chronological index across all projects in this
-solid_gemc workspace. **Lightweight** — one line per milestone:
-project started, major decision, cross-project finding, release
-tag. Per-run detail belongs in the project's `<project>/log.md`,
-not here.
+Cross-project index for this solid_gemc workspace: one line per milestone
+(project started, notable run, decision, cross-project finding). Run-level
+detail lives in each `<project>/log.md`.
 
-Prepend the most recent entry at the top.
+Newest first: insert each entry directly below this paragraph, never at the end.
 
----
-
-## YYYY-MM-DD — <one-line milestone>
-
-<one or two sentences. If a project is involved, link to its log:
-"See [`<project>/log.md`](<project>/log.md) for run-level detail.">
+<!-- Entry format:
+- YYYY-MM-DD — <project>: <one-line milestone> ([log](<project>/log.md))
+-->
