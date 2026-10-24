@@ -8,7 +8,10 @@ the same code serves every platform.
 Usage: solid-gemc-analyze.py <out.root> <run-dir> [max-plots]
 
 Three output classes are handled:
-  - TTrees:     one PNG per numeric branch (up to max-plots).
+  - TTrees:     a stats line per numeric branch; the first max-plots
+                non-constant ones are also plotted as PNGs. header/userHeader
+                (bookkeeping) are listed, not plotted; a tree whose branches
+                hold no values is reported as no hits.
   - TH1/2/3F:   enumerated, not re-plotted (already plottable downstream).
   - neither:    reported as empty / non-standard.
 """
@@ -38,32 +41,41 @@ def main() -> int:
     hists = {k: v for k, v in cn.items() if v.startswith("TH")}
 
     plotted = 0
-    if trees:
-        for tname, tree in trees.items():
-            short = tname.split(";")[0]
-            print(f"[analyze]   tree {short}: {tree.num_entries} entries, {len(tree.keys())} branches")
-            if tree.num_entries == 0:
+    capped = False
+    for tname, tree in trees.items():
+        short = tname.split(";")[0]
+        if short in ("header", "userHeader"):
+            print(f"[analyze]   tree {short}: {tree.num_entries} entries (run/event bookkeeping, not plotted)")
+            continue
+        print(f"[analyze]   tree {short}: {tree.num_entries} entries, {len(tree.keys())} branches")
+        if tree.num_entries == 0:
+            continue
+        nempty = 0
+        for bname in tree.keys():
+            try:
+                arr = tree[bname].array(library="np")
+            except Exception as e:
+                print(f"[analyze]     skip {bname} ({type(e).__name__})")
                 continue
-            for bname in tree.keys():
-                if plotted >= max_plots:
-                    break
+            # Flatten jagged arrays (gemc hit-level branches are usually jagged).
+            try:
+                flat = np.concatenate(arr).astype(float)
+            except (TypeError, ValueError):
                 try:
-                    arr = tree[bname].array(library="np")
-                except Exception as e:
-                    print(f"[analyze]     skip {bname} ({type(e).__name__})")
+                    flat = np.asarray(arr, dtype=float)
+                except Exception:
+                    print(f"[analyze]     skip {bname} (not numeric)")
                     continue
-                # Flatten jagged arrays (gemc hit-level branches are usually jagged).
-                try:
-                    flat = np.concatenate(arr).astype(float)
-                except (TypeError, ValueError):
-                    try:
-                        flat = np.asarray(arr, dtype=float)
-                    except Exception:
-                        continue
-                if flat.size == 0 or not np.isfinite(flat).any():
-                    continue
+            flat = flat[np.isfinite(flat)]
+            if flat.size == 0:
+                nempty += 1
+                continue
+            # Constant branches and branches past the cap still get a stats line.
+            where = ("constant, not plotted" if flat.std() == 0
+                     else "over plot cap" if plotted >= max_plots else "")
+            if not where:
                 plt.figure()
-                plt.hist(flat[np.isfinite(flat)], bins=80)
+                plt.hist(flat, bins=80)
                 plt.xlabel(bname)
                 plt.ylabel("count")
                 plt.title(f"{short} / {bname}")
@@ -72,10 +84,14 @@ def main() -> int:
                 plt.savefig(out, dpi=110, bbox_inches="tight")
                 plt.close()
                 plotted += 1
-                print(f"[analyze]     plotted {bname} -> {out.name}")
-            if plotted >= max_plots:
-                print(f"[analyze]   plot cap ({max_plots}) reached; pass a larger N for more.")
-                break
+                where = f"-> {out.name}"
+            elif where == "over plot cap":
+                capped = True
+            print(f"[analyze]     {bname}: entries={flat.size} mean={flat.mean():g} rms={flat.std():g} {where}")
+        if nempty:
+            print(f"[analyze]     {nempty} branches with no values (no hits recorded in {short})")
+    if capped:
+        print(f"[analyze] plot cap ({max_plots}) reached; pass a larger N for more plots.")
 
     if hists:
         print(f"[analyze] file also contains {len(hists)} pre-built histograms (TH1/2/3F).")
