@@ -11,6 +11,11 @@ Checks, per `**/SKILL.md`:
   1. A frontmatter block exists (`---` ... `---` at the top).
   2. It parses as strict YAML.
   3. It is a mapping with non-empty string `name` and `description`.
+  4. `description` is at most 1024 characters (the Agent Skills limit; over it
+     Codex drops the skill, again silently).
+  5. The body has no shell positional parameter (`$` + digit) and no
+     `${CLAUDE_PLUGIN_ROOT:...}` form: Claude Code replaces `$<digit>` with words of
+     the user's request and fills in only the plain `${CLAUDE_PLUGIN_ROOT}`.
 
 Exit 0 if all skills pass, 1 otherwise. Requires PyYAML.
 """
@@ -25,6 +30,9 @@ except ImportError:
     sys.exit(2)
 
 FRONTMATTER = re.compile(r"^---\n(.*?)\n---\n", re.DOTALL)
+MAX_DESCRIPTION = 1024
+POSITIONAL = re.compile(r"\$[0-9]")
+PLUGIN_ROOT_EXPANSION = re.compile(r"\$\{CLAUDE_PLUGIN_ROOT[:#%/]")
 
 
 def check(path: pathlib.Path) -> list[str]:
@@ -43,6 +51,15 @@ def check(path: pathlib.Path) -> list[str]:
         val = data.get(key)
         if not isinstance(val, str) or not val.strip():
             errors.append(f"{path}: frontmatter `{key}` missing or not a non-empty string")
+    desc = data.get("description")
+    if isinstance(desc, str) and len(desc) > MAX_DESCRIPTION:
+        errors.append(f"{path}: `description` is {len(desc)} chars, limit {MAX_DESCRIPTION}")
+    body = text[m.end():]
+    for n, line in enumerate(body.splitlines(), start=text[:m.end()].count("\n") + 1):
+        if POSITIONAL.search(line):
+            errors.append(f"{path}:{n}: shell positional parameter (Claude Code substitutes it)")
+        if PLUGIN_ROOT_EXPANSION.search(line):
+            errors.append(f"{path}:{n}: use plain ${{CLAUDE_PLUGIN_ROOT}} (the only form filled in)")
     return errors
 
 

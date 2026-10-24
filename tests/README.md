@@ -11,7 +11,7 @@ the start. The basic and full tests share one script (`full-test.sh`), its
 
 | | Quick test | Basic test | Full test |
 |---|---|---|---|
-| Run it | on every change | when `skills/` or the orchestrator flow changes | before a release |
+| Run it | after install/runtime changes, before a commit | when `skills/` or the orchestrator flow changes | before a release |
 | Command | `tests/quick-test.sh` | `tests/basic-test.sh setup` → subagents → `verify` → `cleanup` | `tests/full-test.sh setup` → subagents → `verify` → `cleanup` |
 | Plugin source | a copy of the working tree | a copy of the working tree | the published GitHub marketplace |
 | Image | symlinked into each fake data dir | symlinked | really downloaded by the plugin |
@@ -53,7 +53,7 @@ the start. The basic and full tests share one script (`full-test.sh`), its
 bin/solid-gemc-run clone templates/solid_gemc && bin/solid-gemc-run build templates/solid_gemc
 
 tests/quick-test.sh                 # needs claude, codex, apptainer, git, wget, python3
-SGC_SIF=/abs/path/<sif> tests/quick-test.sh   # if no .sif is in your plugin data dir
+SGC_SIF=/abs/path/<sif> tests/quick-test.sh   # if no .sif is in templates/ or your plugin data dir
 SGC_KEEP=1 tests/quick-test.sh      # keep the sandbox for inspection
 ```
 **Step timing (all three tests).** Every `[PASS]` / `[KNOWN-FAIL]` / `[FAIL]` line ends
@@ -77,7 +77,7 @@ The full test's real agent sessions, with the quick test's shortcuts: the plugin
 the working tree, the `.sif` and `templates/solid_gemc` linked, sessions only (the
 quick test runs the unit checks and the scripted run). It checks the part only an agent session reaches — the skill
 picking up the request, the init and plan gates, and how the agent drives the run —
-in ~10–15 min instead of an hour.
+in ~10–15 min instead of ~30.
 
 ```bash
 tests/basic-test.sh setup                # prints SANDBOX=<dir>
@@ -129,10 +129,9 @@ tests/full-test.sh cleanup <dir>         # stops sessions + sandbox processes; S
 - Read only `summary.md`; triage a FAIL with a fresh subagent on `<dir>/logs/`.
 
 ## Not covered yet
-Behaviors already in the plugin that no test checks (from the deleted manual
-checklists):
+Behaviors already in the plugin that no test checks:
 - **Negative trigger** — a pure Geant4 request ("build a Geant4 sim of a lead block")
-  must not load this plugin's skill (`SKILL.md` description + its "Do not load" list).
+  must not load this plugin's skill (its description says "not for plain Geant4/GDML work").
 - **"Just write the plan"** — choosing it at the plan gate must create no GCard copy and
   no `runs/` dir; only the `<project>/log.md` entry ("Plan only — did not run") that the
   log-every-request rule requires.
@@ -147,7 +146,9 @@ checklists):
 
 ## Lints (CI, `.github/workflows/lint.yml`)
 - `lint-skill-frontmatter.py` — strict-YAML skill frontmatter (Codex silently skips a
-  skill whose description has an unquoted `: `).
+  skill whose description has an unquoted `: ` or is over 1024 characters), plus the
+  skill body: no `$<digit>` (Claude Code substitutes request words) and only the plain
+  `${CLAUDE_PLUGIN_ROOT}` form.
 - `lint-agents-mirror.sh` — every shipped `CLAUDE.md` is a symlink to a real `AGENTS.md`.
 - `bash -n` on the shell scripts; `py_compile` on the Python.
 
@@ -174,10 +175,10 @@ checklists):
   skill's flow — and the maintainer starts it.
 
 ## Rules and gotchas
-- Don't use `~/claude/geant4_claude` code in these tests (no `source`, no calls);
-  copying a snippet and modifying it is fine — note it in BUILD_LOG.
-- Never point a test at `~/claude/run_solid_gemc/` — `init` runs scons on whatever tree
-  it is given; use `templates/solid_gemc`.
+- Don't use `geant4_claude` code in these tests (no `source`, no calls); copying a
+  snippet and modifying it is fine — note it in BUILD_LOG.
+- Never point a test at your own working solid_gemc tree — `init` runs scons on
+  whatever tree it is given; use `templates/solid_gemc`.
 - Interactive Codex starts an `app-server` daemon from `$CODEX_HOME/packages/` that
   outlives its tmux session and recreates files after `rm -rf`; the tests kill every
   process running from the sandbox `HOME` (TERM, then KILL).
@@ -187,5 +188,5 @@ checklists):
 - Codex reads a **local** marketplace's skills and templates from its source dir, not
   its install cache.
 - Inside a `solid_gemc` that is a symlink to a tree outside the workspace, the wrapper
-  can't find the workspace marker (`pwd -P` leaves it); pass `SoLID_GEMC`, as the skill
-  does.
+  can't find the workspace marker (`pwd -P` leaves it); pass `SoLID_GEMC`, as
+  `tests/lib.sh` does.
