@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repo state
 
-v0.0.6 surface: dual-platform (Claude Code + Codex CLI). There are **no
+v0.0.7 surface: dual-platform (Claude Code + Codex CLI). There are **no
 slash commands** — the whole workflow runs through the `solid-gemc`
 orchestrator skill (auto-loads on SoLID-flavored natural language) driving
 `bin/solid-gemc-run` (`init` / `analyze` / `setup-python` subcommands). The
@@ -163,15 +163,15 @@ gate; execute with stop-on-failure post-condition checks.
   inside the same container; analysis reads `out.root` (container ROOT by
   default, host uproot optional).
   Both `out.evio` and `out.root` end up in `runs/<id>/`. HIPO
-  deferred past v0.0.6.
+  deferred past v0.0.7.
 - **solid_gemc pin.** Clone HEAD of master; record commit SHA per run
-  in `runs/<id>/config.json`. No upstream pin at v0.0.6.
+  in `runs/<id>/config.json`. No upstream pin at v0.0.7.
 - **GCard surface.** The orchestrator skill copies a canonical GCard
   from `$SoLID_GEMC/script/` (or `…/analysis/*/`) into `gcards/` and
   injects `USE_GUI=0` / `OUTPUT=evio,out.evio` / `N=<n>` on the live
-  `<gcard>` block. NL→GCard deferred past v0.0.6.
+  `<gcard>` block. NL→GCard deferred past v0.0.7.
 
-## v0.0.6 known limitations
+## v0.0.7 known limitations
 
 - **.sif hosted at Duke webhome.** Personal hosting (no SLA), flagged
   in `README.md` "Known limitations". Revisit before paper citation.
@@ -252,7 +252,7 @@ each ends by checking that.
 
 ## Pre-publish checks
 
-Before the v0.0.6 tag, every item must be clean:
+Before the v0.0.7 tag, every item must be clean:
 
 - `grep -RIn "/home/$USER\|jefflab" .` returns nothing in tracked files (with
   `$USER` expanded). `jlab.org` is allowed only as the `gemc.jlab.org`

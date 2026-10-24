@@ -131,7 +131,7 @@ SoLID build environment.
 JLabCE 2.5 supports only EVIO and TXT output (`-help-output` confirms).
 We post-convert EVIO → ROOT inside the container with `evio2root`, so
 both `out.evio` and `out.root` end up in `runs/<id>/`. Analysis runs on
-the container's ROOT (host uproot optional). HIPO output deferred past v0.0.6.
+the container's ROOT (host uproot optional). HIPO output deferred past v0.0.7.
 
 **Why `wget` to pull the `.sif`, not `apptainer pull docker://`?** The
 `.sif` is hosted at a webhome URL, not a container registry. Direct
@@ -162,7 +162,7 @@ a user's brief can. The basic test (`tests/basic-test.sh`, ~15 min) runs those a
 sessions with the quick test's links, to check skill changes without an hour-long
 run. Details: `tests/README.md`.
 
-## Known limitations (v0.0.6)
+## Known limitations (v0.0.7)
 
 - The `.sif` is at a personal Duke webhome
   (`webhome.phy.duke.edu`). No SLA. Mirror locally if you need
