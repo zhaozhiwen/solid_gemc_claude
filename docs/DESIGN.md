@@ -162,7 +162,7 @@ a user's brief can. The basic test (`tests/basic-test.sh`, ~15 min) runs those a
 sessions with the quick test's links, to check skill changes without the full
 run. Details: `tests/README.md`.
 
-## Known limitations (v0.0.10)
+## Known limitations (v0.0.11)
 
 - The `.sif` is at a personal Duke webhome
   (`webhome.phy.duke.edu`). No SLA. Mirror locally if you need
