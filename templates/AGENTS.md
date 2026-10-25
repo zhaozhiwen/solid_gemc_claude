@@ -10,8 +10,12 @@ which rarely change. How to do things lives where it updates with the plugin:
   it always runs the newest installed plugin; `info` shows which version). From a
   project subdir use `../bin/solid-gemc-run`. A plain terminal can use it only
   after an agent session downloaded the image.
-- **Background** — the plugin's `reference/` dir (`bin/solid-gemc-run paths`,
-  `reference:` line); `README.md` is the user's guide.
+- **Physics and gemc knowledge, at every stage** — planning, GCard edits,
+  interpreting results, physics questions, failures: the plugin's `reference/` dir
+  (`bin/solid-gemc-run paths`, `reference:` line). Look things up there rather than
+  answering from memory: start at its `README.md` index, grep for the term, read
+  only that section (the files are long), cite it. `README.md` here is the user's
+  guide.
 
 ## Layout
 

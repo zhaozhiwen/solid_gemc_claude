@@ -181,13 +181,14 @@ means only "`integrateDgt` does detector-specific physics."
 
 **The stub footgun.** `solid_hgc` registers as "Heavy Gas Cherenkov" but
 its `integrateDgt` (lines 15-52) only writes truth-level deposits. No
-photon-yield calculation. No QE. In production HGC studies, photon
-information comes from running the volume in `flux` mode with optical
-processes enabled in the physics list — not from this hit processor.
-Same for `solid_mrpc`. If a user expects digitized npe / TDC from
-`solid_hgc` or `solid_mrpc`, they will silently get truth deposits only.
-This is documented in `run_solid_gemc/CLAUDE.md:97-98` and confirmed by
-the source.
+photon-yield calculation. No QE. With optical photons recorded
+(`RECORD_OPTICALPHOTONS=1`), each photon reaching the sensor is a truth hit
+(pid −22) in the `solid_hgc` tree; photoelectrons are counted from those hits
+with a QE applied in analysis — upstream `analysis/hgc_study/analysis.C`
+(`pid_opticalphoton=-22`) does exactly this. Same for `solid_mrpc` (no TDC).
+If a user expects digitized npe / TDC from `solid_hgc` or `solid_mrpc`, they
+silently get truth hits only. Confirmed against the source (solid_gemc
+`4084d9d`, 2026-10-19).
 
 ### 6.1 `solid_ec` — main EC shower
 
@@ -323,10 +324,10 @@ avg_x/y/z/lx/ly/lz/t, px/py/pz, vx/vy/vz, mvx/mvy/mvz
 Zero Cherenkov physics. No photon counting. No QE. No threshold check.
 `processID` sets `id_sharing = 1`. All other overrides return defaults.
 
-If you need digitized HGC photon hits, you do not get them from this
-class — you have to either (a) implement them in this file, or (b) use
-the `flux` sensitivity type on the radiator volume and rely on Geant4
-optical-photon tracking through the physics list.
+For HGC photoelectrons: record optical photons (`RECORD_OPTICALPHOTONS=1`), then
+count the optical-photon hits (pid −22) in the `solid_hgc` tree and apply a QE in
+analysis, as upstream `analysis/hgc_study/analysis.C` does. Digitized npe inside
+gemc would need an implementation in this file.
 
 ### 6.7 `solid_mrpc` — MRPC TOF (STUB)
 
@@ -385,8 +386,8 @@ else lives in `lib/`.
 
 1. **`solid_hgc` and `solid_mrpc` are stubs.** They register, they
    emit truth-level banks, and they silently return zero detector-specific
-   output. Anyone debugging "where did my HGC npe go?" needs to look at
-   `flux` + optical physics, not here.
+   output. "Where did my HGC npe go?" → count optical-photon hits (pid −22) in
+   the `solid_hgc` tree with a QE in analysis (upstream `hgc_study/analysis.C`).
 2. **Per-segment EC output has an off-by-one bug.** Bins 5 and 6 in
    `Edep_seg / EdepB_seg / Eend_seg` are mis-indexed
    (`solid_ec_hitprocess.cc:130-132`).

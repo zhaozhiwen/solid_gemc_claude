@@ -53,6 +53,7 @@ Step 2  plan → approval gate
 Step 3  seed <project>/ → bin/solid-gemc-run gcard → bin/solid-gemc-run run
           (gemc, evio2root, config.json, plots in <project>/runs/<id>/) → handoff docs
 Step 4  final report
+At every step: consult the reference library (next section) — not just on failure.
 ```
 
 The workspace root (where `init` ran, once and idempotently) holds init's files —
@@ -62,6 +63,26 @@ flat project subdir (no enforced subfolders) with its own rules and handoff
 documents. There is no bring-your-own binary: if the canonical configs don't fit,
 the divergence point is **the GCard** — edit the closest canonical one, or
 hand-author one.
+
+## Reference library — use it at every stage
+
+`$SGC_ROOT/reference/` holds what you need to get SoLID physics and gemc behavior
+right: source digests of gemc (`gemc.md`) and the SoLID layer (`solid_gemc.md`),
+the SoLID gemc guide (`gemc_simulation_general_note.md`, mirror of the wiki), and
+the PDG passage-of-particles review (`passage-particles-matter-summary.md`, full
+`.md`, `.txt` for exact numbers). **Whenever a plan, an edit, a number or an answer
+depends on how gemc, a SoLID detector or the physics works, look it up here instead
+of answering from memory.** Start at `reference/README.md` (the index), grep the
+file for the term, read only that section (files run to ~1,200 lines — never read
+one whole), and name the file + section in what you tell the user.
+
+| Stage | Typical questions | Look in |
+|---|---|---|
+| Planning (Step 1) | Which detectors a config simulates in full vs as a stub? What will the output contain? | `solid_gemc.md` hit-processor table; `gemc_simulation_general_note.md` |
+| GCard edits (3c) | What does `BEAM_P`, `SPREAD_P`, `PHYSICS`, `PRODUCTIONCUT`… do; override syntax | `gemc_simulation_general_note.md` option reference; `gemc.md` §4–5 |
+| Custom detector | Geometry, material, hit, bank file formats | `gemc_simulation_general_note.md`; `gemc.md` §6 |
+| Results and physics questions (3e, follow-ups) | What a branch means; expected yields, Cherenkov threshold, dE/dx, photoelectrons | `solid_gemc.md` (processor, constants); PDG summary, then full `.md`/`.txt` |
+| Failures | Geometry not found; empty tree; build fails; option ignored | `gemc.md` §16 item 1 + §6, §8, §3, §4–5; `solid_gemc.md` stub table |
 
 ## Non-negotiable 1 — explicit approval before anything is created or run
 
@@ -207,6 +228,9 @@ For each field: did the user give it, is a default safe, or must you ask?
 | **Output** | Fixed by `run` (EVIO, converted to ROOT) | `<project>/runs/<id>/out.evio` + `out.root` |
 | **Analysis** | Plots / numbers to produce | "default plots", "asymmetry binned in Q²" |
 
+Check the reference library (Planning row) before filling a field you aren't sure
+about — e.g. whether the detector the goal needs is simulated in full.
+
 **Ask, never guess:** the physics goal; the SoLID config (~20 canonical GCards in
 `solid_gemc/script/` — PVDIS/SIDIS/J/psi and LD2/LH2/³He/NH3 are different physics;
 list the presets and ask); the beam energy when the user implies a non-standard
@@ -238,6 +262,13 @@ points at `solid_gemc/analysis/hgc_study/`), offer both in the plan: skill-drive
 (copy one of its GCards into a project and run it here) or upstream-driven
 (`bin/solid-gemc-run shell`, `cd solid_gemc/analysis/hgc_study`, `./run.sh`; its
 `.C` analysis via `bin/solid-gemc-run root`). Let the user pick.
+
+**HGC and MRPC record truth hits only.** Their hit processors (`solid_hgc`,
+`solid_mrpc`) compute no photon yield, quantum efficiency or timing. When the
+analysis needs photoelectrons or timing from them, say so on the plan's Notes line:
+photoelectrons are counted from the optical-photon hits (pid −22) in the detector's
+tree with a QE applied, in a macro — the way upstream
+`solid_gemc/analysis/hgc_study/analysis.C` does (`solid_gemc.md`, stub footgun).
 
 **Changes to `solid_gemc/` itself.** Its `origin` is JeffersonLab (fork + PR
 only). If the user wants to keep or share edits inside it, say so in the plan:
@@ -312,7 +343,8 @@ HGC/LGC record Cherenkov light; `--no-optical` when not needed or for faster,
 smaller runs). It prints `gcard: <path>` and `source dir: <dir>` — use those
 values in 3d. It won't overwrite an existing copy (it may hold the user's edits);
 pass `--force` only when the plan says so. For non-default beam or physics, edit
-the copy now. The source dir is where gemc must run: detector names in a GCard are
+the copy now — look each option up first (reference library, GCard-edits row).
+The source dir is where gemc must run: detector names in a GCard are
 relative to gemc's run folder.
 
 **3d. Run, convert, record, plot — one command**, from the workspace root:
@@ -333,11 +365,17 @@ the file onto itself: set `N` and `USE_GUI=0` (and `RECORD_OPTICALPHOTONS` if
 wanted) in its live `<gcard>` block by hand, then
 `"$SGC_RUN" run <project>/<file>.gcard <project>`. Post-condition: a last line `run dir: <path>`, and that dir has
 `gcard.gcard`, `out.evio`, `out.root`, `log.txt`, `config.json` with
-`"exit_code": 0`. On failure `run` exits non-zero and names the log and run dir; no
+`"exit_code": 0`. If `solid_gemc/` or the workspace is reached through a symlink,
+`log.txt` (evio2root's own lines) shows the resolved physical paths while
+`config.json` records the workspace paths — the same files, not a problem; don't
+report it as one. On failure `run` exits non-zero and names the log and run dir; no
 `run dir:` line with `"exit_code": 0` means `analyze` failed. Treat the run dir as
 immutable.
 
-**3e. Read the analysis.** `analyze` prints a stats line per numeric branch
+**3e. Read the analysis.** Interpret numbers, and answer the user's physics
+questions about the run (yields, thresholds, photoelectrons, what a branch means),
+from the reference library (Results row) and cite it. `analyze` prints a stats
+line per numeric branch
 (entries, mean, RMS, under/overflow), plots the first N non-constant ones into
 `hist_<tree>_<branch>.svg` plus `plots.pdf`, skips the `header`/`userHeader`
 trees, and reports an empty tree as "no hits recorded". Explain empty trees to the
@@ -368,6 +406,9 @@ When a post-condition fails, **stop**: report the last 20 lines of the run's
 `log.txt` (or the command's stderr) and ask how to proceed. Don't retry silently,
 paper over the error, or move on.
 
+Diagnose with the reference library (Failures row) before proposing a fix, and
+cite what you found.
+
 **Codex sandbox.** If a container command (or `init`'s smoke test) fails with
 `operation not permitted`, run it with escalation. If that is rejected, tell the
 user exactly this, then wait — don't work around it:
@@ -396,10 +437,9 @@ Next: <one concrete suggestion — vary the beam energy, scale up n_events,
 
 ## References
 
+- The reference library is above ("Reference library — use it at every stage").
 - GCard options (`BEAM_P`, `PHYSICS`, `OUTPUT`, `N`, …): `https://gemc.jlab.org`,
   mirrored in `$SGC_ROOT/reference/gemc_simulation_general_note.md`.
-- Unexpected geometry loading, hit output, build flags or option overrides:
-  `$SGC_ROOT/reference/gemc.md` and `$SGC_ROOT/reference/solid_gemc.md`.
 - Worked examples in the workspace: `solid_gemc/analysis/hgc_study/` (config + run
   + analyze) and `solid_gemc/geometry/hgc_moved/` (custom detector authoring —
   the plugin has no authoring surface of its own; follow upstream's `readme.md`).
