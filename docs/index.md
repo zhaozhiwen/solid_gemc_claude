@@ -29,7 +29,7 @@ codex plugin add solid-gemc-claude@solid-gemc-claude
 
 apptainer can't run inside Codex's sandbox: if a run fails with `operation not permitted`, set `/permissions` to **Ask for approval** so Codex asks before running the container. If Codex says its own sandbox failed to start, read-only commands will ask too — that's the host's `bubblewrap` (test with `bwrap --ro-bind / / true`), not the plugin; runs still work.
 
-`/plugin update` (Claude) handles upgrades. [Apptainer](https://apptainer.org) ≥ 1.4 must already be on the host; the plugin pulls its pinned `.sif` on first use via `wget`.
+To upgrade later, see [Updating](#updating). [Apptainer](https://apptainer.org) ≥ 1.4 must already be on the host; the plugin pulls its pinned `.sif` on first use via `wget`.
 
 ## Quickstart
 
@@ -158,10 +158,14 @@ python3 "$ROOT/templates/embed_html.py" <name>/report.html   # writes report_por
 
 Update the plugin, then start a new agent session:
 
-- Claude Code: `claude plugin marketplace update`, then
-  `claude plugin update solid-gemc-claude@solid-gemc-claude` (restart required).
-- Codex CLI: `codex plugin marketplace upgrade`, then
-  `codex plugin add solid-gemc-claude@solid-gemc-claude` again.
+- Claude Code, in a session: `/plugin` → **Marketplaces** → `solid-gemc-claude` →
+  **Update marketplace** (refreshes it and updates the plugin). In a terminal:
+  `claude plugin marketplace update solid-gemc-claude`, then
+  `claude plugin update solid-gemc-claude@solid-gemc-claude`. The new version loads in
+  your next session (or after `/reload-plugins`). Automatic updates are off by default
+  for this marketplace; turn them on in the same menu with **Enable auto-update**.
+- Codex CLI: `codex plugin marketplace upgrade` — it refreshes the marketplace and
+  updates the installed plugin (the old version is removed).
 
 Existing workspaces need nothing: their `bin/solid-gemc-run` always runs the newest
 installed plugin, and the files `init` copied hold only rules that rarely change.
