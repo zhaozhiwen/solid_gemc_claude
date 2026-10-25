@@ -468,8 +468,12 @@ exec tcsh -i"
 
 # $ROOTSYS/bin/root, not `root`: the image aliases root to `root -l --web=off`,
 # which this ROOT build rejects with spurious errors on every call.
+# Each argument is single-quoted for the container's tcsh, so a macro call like
+# 'm.C("a b")' (parentheses, quotes, spaces) reaches ROOT intact.
 cmd_root() {
-  in_container "\$ROOTSYS/bin/root -l -b -q $*"
+  local a q=""
+  for a in "$@"; do q+=" '${a//\'/\'\\\'\'}'"; done
+  in_container "\$ROOTSYS/bin/root -l -b -q${q}"
 }
 
 cmd_validate_gcard() {
@@ -598,7 +602,7 @@ cmd_analyze() {
   [[ "${max_plots}" =~ ^[0-9]+$ ]] || die "max-plots must be a number: ${max_plots}"
   root="$(readlink -f "${root}")"; run_dir="$(readlink -f "${run_dir}")"
   EXTRA_BIND_PATHS=("${PLUGIN_ROOT}/bin" "${run_dir}")
-  cmd_root "'${PLUGIN_ROOT}/bin/solid_gemc_analyze.C(\"${root}\",\"${run_dir}\",${max_plots})'"
+  cmd_root "${PLUGIN_ROOT}/bin/solid_gemc_analyze.C(\"${root}\",\"${run_dir}\",${max_plots})"
   ls -1 "${run_dir}"/*.svg "${run_dir}"/plots.pdf 2>/dev/null || true
 }
 

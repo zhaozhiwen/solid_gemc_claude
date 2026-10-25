@@ -94,7 +94,7 @@ Other useful commands:
 
 | Command | Does |
 |---|---|
-| `bin/solid-gemc-run root <macro.C>` | Run your own ROOT macro in the container; no ROOT install needed. |
+| `bin/solid-gemc-run root <macro.C>` | Run your own ROOT macro in the container; no ROOT install needed. With arguments, quote the call once for your shell: `bin/solid-gemc-run root 'm.C("out.root")'`. |
 | `bin/solid-gemc-run shell` | Interactive shell (tcsh) in the container, e.g. to follow upstream's `run.sh`. |
 | `bin/solid-gemc-run validate-gcard <file>` | Check a GCard for XML errors. |
 | `bin/solid-gemc-run info` | Plugin version in use, container image and where it is cached, solid_gemc repo, gemc and apptainer versions. |

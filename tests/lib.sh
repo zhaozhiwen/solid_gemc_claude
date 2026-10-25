@@ -366,6 +366,12 @@ scripted_run() {
   (( ${nhits:-0} > 10 )) || fail "${t}: solid_hgc has ${nhits:-no} hits (want optical photons; evio2root -B); see logs/scripted-${t}-run.log"
   [[ -e "${ws}/venv" ]] && fail "${t}: default analyze created a venv"
   pass "${t}: gcard (optical on, no overwrite) + run → evio2root -B, config.json, analyze; solid_hgc ${nhits} hits; no venv"
+  # `root` with a macro argument (parentheses, quotes, a space): user macros are
+  # called as m.C("file"); the wrapper must quote it for the container's tcsh.
+  printf 'void argtest(const char* s){ printf("ARG=[%%s]\\n", s); }\n' > "${ws}/${proj}/argtest.C"
+  out=$( cd "${ws}/${proj}" && iso "${v}" "${L}" root 'argtest.C("a b")' 2>&1 ) || true
+  grep -qF 'ARG=[a b]' <<<"${out}" || fail "${t}: root with a macro argument failed: ${out}"
+  pass "${t}: root passes a macro argument with (), quotes and a space intact"
   ( cd "${ws}" && iso "${v}" "${L}" analyze --python "${RUN_DIR}" 4 ) > "${SCRATCH}/logs/scripted-${t}-analyze-python.log" 2>&1 \
     || fail "${t}: analyze --python failed; see logs/scripted-${t}-analyze-python.log"
   (( $(ls "${RUN_DIR}"/*.png 2>/dev/null | wc -l) >= 1 )) || fail "${t}: analyze --python wrote no PNGs"
