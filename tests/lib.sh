@@ -287,7 +287,8 @@ scripted_run() {
     [[ -f "${ws}/${f}" ]] || fail "${t}: workspace ${f} missing after init"
   done
   cmp -s "${ws}/CLAUDE.md" "${ws}/AGENTS.md" || fail "${t}: workspace CLAUDE.md differs from AGENTS.md"
-  pass "${t}: init wrote the workspace files incl. CLAUDE.md (= AGENTS.md)"
+  [[ -d "${ws}/study" ]] || fail "${t}: init did not create study/"
+  pass "${t}: init wrote the workspace files incl. CLAUDE.md (= AGENTS.md) and study/"
   [[ -x "${L}" ]] || fail "${t}: init wrote no executable bin/solid-gemc-run"
   [[ -e "${ws}/cache" ]] && fail "${t}: a cache/ dir appeared in the workspace"
   pass "${t}: launcher written, no workspace cache/"
@@ -320,7 +321,7 @@ scripted_run() {
   # symlink — the container mounts physical paths only, so a logical one can be
   # missing inside it (build: GEMC headers not found; run: GCard unreadable,
   # evio2root silently drops the detector banks).
-  local lnk="${SCRATCH}/ws-link-${t}" lproj=link_${t} lout
+  local lnk="${SCRATCH}/ws-link-${t}" lproj=study/link_${t} lout
   ln -sfn "${ws}" "${lnk}"
   mkdir -p "${ws}/${lproj}" && cp "${ws}/solid_gemc/analysis/hgc_study/cherenkov.gcard" "${ws}/${lproj}/"
   lout=$( cd "${lnk}" && iso "${v}" SOLID_GEMC_RUN_DRYRUN=1 "SoLID_GEMC=${lnk}/solid_gemc" "${L}" exec true )
@@ -337,7 +338,7 @@ scripted_run() {
   # The skill's run loop through the launcher: seed a project, `gcard` (copy +
   # options, optical photons on by default), then one `run`: gemc from the source
   # dir, evio2root -R=flux -B=<banks>, config.json, analyze.
-  local root proj=quick_${t} OUT DEST SOURCE_DIR RUN_DIR
+  local root proj=study/quick_${t} OUT DEST SOURCE_DIR RUN_DIR
   root=$( iso "${v}" "${L}" paths | awk '/^root:/{print $2}' )
   ( cd "${ws}" && cp -r "${root}/templates/workspace/." "${proj}/" \
       && { [[ -f "${proj}/CLAUDE.md" ]] || cp "${proj}/AGENTS.md" "${proj}/CLAUDE.md"; } )

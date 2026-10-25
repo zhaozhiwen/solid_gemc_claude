@@ -523,6 +523,9 @@ cmd_init() {
     log "wrote ${dst}"
   done
 
+  # One folder per study lives under study/ (keeps the root tidy as studies pile up).
+  [[ -d ./study ]] || { mkdir -p ./study; log "wrote ./study/ (one folder per study)"; }
+
   # Workspace launcher: makes `bin/solid-gemc-run` real in the workspace (the
   # wrapper itself lives in the version-pinned plugin install). Always
   # (re)written — a verbatim copy, no user state. Never when ./bin/solid-gemc-run

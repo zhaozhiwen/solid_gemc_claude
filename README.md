@@ -91,8 +91,8 @@ reporting each step. On Codex, if it says the container was blocked, type
 **2. Run a study** in the same folder, for example "Run the heavy-gas Cherenkov
 study on He-3, 100 events". The agent shows a plan and waits for your approval.
 (Skip step 1 and your first study request offers to run the setup first.)
-Results land in `<project>/runs/<id>/` (`out.root`, `plots.pdf`, `config.json`)
-and `<project>/report.html`. The workspace's own `README.md` explains the rest.
+Results land in `study/<project>/runs/<id>/` (`out.root`, `plots.pdf`, `config.json`)
+and `study/<project>/report.html`. The workspace's own `README.md` explains the rest.
 
 A bigger request, once that works:
 
@@ -125,12 +125,12 @@ Two upstream worked examples live in your workspace after init, both fully self-
 
 Init also writes `bin/solid-gemc-run` into your workspace: a small launcher that runs the newest installed plugin wrapper, so the commands below work from the workspace root (`../bin/solid-gemc-run` from a project subdir), in the agent or a plain terminal. A plain terminal uses an image an agent session already downloaded; it never downloads one itself.
 
-- `bin/solid-gemc-run gcard <preset> <project> --events N` copies a GCard into a
+- `bin/solid-gemc-run gcard <preset> study/<project> --events N` copies a GCard into a
   project with the batch options set (optical photons on; `--no-optical` turns
   them off).
-- `bin/solid-gemc-run run <project>/<gcard> <source-dir>` is one whole run: gemc,
+- `bin/solid-gemc-run run study/<project>/<gcard> <source-dir>` is one whole run: gemc,
   `evio2root` with the GCard's detector banks, `config.json` and default plots.
-- `bin/solid-gemc-run analyze <project>/runs/<id>` re-plots a run with ROOT in the
+- `bin/solid-gemc-run analyze study/<project>/runs/<id>` re-plots a run with ROOT in the
   container: `hist_*.svg`, `plots.pdf` and a stats line per branch
   (`--python` makes uproot PNGs instead).
 

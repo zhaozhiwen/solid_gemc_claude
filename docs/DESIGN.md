@@ -68,7 +68,7 @@ on Codex), presents a plan, gates on user approval, and drives
 
 | Field | Example |
 |---|---|
-| Project name | `pvdis_ld2_aPV` (the `<name>/` subdir under the workspace root) |
+| Project name | `pvdis_ld2_aPV` (the study folder `study/<name>/` in the workspace) |
 | Physics goal | "PVDIS A_PV asymmetry vs Q²" |
 | SoLID config | "PVDIS, LD2 target, full magnet config" |
 | Beam | "11 GeV e⁻ on LD2, 10000 events" |

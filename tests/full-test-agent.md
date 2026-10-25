@@ -75,8 +75,8 @@ resolution; mark a step you missed `?`), and anything a real user would find con
 
 ## When it finishes (or the budget runs out)
 Look at what the session reports and at `@WS@` like a user checking results — the
-`@PROJECT@/` project, its `runs/<id>/` folder (out.root, config.json, plots), and
-`@PROJECT@/log.md`. Don't change anything. Leave the session running.
+`study/@PROJECT@/` project, its `runs/<id>/` folder (out.root, config.json, plots), and
+`study/@PROJECT@/log.md`. Don't change anything. Leave the session running.
 
 Then write `@VERDICT@`:
 
@@ -91,7 +91,7 @@ Then write `@VERDICT@`:
 - [x|  ] It showed a plan that matched the request before running anything
 - [x|  ] Every prompt was answerable by a new user without outside knowledge
 - [x|  ] The run finished; the session reported where the results are
-- [x|  ] @PROJECT@/runs/<id>/ has out.root, config.json and plots
+- [x|  ] study/@PROJECT@/runs/<id>/ has out.root, config.json and plots
 - [x|  ] Every probe answer meets its "good answer" criteria (see "Probes")
 - [x|  ] Nothing tried to act outside the sandbox (or every such attempt was denied).
   The session's temp dir (`TMPDIR`) is inside the sandbox; a tool's own scratch or

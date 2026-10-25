@@ -48,7 +48,7 @@ Initialize the solid_gemc workspace
 
 The agent says what setup will do, then downloads the ~1.7 GB container image (first time only; every workspace shares it), clones `solid_gemc` and builds it, reporting each step. On Codex, if it says the container was blocked, type `/permissions`, choose **Ask for approval**, then `continue`.
 
-**2. Run a study** in the same folder. A good first request is "Run the heavy-gas Cherenkov study on He-3, 100 events"; the agent shows a plan and waits for your approval. (Skip step 1 and your first study request offers to run the setup first.) Results land in `<project>/runs/<id>/` and `<project>/report.html`; the workspace's own `README.md` explains the rest. A bigger request, once that works:
+**2. Run a study** in the same folder. A good first request is "Run the heavy-gas Cherenkov study on He-3, 100 events"; the agent shows a plan and waits for your approval. (Skip step 1 and your first study request offers to run the setup first.) Results land in `study/<project>/runs/<id>/` and `study/<project>/report.html`; the workspace's own `README.md` explains the rest. A bigger request, once that works:
 
 ```text
 Learn the examples at solid_gemc repo "solid_gemc/analysis/hgc_study/" and "solid_gemc/geometry/hgc_moved/",
@@ -69,21 +69,21 @@ Init writes `bin/solid-gemc-run` into your workspace — a launcher that runs th
 
 ## Using your workspace
 
-Commands below run from the workspace root (`../bin/solid-gemc-run` from inside a
+Commands below run from the workspace root (`../../bin/solid-gemc-run` from inside a
 project). `bin/solid-gemc-run help` lists every command for the version you have
 installed.
 
 ### Running by hand
 
 ```sh
-bin/solid-gemc-run gcard <preset> <name> --events 1000   # copy a canonical GCard into <name>/
-bin/solid-gemc-run run <name>/<preset>.gcard <source-dir> # gemc → out.root → plots
-bin/solid-gemc-run analyze <name>/runs/<id>                # re-plot a run
+bin/solid-gemc-run gcard <preset> study/<name> --events 1000   # copy a canonical GCard into study/<name>/
+bin/solid-gemc-run run study/<name>/<preset>.gcard <source-dir> # gemc → out.root → plots
+bin/solid-gemc-run analyze study/<name>/runs/<id>                # re-plot a run
 ```
 
 `gcard` prints the `<source-dir>` to use: the upstream folder the GCard came
 from, because gemc finds detectors relative to the folder it runs in. Edit
-`<name>/<preset>.gcard` between the two steps to change beam, target or
+`study/<name>/<preset>.gcard` between the two steps to change beam, target or
 physics. `--no-optical` turns off optical-photon recording (faster, smaller
 output).
 
@@ -100,7 +100,7 @@ Other useful commands:
 | `bin/solid-gemc-run info` | Plugin version in use, container image and where it is cached, solid_gemc repo, gemc and apptainer versions. |
 | `bin/solid-gemc-run help` | All commands. |
 
-From inside a project folder use `../bin/solid-gemc-run`. The command works in a
+From inside a study folder use `../../bin/solid-gemc-run`. The command works in a
 plain terminal too, once an agent session has downloaded the container image.
 
 ### Your own detector
@@ -108,12 +108,12 @@ plain terminal too, once an agent session has downloaded the container image.
 Copy the pattern of `solid_gemc/geometry/hgc_moved/` into your project folder:
 Perl generators (`<sub>_geometry.pl`, `_materials.pl`, `_hit.pl`, …) plus a
 `config_<sub>.dat`, which produce the `.txt` files gemc reads. Regenerate them
-from `<name>/` with `../bin/solid-gemc-run exec "./<sub>.pl config_<sub>.dat"`.
+from `study/<name>/` with `../../bin/solid-gemc-run exec "./<sub>.pl config_<sub>.dat"`.
 
 Then run it with your project folder as gemc's run folder —
-`bin/solid-gemc-run run <name>/<gcard> <name>` from the workspace root, or
-`../bin/solid-gemc-run run <gcard> .` from inside it — point
-upstream detectors in the GCard at the clone (`name="../solid_gemc/geometry/…"`),
+`bin/solid-gemc-run run study/<name>/<gcard> study/<name>` from the workspace root, or
+`../../bin/solid-gemc-run run <gcard> .` from inside it — point
+upstream detectors in the GCard at the clone (`name="../../solid_gemc/geometry/…"`),
 and give your detector a new name so it can't be confused with an upstream one.
 
 ### Changing solid_gemc itself
@@ -140,13 +140,13 @@ inside this folder. To send it elsewhere, make a self-contained copy:
 
 ```sh
 ROOT=$(bin/solid-gemc-run paths | awk '/^root:/{print $2}')
-python3 "$ROOT/templates/embed_html.py" <name>/report.html   # writes report_portable.html
+python3 "$ROOT/templates/embed_html.py" study/<name>/report.html   # writes report_portable.html
 ```
 
 ### When something fails
 
-- **GCard error** → `bin/solid-gemc-run validate-gcard <name>/<gcard>`.
-- **Run failed** → read `<name>/runs/<id>/log.txt`; usually a volume, material or
+- **GCard error** → `bin/solid-gemc-run validate-gcard study/<name>/<gcard>`.
+- **Run failed** → read `study/<name>/runs/<id>/log.txt`; usually a volume, material or
   field setting.
 - **"Failed to open geometry file"** → gemc ran from the wrong folder; see "Your own detector" above.
 - **Missing `solid_gemc/source/2.9/solid_gemc`** → re-run `bin/solid-gemc-run init`.

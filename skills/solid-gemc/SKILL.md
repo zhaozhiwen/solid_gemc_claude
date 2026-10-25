@@ -58,9 +58,11 @@ At every step: consult the reference library (next section) — not just on fail
 
 The workspace root (where `init` ran, once and idempotently) holds init's files —
 `AGENTS.md`/`CLAUDE.md`, `README.md`, `.gitignore`, `log.md`, `result.md`,
-`report.html`, `bin/solid-gemc-run` — and the built `solid_gemc/`. Each study is a
-flat project subdir (no enforced subfolders) with its own rules and handoff
-documents. There is no bring-your-own binary: if the canonical configs don't fit,
+`report.html`, `bin/solid-gemc-run` — the built `solid_gemc/`, and `study/`, which
+holds one folder per study: `study/<name>/`, flat inside (no enforced subfolders),
+with its own rules and handoff documents. **Below, `<project>` always means the path
+`study/<name>`** (relative to the workspace root). There is no bring-your-own
+binary: if the canonical configs don't fit,
 the divergence point is **the GCard** — edit the closest canonical one, or
 hand-author one.
 
@@ -159,7 +161,7 @@ Write it at the very end (after `analyze`, or after the failure that stopped the
 flow). Exceptions (a) and (b) log a short entry instead: the request verbatim, the
 run id, the outcome. Debugging (c) and a Step 0 **Cancel** write nothing. Also add
 one line **at the top** of the workspace `log.md`, below its intro:
-`- YYYY-MM-DD — <project>: <one-line milestone> ([log](<project>/log.md))`.
+`- YYYY-MM-DD — <name>: <one-line milestone> ([log](<project>/log.md))`.
 
 ## Step 0 — Ensure the workspace is initialized (before anything else)
 
@@ -220,7 +222,7 @@ For each field: did the user give it, is a default safe, or must you ask?
 
 | Field | What it is | Example |
 |---|---|---|
-| **Project name** | The `<name>/` subdir for this study | `pvdis_ld2_aPV`, `sidis_he3_hgc` |
+| **Project name** | `<name>` of the study folder `study/<name>/` | `pvdis_ld2_aPV`, `sidis_he3_hgc` |
 | **Physics goal** | What's measured / counted | "PVDIS A_PV vs Q²", "HGC photoelectron yield vs Cherenkov radius" |
 | **SoLID config** | Magnet + spectrometer configuration | "PVDIS, LD2 target, full magnet config", "J/psi LH2 simple" |
 | **Beam** | Particle, energy, event count | "11 GeV e-, 10000 events" |
@@ -286,7 +288,7 @@ printed right before it (no GCard or file dumps), one line per option:
 ```
 Plan: <one-sentence description of the simulation>
 Project <name> · Config <SoLID config> · Beam <beam>
-Goal <physics goal> · Analysis <default plots | <name>.C macro | Python>
+Goal <physics goal> · Analysis <default plots | <macro>.C | Python>
 GCard <preset>, N=<n>, optical photons <on|off><, other overrides>
 Steps seed <project>/ (if new) → gcard<, edit: …> → run → <project>/runs/<id>/
 Notes <defaults you filled in; real risks — omit the line if none>
@@ -306,17 +308,19 @@ stop and report (see "Failure handling").
 **3a.** Re-run Step 0's check. If `init_needed=1`, stop and report — never re-run
 init mid-execution.
 
-**3b. Seed the project subdir if missing.**
+**3b. Seed the study folder if missing.**
 
 ```bash
-PROJECT='<resolved from spec>'   # single-quoted
+NAME='<project name from spec>'   # single-quoted
 # Fail-closed guard for the project name contract. Never weaken or skip.
-if ! printf '%s' "$PROJECT" | grep -Eq '^[A-Za-z0-9_][A-Za-z0-9._-]{0,63}$'; then
-  echo "[skill] refusing unsafe project name: '${PROJECT}'" >&2
+if ! printf '%s' "$NAME" | grep -Eq '^[A-Za-z0-9_][A-Za-z0-9._-]{0,63}$'; then
+  echo "[skill] refusing unsafe project name: '${NAME}'" >&2
   echo "[skill] must match ^[A-Za-z0-9_][A-Za-z0-9._-]{0,63}\$ (no /, .., whitespace, quotes, shell metachars, leading -)" >&2
   exit 1
 fi
+PROJECT="study/${NAME}"
 if [[ ! -d "$PROJECT" ]]; then
+  mkdir -p study
   cp -r "${SGC_ROOT}/templates/workspace/." "$PROJECT/"
   # Codex installs drop the CLAUDE.md -> AGENTS.md symlink; same content.
   [[ -f "$PROJECT/CLAUDE.md" ]] || cp "$PROJECT/AGENTS.md" "$PROJECT/CLAUDE.md"
@@ -356,7 +360,7 @@ relative to gemc's run folder.
 `run` checks the GCard (xmllint), freezes it into `<project>/runs/<id>/gcard.gcard`,
 runs gemc from the source dir, converts with `evio2root -R=flux -B=<banks>`
 (`-R=flux` keeps the flux detector's raw fields; `-B` lists every GCard detector
-with a `<name>__bank.txt` — without it those trees come out **empty**), writes
+with a `<detector>__bank.txt` — without it those trees come out **empty**), writes
 `config.json` (the provenance record: GCard, image, solid_gemc origin + commit,
 gemc version, events, times, exit codes, banks) and runs `analyze`. Don't
 re-implement any of this by hand — one command keeps one approval. For a GCard
@@ -380,14 +384,14 @@ line per numeric branch
 `hist_<tree>_<branch>.svg` plus `plots.pdf`, skips the `header`/`userHeader`
 trees, and reports an empty tree as "no hits recorded". Explain empty trees to the
 user: the GCard's detector trees are the banks named (first column) in the
-`<name>__bank.txt` files that `config.json` lists under `evio2root_banks`;
+`<detector>__bank.txt` files that `config.json` lists under `evio2root_banks`;
 `evio2root` also writes `flux`, `counter`, `mirror`, `rf`, `allraws`, `chargeTime`
 and `ancestors` on every run, and these stay empty unless the GCard has a detector
 of that type — say so plainly. Only an empty tree of a GCard detector is a finding:
 too few events for that acceptance, or a geometry problem. If every GCard detector
 tree is empty, the run produced no physics — say so. More
 plots: `"$SGC_RUN" analyze <run dir> <N>` (default 12). Asymmetries, fits,
-multi-run comparisons: a ROOT macro `<project>/<name>.C` run with
+multi-run comparisons: a ROOT macro `<project>/<macro>.C` run with
 `"$SGC_RUN" root <macro.C>` (save `.svg`/`.pdf`; the container's ROOT can't write
 PNG). Python only when the user asks: `"$SGC_RUN" analyze --python <run>`, or a
 uproot script with `<workspace-root>/venv/bin/python` after
@@ -432,7 +436,7 @@ Done.
 - Updated: <only the files actually touched, e.g. <project>/log.md, log.md>
 
 Next: <one concrete suggestion — vary the beam energy, scale up n_events,
-       try a different canonical config, run a custom <project>/<name>.C>
+       try a different canonical config, run a custom <project>/<macro>.C>
 ```
 
 ## References

@@ -2,7 +2,7 @@
 
 Cross-project results index. One section per project (or per
 cross-cutting finding). Keep it short — full per-run numbers and
-plot paths live in each project's `<project>/result.md`. This
+plot paths live in each study's `study/<name>/result.md`. This
 file is for **what's worth knowing across the workspace**:
 
 - Which projects produced shippable numbers.
@@ -11,7 +11,7 @@ file is for **what's worth knowing across the workspace**:
 
 ---
 
-## `<project>` — <one-line headline>
+## `<name>` — <one-line headline>
 
 <2-3 sentences. Key numbers. Link to the project's
-[`result.md`](<project>/result.md) for full detail.>
+[`result.md`](study/<name>/result.md) for full detail.>

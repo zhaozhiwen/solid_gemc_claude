@@ -12,11 +12,11 @@ for you.
 
 | Path | What it is |
 |---|---|
-| `<name>/` | One study (project) per folder, e.g. `pvdis_ld2/`, `sidis_he3_hgc/`. Created by the agent when you start a study. |
-| `<name>/log.md` | Every request you made, the plan, your decision, and the outcome — newest first. |
-| `<name>/result.md` | Key numbers and plot paths from runs worth keeping. |
-| `<name>/report.html` | A readable summary of the study; open it in a browser. |
-| `<name>/runs/<id>/` | One folder per run (`<id>` = UTC time + random suffix): the frozen `gcard.gcard`, `out.evio`, `out.root`, `log.txt`, `config.json`, and plots. Never edited after the run. |
+| `study/<name>/` | One study (project) per folder, e.g. `study/pvdis_ld2/`. Created by the agent when you start a study. |
+| `study/<name>/log.md` | Every request you made, the plan, your decision, and the outcome — newest first. |
+| `study/<name>/result.md` | Key numbers and plot paths from runs worth keeping. |
+| `study/<name>/report.html` | A readable summary of the study; open it in a browser. |
+| `study/<name>/runs/<id>/` | One folder per run (`<id>` = UTC time + random suffix): the frozen `gcard.gcard`, `out.evio`, `out.root`, `log.txt`, `config.json`, and plots. Never edited after the run. |
 | `solid_gemc/` | The SoLID GEMC source, cloned from JeffersonLab and built by `init`. Geometry, canonical GCards (`solid_gemc/script/`) and worked examples (`solid_gemc/analysis/`) live here. |
 | `bin/solid-gemc-run` | The command that runs everything (gemc, ROOT, conversion) inside the container. |
 | `venv/` | Optional Python environment for `analyze --python`; appears on first use. |

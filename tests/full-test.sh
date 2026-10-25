@@ -137,7 +137,7 @@ cmd_verify() {
   {
     echo "# ${MODE^} test — ${S}"; echo; echo "Source: ${SOURCE}"; echo
     for t in "${TOOLS[@]}"; do
-      ws="${S}/wsB-${t}"; run=$(ls -d "${ws}/${PROJECT}"/runs/*/ 2>/dev/null | head -1 || true)
+      ws="${S}/wsB-${t}"; run=$(ls -d "${ws}/study/${PROJECT}"/runs/*/ 2>/dev/null | head -1 || true)
       v="${S}/logs/verdict-${t}.md"
       local sif="${FH}/.${t}/plugins/data/${DATA_NAME}/cache/sif/${SIF_NAME}"
       echo "## ${t}"
@@ -154,7 +154,7 @@ cmd_verify() {
       check "run dir with gcard.gcard, out.evio, out.root, log.txt, config.json" \
             "[[ -n '${run}' ]] && for f in gcard.gcard out.evio out.root log.txt config.json; do [[ -s '${run}'\$f ]] || exit 1; done"
       check "analyze plots in the run dir" "[[ -n '${run}' ]] && [[ -s '${run}'plots.pdf ]] && ls '${run}'*.svg >/dev/null 2>&1"
-      check "request logged verbatim in ${PROJECT}/log.md" "grep -qF '${REQUEST}' '${ws}/${PROJECT}/log.md' 2>/dev/null"
+      check "request logged verbatim in study/${PROJECT}/log.md" "grep -qF '${REQUEST}' '${ws}/study/${PROJECT}/log.md' 2>/dev/null"
       check "subagent verdict OVERALL: PASS (${v##*/})" "grep -q '^OVERALL: PASS' '${v}' 2>/dev/null"
       echo; echo "### ${t} timeline (from the subagent)"
       awk '/^## Timeline/{f=1; next} /^## |^OVERALL/{f=0} f' "${v}" 2>/dev/null || true
