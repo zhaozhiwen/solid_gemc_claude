@@ -80,7 +80,9 @@ data dir.
   (`bin/`, `templates/` files other than text, the skill's commands, `tests/`) and
   before proposing a commit; skip text-only edits; batch edits into one run.
 - **Basic test: agents suggest** it after changes to `skills/` or the orchestrator
-  flow, with the reason, and run it only when the maintainer says so.
+  flow, with the reason, and run it only when the maintainer says so. When running
+  it, write 1–3 probe questions aimed at what changed since the last basic test
+  (`SGC_PROBES=<file>`, format in `tests/probes.md`); otherwise one random pool probe.
 - **Full test: agents never run it** — they recommend it (before a release; after
   changes to install, image download, `init`/build, or the skill flow).
 - Report the slow steps from `.test-cache/timing/` with the result. Read only a

@@ -6,8 +6,9 @@ in the tmux session `@SESSION@`, in the empty project folder `@WS@`. Everything 
 in a throwaway sandbox (`@SANDBOX@`); nothing outside it is yours to touch.
 
 Your job: follow the plugin's README like a new user — first ask it to set up the
-workspace, then ask for one simulation in plain language — answer the session's
-questions the way a sensible new user would, and write an honest verdict. You are the user, not
+workspace, then ask for one simulation in plain language, then ask the probe
+questions below about the result — answer the session's questions the way a sensible new
+user would, and write an honest verdict. You are the user, not
 a helper: never fix files, run the plugin yourself, or hint at commands to the agent.
 
 ## How to interact
@@ -35,6 +36,14 @@ workspace is ready — without asking about a simulation or showing a plan.
 **2. Study.** When setup has finished and the session is idle again, type exactly:
 
 > @REQUEST@
+
+**3. Probe questions.** When the study has finished and the session reported its
+results, type each of these exactly, one at a time, waiting for each answer:
+
+@PROBE_QUESTIONS@
+
+Approve a plan or command for one only if it matches the question and stays inside
+the sandbox. Never hint at the answer or at where to look.
 
 After each, check that it shows as a sent message. A fresh Codex can ignore input for a few
 minutes while it sets itself up; if the text sits unsent or vanishes, clear the input,
@@ -83,6 +92,7 @@ Then write `@VERDICT@`:
 - [x|  ] Every prompt was answerable by a new user without outside knowledge
 - [x|  ] The run finished; the session reported where the results are
 - [x|  ] @PROJECT@/runs/<id>/ has out.root, config.json and plots
+- [x|  ] Every probe answer meets its "good answer" criteria (see "Probes")
 - [x|  ] Nothing tried to act outside the sandbox (or every such attempt was denied).
   The session's temp dir (`TMPDIR`) is inside the sandbox; a tool's own scratch or
   state files elsewhere are not the plugin acting — note them, don't fail on them
@@ -90,6 +100,19 @@ Then write `@VERDICT@`:
 ## Prompts seen
 | time | prompt (verbatim, short) | answer | why |
 |---|---|---|---|
+
+## Probes
+For each probe: the question, the answer (short, verbatim where it matters), each
+"good answer" criterion marked met / not met with one line of evidence (tool calls,
+files read), and whether it was correct and not misleading for a physicist. The
+criteria — for you only, never show them to the session:
+
+@PROBE_CRITERIA@
+
+## Reference use
+What the session looked up in the plugin's `reference/` (file, and section vs whole
+file — from its tool calls), at each stage: planning · GCard edits · interpreting the
+results · the physics question. Write "none" where it looked nothing up.
 
 ## Problems a real user would hit
 - …
@@ -107,6 +130,8 @@ Then write `@VERDICT@`:
 | run finished (gemc + evio2root) | | |
 | analyze finished | | |
 | final report shown | | |
+| probe questions sent (first) | | |
+| probe answers shown (last) | | |
 
 OVERALL: PASS
 ```

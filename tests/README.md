@@ -99,7 +99,8 @@ A real user's first session in each tool, with none of the quick test's shortcut
 published install, real download and build, Claude Code's default permission mode,
 Codex's default sandbox and approvals, nothing pre-trusted. A fresh subagent per tool
 plays a new user (`tests/full-test-agent.md`) following the README: it first asks to
-"Initialize the solid_gemc workspace", then types one plain-language study request,
+"Initialize the solid_gemc workspace", then types one plain-language study request
+and, after the run, the **probe questions** (below),
 answers every prompt as a sensible user would — approving the plan only
 if it matches the request, approving Codex escalations only for this study's commands
 inside the sandbox — and writes a verdict listing every prompt it saw.
@@ -131,6 +132,16 @@ tests/full-test.sh cleanup <dir>         # stops sessions + sandbox processes; S
 - If the image host (personal Duke webhome, no SLA) is down, the test fails at the
   download — what a real user would hit. There is no fallback.
 - Read only `summary.md`; triage a FAIL with a fresh subagent on `<dir>/logs/`.
+
+## Probe questions
+
+After the study, each tester asks probe questions and judges every answer against
+criteria the session never sees (correct, not misleading, looked up in the plugin's
+`reference/` where expected). `tests/probes.md` is the default pool; `setup` picks
+one at random. To test a specific change, write 1–3 probes aimed at it (same format:
+`## <question>` + `- <criterion>` bullets) and run
+`SGC_PROBES=<file> tests/basic-test.sh setup` — all of them are asked. The chosen
+probes are in `<sandbox>/probes.md`; their results land in `summary.md`.
 
 ## Not covered yet
 Behaviors already in the plugin that no test checks:

@@ -51,6 +51,16 @@ cmd_setup() {
     unset SGC_UV_CACHE; budget=75   # a real first run: fresh downloads, no test cache
   fi
   new_sandbox "sgc-${MODE}"
+  # Probe questions asked after the study: $SGC_PROBES (written for this run's
+  # change) or one random probe from tests/probes.md.
+  python3 - "${SGC_PROBES:-${PLUGIN_ROOT}/tests/probes.md}" "${SGC_PROBES:+all}" \
+      > "${SCRATCH}/probes.md" <<'PY' || fail "no probes in ${SGC_PROBES:-tests/probes.md}"
+import random, re, sys
+blocks = re.findall(r'^## .*?(?=^## |\Z)', open(sys.argv[1]).read(), re.M | re.S)
+if not blocks: sys.exit(1)
+pick = blocks if sys.argv[2] == "all" else [random.choice(blocks)]
+print("\n".join(b.strip() + "\n" for b in pick), end="")
+PY
   timing_start "${PLUGIN_ROOT}" "$(basename "${SCRATCH}")"
   # A successful setup must leave the sessions (and the Codex daemon) running for
   # the subagents; only a failed setup stops them.
@@ -99,11 +109,16 @@ cmd_setup() {
         -e "s|@WS@|${ws}|g" -e "s|@REQUEST@|${request}|g" -e "s|@PROJECT@|${project}|g" \
         -e "s|@BUDGET@|${budget}|g" \
         -e "s|@VERDICT@|${SCRATCH}/logs/verdict-${t}.md|g" \
-        "${PLUGIN_ROOT}/tests/full-test-agent.md" > "${SCRATCH}/agent-${t}.md"
+        "${PLUGIN_ROOT}/tests/full-test-agent.md" \
+      | python3 -c 'import re,sys; p=open(sys.argv[1]).read(); q=re.findall(r"^## (.*)$",p,re.M)
+t=sys.stdin.read().replace("@PROBE_QUESTIONS@","\n".join(f"> {x}\n" for x in q).rstrip())
+sys.stdout.write(t.replace("@PROBE_CRITERIA@",p.rstrip().replace("## ","### ")))' "${SCRATCH}/probes.md" \
+      > "${SCRATCH}/agent-${t}.md"
     pass "${t}: session ${name} started in ${ws}; agent prompt ${SCRATCH}/agent-${t}.md"
   done
   printf 'MODE=%q\nROOT=%q\nSOURCE=%q\nPROJECT=%q\nREQUEST=%q\nTIMING=%q\n' \
     "${MODE}" "${root}" "${src}" "${project}" "${request}" "${TIMING_FILE}" > "${SCRATCH}/state.env"
+  log "probes ($(grep -c '^## ' "${SCRATCH}/probes.md")): $(sed -n 's/^## //p' "${SCRATCH}/probes.md" | paste -sd'|')"
 
   log "setup done — ${N_PASS} pass, ${N_KFAIL} known-fail, ${SECONDS}s"
   echo "Step timing: ${TIMING_FILE}"
@@ -143,6 +158,8 @@ cmd_verify() {
       check "subagent verdict OVERALL: PASS (${v##*/})" "grep -q '^OVERALL: PASS' '${v}' 2>/dev/null"
       echo; echo "### ${t} timeline (from the subagent)"
       awk '/^## Timeline/{f=1; next} /^## |^OVERALL/{f=0} f' "${v}" 2>/dev/null || true
+      echo "### ${t} probes and reference use (from the subagent)"
+      awk '/^## (Probes|Reference use)/{f=1} /^## (Problems|Timeline)/{f=0} /^OVERALL/{f=0} f' "${v}" 2>/dev/null || true
       echo
     done
     echo "## isolation"
