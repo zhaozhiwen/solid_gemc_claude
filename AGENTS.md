@@ -5,7 +5,7 @@ is the one-line import `@AGENTS.md` for Claude Code, here and in `templates/`.
 
 ## Repo state
 
-v0.0.11, dual-platform (Claude Code + Codex CLI). No slash commands and no hooks:
+v0.0.12, dual-platform (Claude Code + Codex CLI). No slash commands and no hooks:
 the `solid-gemc` skill (auto-loads on SoLID-flavored natural language) drives
 `bin/solid-gemc-run`; `bin/solid-gemc-run help` lists its subcommands.
 
