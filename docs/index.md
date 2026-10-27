@@ -48,7 +48,7 @@ Initialize the solid_gemc workspace
 
 The agent says what setup will do, then downloads the ~1.7 GB container image (first time only; every workspace shares it), clones `solid_gemc` and builds it, reporting each step. On Codex, if it says the container was blocked, type `/permissions`, choose **Ask for approval**, then `continue`.
 
-**2. Run a study** in the same folder. A good first request is "Run the heavy-gas Cherenkov study on He-3, 100 events"; the agent shows a plan and waits for your approval. (Skip step 1 and your first study request offers to run the setup first.) Results land in `study/<project>/runs/<id>/` and `study/<project>/report.html`; the workspace's own `README.md` explains the rest. A bigger request, once that works:
+**2. Run a study** in the same folder. A good first request is "Run the heavy-gas Cherenkov study on He-3, 100 events"; the agent shows a plan and waits for your approval. (Skip step 1 and your first study request offers to run the setup first.) Results land in `study/<name>/runs/<id>/` and `study/<name>/report.html`; the workspace's own `README.md` explains the rest. A bigger request, once that works:
 
 ```text
 Learn the examples at solid_gemc repo "solid_gemc/analysis/hgc_study/" and "solid_gemc/geometry/hgc_moved/",
@@ -65,7 +65,7 @@ Setup (`bin/solid-gemc-run init`) runs once per workspace: pull the `.sif`, clon
 | `solid_gemc/analysis/hgc_study/` | the **config + run + analyze** pipeline — GCards, batch run scripts, ROOT analysis macros |
 | `solid_gemc/geometry/hgc_moved/` | **custom detector authoring** — Perl generators, the factory text files they emit, and the GCard wiring |
 
-Init writes `bin/solid-gemc-run` into your workspace — a launcher that runs the newest installed plugin wrapper, from the agent or a plain terminal (a terminal uses an already-downloaded image; it never downloads one). `bin/solid-gemc-run run <project>/<gcard> <source-dir>` is one whole run (gemc, `evio2root` with the GCard's detector banks, `config.json`, plots); `bin/solid-gemc-run analyze <project>/runs/<id>` re-plots the post-converted `out.root` with ROOT in the container (SVG + `plots.pdf` + per-branch stats; `--python` for host uproot PNGs). `bin/solid-gemc-run shell` drops you into a tcsh prompt with the env exported, to follow upstream's scripts directly.
+Init writes `bin/solid-gemc-run` into your workspace — a launcher that runs the newest installed plugin wrapper, from the agent or a plain terminal (a terminal uses an already-downloaded image; it never downloads one). `bin/solid-gemc-run run study/<name>/<gcard> <source-dir>` is one whole run (gemc, `evio2root` with the GCard's detector banks, `config.json`, plots); `bin/solid-gemc-run analyze study/<name>/runs/<id>` re-plots the post-converted `out.root` with ROOT in the container (SVG + `plots.pdf` + per-branch stats; `--python` for host uproot PNGs). `bin/solid-gemc-run shell` drops you into a tcsh prompt with the env exported, to follow upstream's scripts directly.
 
 ## Using your workspace
 
