@@ -1,9 +1,10 @@
-# CLAUDE.md — project rules
+# AGENTS.md — project rules
 
 Rules for the agent (Claude Code or Codex) inside one study folder
 (`study/<name>/`) of a solid_gemc workspace. The workspace rules in
-`../../AGENTS.md` (same as `../../CLAUDE.md`) apply too — read them. From this
-folder the launcher is `../../bin/solid-gemc-run`.
+`../../AGENTS.md` apply too — read them. From this folder the launcher is
+`../../bin/solid-gemc-run`. To add a rule for this study, edit this file only:
+`CLAUDE.md` here is just the import `@AGENTS.md`, so both tools read it.
 
 ## Layout
 

@@ -1,7 +1,7 @@
-# CLAUDE.md
+# AGENTS.md
 
-Maintainer rules for this repository (Claude Code reads `CLAUDE.md`, Codex reads
-`AGENTS.md`; same file).
+Maintainer rules for this repository. Edit `AGENTS.md` (Codex reads it); `CLAUDE.md`
+is the one-line import `@AGENTS.md` for Claude Code, here and in `templates/`.
 
 ## Repo state
 

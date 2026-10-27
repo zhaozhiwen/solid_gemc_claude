@@ -5,8 +5,8 @@ plugin. You describe a study in plain language to your agent (Claude Code or
 Codex); it plans the run, asks for your approval, then runs SoLID GEMC in a
 container and plots the result. Everything is recorded in this folder.
 
-`AGENTS.md` / `CLAUDE.md` are the rules your agent follows here; this README is
-for you.
+`AGENTS.md` holds the rules your agent follows here (`CLAUDE.md` only imports it for
+Claude Code, so edit `AGENTS.md`); this README is for you.
 
 ## What's here
 

@@ -164,7 +164,8 @@ Behaviors already in the plugin that no test checks:
   skill whose description has an unquoted `: ` or is over 1024 characters), plus the
   skill body: no `$<digit>` (Claude Code substitutes request words) and only the plain
   `${CLAUDE_PLUGIN_ROOT}` form.
-- `lint-agents-mirror.sh` — every shipped `CLAUDE.md` is a symlink to a real `AGENTS.md`.
+- `lint-agents-mirror.sh` — every shipped `CLAUDE.md` is the one-line import `@AGENTS.md`
+  next to a real `AGENTS.md`.
 - `bash -n` on the shell scripts; `py_compile` on the Python.
 
 ## Files

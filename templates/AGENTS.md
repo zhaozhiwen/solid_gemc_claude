@@ -1,8 +1,10 @@
-# CLAUDE.md — solid_gemc workspace
+# AGENTS.md — solid_gemc workspace
 
 Rules for the agent (Claude Code or Codex) in this solid_gemc simulation
 workspace, made by the `solid-gemc-claude` plugin. This file holds only rules,
-which rarely change. How to do things lives where it updates with the plugin:
+which rarely change; add a rule here, not in `CLAUDE.md` (that is just the import
+`@AGENTS.md`, so both tools read this file). How to do things lives where it
+updates with the plugin:
 
 - **Simulation requests** — the `solid-gemc` skill (spec → plan → approval → run →
   analyze); let it drive.

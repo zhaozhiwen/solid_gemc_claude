@@ -19,9 +19,9 @@ jobs:
         # YAML parser rejects (and Claude silently tolerates). See BUILD_LOG
         # Phase 19 for the original incident.
         run: python3 tests/lint-skill-frontmatter.py
-      - name: AGENTS.md must mirror CLAUDE.md (real files, not symlinks)
-        # codex plugin add drops symlinks, so AGENTS.md are real copies; this
-        # guards against drift. See BUILD_LOG Phase 19.
+      - name: CLAUDE.md must be the one-line import of AGENTS.md
+        # One rules source per folder for both tools; a plain file survives
+        # codex plugin add (which drops symlinks).
         run: tests/lint-agents-mirror.sh
 
   shell-syntax:

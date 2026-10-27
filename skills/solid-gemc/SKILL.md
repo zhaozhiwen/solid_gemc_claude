@@ -322,8 +322,6 @@ PROJECT="study/${NAME}"
 if [[ ! -d "$PROJECT" ]]; then
   mkdir -p study
   cp -r "${SGC_ROOT}/templates/workspace/." "$PROJECT/"
-  # Codex installs drop the CLAUDE.md -> AGENTS.md symlink; same content.
-  [[ -f "$PROJECT/CLAUDE.md" ]] || cp "$PROJECT/AGENTS.md" "$PROJECT/CLAUDE.md"
 fi
 ```
 

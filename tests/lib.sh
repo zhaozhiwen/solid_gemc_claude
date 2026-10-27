@@ -71,8 +71,10 @@ on_exit() {
 REAL_STATE=("${HOME}/.claude/plugins/installed_plugins.json"
             "${HOME}/.claude/plugins/known_marketplaces.json"
             "${HOME}/.codex/config.toml")
+# Only this plugin's lines: the tools rewrite these files on their own (the Codex
+# app refreshes config.toml), which says nothing about the test leaking.
 state_sum() { local f; for f in "${REAL_STATE[@]}"; do
-  [[ -f "${f}" ]] && sha256sum "${f}" || echo "absent ${f}"; done; }
+  [[ -f "${f}" ]] && echo "${f}: $(grep -i 'solid-gemc' "${f}" | sha256sum)" || echo "absent ${f}"; done; }
 
 # --- install ----------------------------------------------------------------
 # install_plugin <marketplace-source>: a local dir or a GitHub owner/repo, added
@@ -286,9 +288,9 @@ scripted_run() {
   for f in CLAUDE.md AGENTS.md README.md .gitignore log.md result.md report.html; do
     [[ -f "${ws}/${f}" ]] || fail "${t}: workspace ${f} missing after init"
   done
-  cmp -s "${ws}/CLAUDE.md" "${ws}/AGENTS.md" || fail "${t}: workspace CLAUDE.md differs from AGENTS.md"
+  [[ "$(cat "${ws}/CLAUDE.md")" == "@AGENTS.md" ]] || fail "${t}: workspace CLAUDE.md is not the @AGENTS.md import"
   [[ -d "${ws}/study" ]] || fail "${t}: init did not create study/"
-  pass "${t}: init wrote the workspace files incl. CLAUDE.md (= AGENTS.md) and study/"
+  pass "${t}: init wrote the workspace files incl. CLAUDE.md (@AGENTS.md) and study/"
   [[ -x "${L}" ]] || fail "${t}: init wrote no executable bin/solid-gemc-run"
   [[ -e "${ws}/cache" ]] && fail "${t}: a cache/ dir appeared in the workspace"
   pass "${t}: launcher written, no workspace cache/"
@@ -340,9 +342,10 @@ scripted_run() {
   # dir, evio2root -R=flux -B=<banks>, config.json, analyze.
   local root proj=study/quick_${t} OUT DEST SOURCE_DIR RUN_DIR
   root=$( iso "${v}" "${L}" paths | awk '/^root:/{print $2}' )
-  ( cd "${ws}" && cp -r "${root}/templates/workspace/." "${proj}/" \
-      && { [[ -f "${proj}/CLAUDE.md" ]] || cp "${proj}/AGENTS.md" "${proj}/CLAUDE.md"; } )
+  ( cd "${ws}" && cp -r "${root}/templates/workspace/." "${proj}/" )
   [[ -f "${ws}/${proj}/log.md" ]] || fail "${t}: project not seeded from the installed templates"
+  [[ "$(cat "${ws}/${proj}/CLAUDE.md" 2>/dev/null)" == "@AGENTS.md" && -f "${ws}/${proj}/AGENTS.md" ]] \
+    || fail "${t}: project CLAUDE.md is not the @AGENTS.md import (or AGENTS.md is missing)"
   OUT=$( cd "${ws}" && iso "${v}" "${L}" gcard cherenkov "${proj}" --events 2 2>"${SCRATCH}/logs/scripted-${t}-gcard.log" ) \
     || fail "${t}: gcard failed; see logs/scripted-${t}-gcard.log"
   DEST=$(awk '/^gcard: /{print $2}' <<<"${OUT}"); SOURCE_DIR=$(awk '/^source dir: /{print $3}' <<<"${OUT}")
