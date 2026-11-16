@@ -42,6 +42,6 @@ it. After the run it reports the run folder, the plots, and updates `log.md`.
 
 - How to run things by hand, your own detector, changing solid_gemc, sharing a
   report, troubleshooting, updating:
-  <https://zhaozhiwen.github.io/solid_gemc_claude/#using-your-workspace>
+  <https://github.com/zhaozhiwen/solid_gemc_claude#using-your-workspace>
 - Every command for the installed version: `bin/solid-gemc-run help`; the version
   in use: `bin/solid-gemc-run info`.

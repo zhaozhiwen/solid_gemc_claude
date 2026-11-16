@@ -12,7 +12,7 @@ analysis runs on that ROOT inside the container (host-side
 > platform-neutral wrapper (`bin/solid-gemc-run`) and one skill, identical on
 > both tools.
 
-**Docs site:** [zhaozhiwen.github.io/solid_gemc_claude](https://zhaozhiwen.github.io/solid_gemc_claude/) (install + quickstart + two demo run reports).
+**Docs site:** [zhaozhiwen.github.io/solid_gemc_claude](https://zhaozhiwen.github.io/solid_gemc_claude/) (overview, install, demo run reports).
 
 > **Status: v0.0.12.** Dual-platform (Claude Code + Codex CLI). The
 > orchestrator skill drives the full simulation loop through the wrapper. See
@@ -112,10 +112,6 @@ then drives the whole run through `bin/solid-gemc-run` (bootstrap
 the workspace, pick + edit a GCard, run `solid_gemc`, convert EVIO → ROOT,
 record provenance, plot). Works the same on Claude Code and Codex CLI.
 
-Setup is `bin/solid-gemc-run init` (step 1 of "First run"): download the image,
-clone solid_gemc, build it, and write the workspace files. A study request in a
-folder that isn't set up asks you before running it.
-
 Two upstream worked examples live in your workspace after init, both fully self-contained:
 
 | Example | What it teaches |
@@ -123,36 +119,115 @@ Two upstream worked examples live in your workspace after init, both fully self-
 | `solid_gemc/analysis/hgc_study/` | the **config + run + analyze** pipeline — GCards (`cherenkov.gcard`, `solid_SIDIS_He3_hgc.gcard`, …), batch run scripts (`load.sh` / `run.sh`), ROOT analysis (`analysis.C` and the `compare_*.C` scripts) |
 | `solid_gemc/geometry/hgc_moved/` | **custom detector authoring** — Perl generators (`solid_SIDIS_hgc_*.pl`), the resulting factory text files (`*__geometry_Original.txt` etc.) referenced by `<detector name="..." factory="TEXT" ...>`, plus a `readme.md` |
 
-Init also writes `bin/solid-gemc-run` into your workspace: a small launcher that runs the newest installed plugin wrapper, so the commands below work from the workspace root (`../bin/solid-gemc-run` from a project subdir), in the agent or a plain terminal. A plain terminal uses an image an agent session already downloaded; it never downloads one itself.
+Init also writes `bin/solid-gemc-run` into your workspace: a small launcher that
+runs the newest installed plugin wrapper, from the agent or a plain terminal. A plain
+terminal uses an image an agent session already downloaded; it never downloads one.
 
-- `bin/solid-gemc-run gcard <preset> study/<project> --events N` copies a GCard into a
-  project with the batch options set (optical photons on; `--no-optical` turns
-  them off).
-- `bin/solid-gemc-run run study/<project>/<gcard> <source-dir>` is one whole run: gemc,
-  `evio2root` with the GCard's detector banks, `config.json` and default plots.
-- `bin/solid-gemc-run analyze study/<project>/runs/<id>` re-plots a run with ROOT in the
-  container: `hist_*.svg`, `plots.pdf` and a stats line per branch
-  (`--python` makes uproot PNGs instead).
+## Using your workspace
 
-`bin/solid-gemc-run shell` drops you into a tcsh prompt with the env
-exported (`SoLID_GEMC`, `GEMC`, `PATH`, `LD_LIBRARY_PATH`) so you can
-follow upstream's scripts directly. For HGC: `cd solid_gemc/analysis/hgc_study`,
-then `./run.sh`. For detector authoring: edit the `.pl` in
-`solid_gemc/geometry/hgc_moved/`, regenerate, run gemc against your new
-detector.
+Commands below run from the workspace root (`../../bin/solid-gemc-run` from inside a
+project). `bin/solid-gemc-run help` lists every command for the version you have
+installed.
 
-**The `solid_gemc/` clone is for reading and running.** It comes from
-[JeffersonLab/solid_gemc](https://github.com/JeffersonLab/solid_gemc), which
-accepts changes only as fork → pull request. To keep or submit changes, point
-the clone at your fork; the docs site has the commands
-("Changing solid_gemc itself" under [Using your workspace](https://zhaozhiwen.github.io/solid_gemc_claude/#using-your-workspace)).
-Init reuses an existing clone, so it never overwrites your work.
+### Running by hand
+
+```sh
+bin/solid-gemc-run gcard <preset> study/<name> --events 1000   # copy a canonical GCard into study/<name>/
+bin/solid-gemc-run run study/<name>/<preset>.gcard <source-dir> # gemc → out.root → plots
+bin/solid-gemc-run analyze study/<name>/runs/<id>                # re-plot a run
+```
+
+`gcard` prints the `<source-dir>` to use: the upstream folder the GCard came
+from, because gemc finds detectors relative to the folder it runs in. Edit
+`study/<name>/<preset>.gcard` between the two steps to change beam, target or
+physics. `--no-optical` turns off optical-photon recording (faster, smaller
+output).
+
+Plots are SVG plus a combined `plots.pdf` (the container's ROOT can't write PNG).
+For PNGs from host Python: `bin/solid-gemc-run analyze --python <run>`.
+
+Other useful commands:
+
+| Command | Does |
+|---|---|
+| `bin/solid-gemc-run root <macro.C>` | Run your own ROOT macro in the container; no ROOT install needed. With arguments, quote the call once for your shell: `bin/solid-gemc-run root 'm.C("out.root")'`. |
+| `bin/solid-gemc-run shell` | Interactive shell (tcsh) in the container, e.g. to follow upstream's `run.sh`. |
+| `bin/solid-gemc-run validate-gcard <file>` | Check a GCard for XML errors. |
+| `bin/solid-gemc-run info` | Plugin version in use, container image and where it is cached, solid_gemc repo, gemc and apptainer versions. |
+| `bin/solid-gemc-run help` | All commands. |
+
+From inside a study folder use `../../bin/solid-gemc-run`. The command works in a
+plain terminal too, once an agent session has downloaded the container image.
+
+### Your own detector
+
+Copy the pattern of `solid_gemc/geometry/hgc_moved/` into your project folder:
+Perl generators (`<sub>_geometry.pl`, `_materials.pl`, `_hit.pl`, …) plus a
+`config_<sub>.dat`, which produce the `.txt` files gemc reads. Regenerate them
+from `study/<name>/` with `../../bin/solid-gemc-run exec "./<sub>.pl config_<sub>.dat"`.
+
+Then run it with your project folder as gemc's run folder —
+`bin/solid-gemc-run run study/<name>/<gcard> study/<name>` from the workspace root, or
+`../../bin/solid-gemc-run run <gcard> .` from inside it — point
+upstream detectors in the GCard at the clone (`name="../../solid_gemc/geometry/…"`),
+and give your detector a new name so it can't be confused with an upstream one.
+
+### Changing solid_gemc itself
+
+`solid_gemc/` is a clone of JeffersonLab's repository, which accepts changes only
+as a pull request from a fork. Before editing files there that you want to keep,
+fork JeffersonLab/solid_gemc on GitHub and point the clone at your fork:
+
+```sh
+git -C solid_gemc remote rename origin upstream
+git -C solid_gemc remote add origin https://github.com/<you>/solid_gemc.git
+git -C solid_gemc switch -c <topic>      # work here, then push and open a PR
+git -C solid_gemc pull upstream master   # stay in sync with JeffersonLab
+bin/solid-gemc-run build solid_gemc      # rebuild after pulling or editing
+```
+
+Don't delete `solid_gemc/` once it holds your work. Each run's `config.json`
+records the clone's URL and commit, so results stay traceable.
+
+### Sharing a report
+
+`report.html` shows plots from `runs/` by relative path, so it only renders
+inside this folder. To send it elsewhere, make a self-contained copy:
+
+```sh
+ROOT=$(bin/solid-gemc-run paths | awk '/^root:/{print $2}')
+python3 "$ROOT/templates/embed_html.py" study/<name>/report.html   # writes report_portable.html
+```
+
+### When something fails
+
+- **GCard error** → `bin/solid-gemc-run validate-gcard study/<name>/<gcard>`.
+- **Run failed** → read `study/<name>/runs/<id>/log.txt`; usually a volume, material or
+  field setting.
+- **"Failed to open geometry file"** → gemc ran from the wrong folder; see "Your own detector" above.
+- **Missing `solid_gemc/source/2.9/solid_gemc`** → re-run `bin/solid-gemc-run init`.
+- **Image missing** (`info` shows `[not pulled]`, or `unresolved` in a plain
+  terminal) → ask your agent to run `bin/solid-gemc-run pull`; a plain terminal
+  never downloads it.
 
 ## Updating
 
-Update the plugin in Claude Code or Codex and start a new session; existing
-workspaces need nothing (their launcher runs the newest installed plugin). Commands:
-[Updating](https://zhaozhiwen.github.io/solid_gemc_claude/#updating).
+Update the plugin, then start a new agent session:
+
+- Claude Code, in a session: `/plugin` → **Marketplaces** → `solid-gemc-claude` →
+  **Update marketplace** (refreshes it and updates the plugin). In a terminal:
+  `claude plugin marketplace update solid-gemc-claude`, then
+  `claude plugin update solid-gemc-claude@solid-gemc-claude`. The new version loads in
+  your next session (or after `/reload-plugins`). Automatic updates are off by default
+  for this marketplace; turn them on in the same menu with **Enable auto-update**.
+- Codex CLI: `codex plugin marketplace upgrade` — it refreshes the marketplace and
+  updates the installed plugin (the old version is removed).
+
+Existing workspaces need nothing: their `bin/solid-gemc-run` always runs the newest
+installed plugin, and the files `init` copied hold only rules that rarely change.
+`bin/solid-gemc-run info` shows the version in use. Re-run `init` only when a
+release note says so; it never touches your projects or runs.
+
 
 ## Testing (maintainers)
 
